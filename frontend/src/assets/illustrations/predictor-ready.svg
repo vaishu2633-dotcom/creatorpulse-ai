@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" fill="none">
+  <!-- Friendly Predictor Ready Illustration -->
+  <defs>
+    <linearGradient id="predBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5B5BD6" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#8B5CF6" stop-opacity="0.04"/>
+    </linearGradient>
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5B5BD6"/>
+      <stop offset="100%" stop-color="#14B8A6"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="320" height="240" rx="20" fill="url(#predBg)"/>
+
+  <!-- Concentric Target Radar / Launchpad -->
+  <circle cx="160" cy="120" r="80" stroke="#CBD5E1" stroke-width="1.5" stroke-dasharray="4 6" opacity="0.6"/>
+  <circle cx="160" cy="120" r="55" stroke="#CBD5E1" stroke-width="1.5" opacity="0.8"/>
+  <circle cx="160" cy="120" r="32" fill="#FFFFFF" stroke="url(#ringGrad)" stroke-width="3" filter="drop-shadow(0 6px 12px rgba(91,91,214,0.15))"/>
+
+  <!-- Center Target Rocket / Spark -->
+  <path d="M160 102 C154 108, 150 118, 150 126 L154 128 L154 135 L160 132 L166 135 L166 128 L170 126 C170 118, 166 108, 160 102 Z" fill="#5B5BD6"/>
+  <circle cx="160" cy="118" r="3" fill="#FFFFFF"/>
+  <path d="M157 135 L160 142 L163 135 Z" fill="#F97316"/>
+
+  <!-- Floating Satellites / Indicator Badges -->
+  <g transform="translate(65, 45)">
+    <rect width="64" height="28" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" filter="drop-shadow(0 4px 8px rgba(0,0,0,0.04))"/>
+    <circle cx="14" cy="14" r="5" fill="#14B8A6"/>
+    <rect x="25" y="11" width="28" height="6" rx="3" fill="#64748B"/>
+  </g>
+
+  <g transform="translate(195, 40)">
+    <rect width="70" height="28" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" filter="drop-shadow(0 4px 8px rgba(0,0,0,0.04))"/>
+    <circle cx="15" cy="14" r="5" fill="#F97316"/>
+    <rect x="26" y="11" width="32" height="6" rx="3" fill="#64748B"/>
+  </g>
+
+  <g transform="translate(125, 185)">
+    <rect width="72" height="28" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" filter="drop-shadow(0 4px 8px rgba(0,0,0,0.04))"/>
+    <circle cx="15" cy="14" r="5" fill="#5B5BD6"/>
+    <rect x="26" y="11" width="34" height="6" rx="3" fill="#64748B"/>
+  </g>
+
+  <!-- Stars -->
+  <path d="M70 145 Q72 138 74 145 Q81 147 74 149 Q72 156 70 149 Q63 147 70 145 Z" fill="#F59E0B"/>
+  <path d="M255 140 Q257 134 259 140 Q265 142 259 144 Q257 150 255 144 Q249 142 255 140 Z" fill="#8B5CF6"/>
+</svg>

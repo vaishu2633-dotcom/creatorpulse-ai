@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" fill="none">
+  <!-- Friendly Content Studio Illustration -->
+  <defs>
+    <linearGradient id="studioBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14B8A6" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#5B5BD6" stop-opacity="0.05"/>
+    </linearGradient>
+    <linearGradient id="pageGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#F8FAFC"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="320" height="240" rx="20" fill="url(#studioBg)"/>
+
+  <!-- Writing Notebook Canvas -->
+  <g transform="translate(100, 50)">
+    <rect width="120" height="150" rx="12" fill="url(#pageGrad)" stroke="#CBD5E1" stroke-width="2" filter="drop-shadow(0 10px 20px rgba(0,0,0,0.06))"/>
+    
+    <!-- Notebook lines -->
+    <line x1="20" y1="35" x2="100" y2="35" stroke="#E2E8F0" stroke-width="3" stroke-linecap="round"/>
+    <line x1="20" y1="55" x2="85" y2="55" stroke="#E2E8F0" stroke-width="3" stroke-linecap="round"/>
+    <line x1="20" y1="75" x2="95" y2="75" stroke="#E2E8F0" stroke-width="3" stroke-linecap="round"/>
+    <line x1="20" y1="95" x2="70" y2="95" stroke="#E2E8F0" stroke-width="3" stroke-linecap="round"/>
+    
+    <!-- Highlighted hook banner -->
+    <rect x="18" y="115" width="84" height="22" rx="6" fill="#EDE9FE"/>
+    <rect x="26" y="123" width="50" height="6" rx="3" fill="#5B5BD6"/>
+  </g>
+
+  <!-- Glowing Idea Bulb on top -->
+  <g transform="translate(142, 18)">
+    <circle cx="18" cy="18" r="18" fill="#FEF3C7" filter="drop-shadow(0 4px 10px rgba(245,158,11,0.25))"/>
+    <path d="M14 18 C14 15, 16 12, 18 12 C20 12, 22 15, 22 18 C22 20, 20 21, 20 23 L16 23 C16 21, 14 20, 14 18 Z" fill="#D97706"/>
+    <rect x="16" y="24" width="4" height="2" fill="#B45309"/>
+    <!-- Radiance rays -->
+    <line x1="18" y1="4" x2="18" y2="8" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
+    <line x1="6" y1="18" x2="10" y2="18" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
+    <line x1="26" y1="18" x2="30" y2="18" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
+  </g>
+
+  <!-- Cute Coffee Mug on left -->
+  <g transform="translate(50, 125)">
+    <rect width="28" height="34" rx="6" fill="#F87171"/>
+    <path d="M28 13 C34 13, 34 25, 28 25" stroke="#F87171" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <!-- Steam -->
+    <path d="M8 8 Q12 2 8 -2" stroke="#CBD5E1" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+    <path d="M16 8 Q20 2 16 -2" stroke="#CBD5E1" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+  </g>
+
+  <!-- Colorful post-it note on right -->
+  <g transform="translate(235, 110) rotate(8)">
+    <rect width="45" height="45" rx="4" fill="#FEF08A" stroke="#FDE047" stroke-width="1" filter="drop-shadow(0 4px 8px rgba(0,0,0,0.06))"/>
+    <line x1="8" y1="14" x2="36" y2="14" stroke="#CA8A04" stroke-width="2" stroke-linecap="round"/>
+    <line x1="8" y1="24" x2="28" y2="24" stroke="#CA8A04" stroke-width="2" stroke-linecap="round"/>
+  </g>
+
+  <!-- Pen -->
+  <g transform="translate(210, 175) rotate(-35)">
+    <rect width="8" height="42" rx="3" fill="#5B5BD6"/>
+    <polygon points="0,0 8,0 4,-10" fill="#CBD5E1"/>
+    <polygon points="3,-7 5,-7 4,-10" fill="#1F2430"/>
+  </g>
+</svg>

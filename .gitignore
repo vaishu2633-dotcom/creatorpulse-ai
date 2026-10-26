@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production & Build outputs
+dist/
+dist-ssr/
+build/
+*.local
+
+# Python & Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.token
+
+# Logs & temporary debug files
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# System & IDE files
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Vite & Jupyter caches
+.vite/
+.ipynb_checkpoints/
+
+# Generated ML Models & Synthetic Data (can be recreated via generate_data.py and train.py)
+backend/ml/model.pkl
+backend/ml/results.json
+backend/data/*.json
+!backend/data/.gitkeep
+!backend/ml/.gitkeep
+
+# Large data files (> 5 MB)
+*.csv

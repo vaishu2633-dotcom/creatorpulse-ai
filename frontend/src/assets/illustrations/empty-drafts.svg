@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 200" fill="none">
+  <!-- Friendly Empty State / Drafts Illustration -->
+  <defs>
+    <linearGradient id="emptyBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5B5BD6" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#14B8A6" stop-opacity="0.04"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Soft oval base -->
+  <ellipse cx="140" cy="165" rx="100" ry="12" fill="#E2E8F0" opacity="0.6"/>
+
+  <!-- Open Folder / Clipboard -->
+  <rect x="75" y="45" width="130" height="110" rx="14" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2" filter="drop-shadow(0 6px 14px rgba(0,0,0,0.05))"/>
+  <rect x="85" y="55" width="110" height="90" rx="8" fill="#FAF9F6"/>
+
+  <!-- Friendly Star floating -->
+  <g transform="translate(125, 75)">
+    <circle cx="15" cy="15" r="22" fill="#EDE9FE"/>
+    <!-- Pencil / Wand -->
+    <path d="M10 20 L20 10 L22 12 L12 22 Z" fill="#5B5BD6"/>
+    <path d="M9 21 L10 20 L12 22 L11 23 Z" fill="#F97316"/>
+  </g>
+
+  <!-- Clean dotted outline ready for content -->
+  <rect x="95" y="120" width="90" height="14" rx="6" stroke="#94A3B8" stroke-width="1.5" stroke-dasharray="3 3" fill="none"/>
+
+  <!-- Little cheerful floating hearts & sparkles -->
+  <circle cx="55" cy="90" r="5" fill="#F472B6"/>
+  <circle cx="225" cy="75" r="4" fill="#14B8A6"/>
+  <path d="M210 120 Q212 114 214 120 Q220 122 214 124 Q212 130 210 124 Q204 122 210 120 Z" fill="#F59E0B"/>
+</svg>

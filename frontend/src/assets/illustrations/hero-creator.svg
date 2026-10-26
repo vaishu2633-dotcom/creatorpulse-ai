@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 280" fill="none">
+  <!-- Friendly Creator Pulse Hero Illustration -->
+  <defs>
+    <linearGradient id="heroGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5B5BD6" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#14B8A6" stop-opacity="0.08"/>
+    </linearGradient>
+    <linearGradient id="badgeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5B5BD6"/>
+      <stop offset="100%" stop-color="#818CF8"/>
+    </linearGradient>
+    <linearGradient id="accentTeal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14B8A6"/>
+      <stop offset="100%" stop-color="#2DD4BF"/>
+    </linearGradient>
+    <linearGradient id="warmOrange" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F97316"/>
+      <stop offset="100%" stop-color="#FDBA74"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background organic soft bubble -->
+  <path d="M60 140 C50 60, 160 30, 260 50 C350 70, 370 180, 310 230 C240 280, 80 240, 60 140 Z" fill="url(#heroGrad1)"/>
+  
+  <!-- Desk/Base Surface -->
+  <ellipse cx="200" cy="240" rx="140" ry="16" fill="#E2E8F0" opacity="0.6"/>
+
+  <!-- Character Torso & Clothes -->
+  <rect x="155" y="160" width="90" height="75" rx="36" fill="#5B5BD6"/>
+  <path d="M175 160 Q200 185 225 160" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Neck & Head -->
+  <rect x="188" y="140" width="24" height="25" rx="6" fill="#FBD38D"/>
+  <circle cx="200" cy="115" r="34" fill="#FBD38D"/>
+
+  <!-- Hair (friendly modern cut) -->
+  <path d="M168 115 C166 85, 230 75, 234 110 C220 95, 185 95, 175 118 Z" fill="#2D3748"/>
+  <circle cx="166" cy="112" r="5" fill="#2D3748"/>
+  <circle cx="233" cy="112" r="5" fill="#2D3748"/>
+
+  <!-- Cheerful Face -->
+  <circle cx="190" cy="114" r="3.5" fill="#2D3748"/>
+  <circle cx="210" cy="114" r="3.5" fill="#2D3748"/>
+  <!-- Smile -->
+  <path d="M192 124 Q200 133 208 124" stroke="#2D3748" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <!-- Rosy cheeks -->
+  <circle cx="183" cy="122" r="4" fill="#FEB2B2" opacity="0.8"/>
+  <circle cx="217" cy="122" r="4" fill="#FEB2B2" opacity="0.8"/>
+
+  <!-- Laptop on stand -->
+  <rect x="140" y="195" width="120" height="32" rx="6" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2"/>
+  <path d="M130 227 L270 227 L260 234 L140 234 Z" fill="#94A3B8"/>
+  <rect x="180" y="204" width="40" height="14" rx="3" fill="#5B5BD6" opacity="0.2"/>
+
+  <!-- Floating Content Idea Cards -->
+  <!-- Left analytics card -->
+  <g transform="translate(45, 60)">
+    <rect width="90" height="65" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" filter="drop-shadow(0px 8px 16px rgba(0,0,0,0.06))"/>
+    <circle cx="22" cy="20" r="10" fill="url(#accentTeal)"/>
+    <path d="M18 20 L21 23 L26 17" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="38" y="14" width="40" height="6" rx="3" fill="#64748B"/>
+    <rect x="38" y="24" width="26" height="4" rx="2" fill="#94A3B8"/>
+    <!-- Mini sparkline -->
+    <path d="M14 48 L32 38 L48 44 L68 32 L78 36" stroke="#14B8A6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+
+  <!-- Right viral hit card -->
+  <g transform="translate(265, 80)">
+    <rect width="92" height="68" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" filter="drop-shadow(0px 8px 16px rgba(0,0,0,0.06))"/>
+    <circle cx="22" cy="22" r="11" fill="url(#warmOrange)"/>
+    <!-- Fire/Spark icon -->
+    <path d="M22 15 C20 18, 17 20, 19 25 C20 27, 24 27, 25 24 C26 21, 23 19, 22 15 Z" fill="#FFFFFF"/>
+    <rect x="40" y="16" width="38" height="6" rx="3" fill="#1F2430"/>
+    <rect x="40" y="26" width="24" height="4" rx="2" fill="#F97316"/>
+    <rect x="14" y="44" width="64" height="12" rx="4" fill="#FFF7ED"/>
+    <text x="46" y="53" font-size="8" font-family="system-ui" font-weight="bold" fill="#C2410C" text-anchor="middle">Hit Chance +3.8x</text>
+  </g>
+
+  <!-- Friendly Floating Sparks & Stars -->
+  <path d="M125 45 Q128 35 131 45 Q141 48 131 51 Q128 61 125 51 Q115 48 125 45 Z" fill="#F59E0B"/>
+  <circle cx="260" cy="40" r="4" fill="#818CF8"/>
+  <circle cx="95" cy="180" r="5" fill="#2DD4BF"/>
+  <circle cx="315" cy="190" r="6" fill="#F472B6"/>
+  <path d="M290 160 Q292 152 294 160 Q302 162 294 164 Q292 172 290 164 Q282 162 290 160 Z" fill="#5B5BD6"/>
+</svg>
