@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" fill="none">
+  <defs>
+    <linearGradient id="labBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#5B5BD6" stop-opacity="0.04"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="320" height="240" rx="20" fill="url(#labBg)"/>
+
+  <!-- Flask / Science beaker with bubbly layers -->
+  <g transform="translate(60, 45)">
+    <!-- Flask Outline -->
+    <path d="M70 20 L70 50 L35 125 A 15 15 0 0 0 48 145 L92 145 A 15 15 0 0 0 105 125 L70 50 L70 20 Z" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2"/>
+    <rect x="63" y="16" width="14" height="6" rx="2" fill="#94A3B8"/>
+
+    <!-- Liquid layers -->
+    <path d="M43 115 L97 115 L92 143 A 13 13 0 0 1 80 145 L60 145 A 13 13 0 0 1 48 143 Z" fill="#5B5BD6" fill-opacity="0.85"/>
+    <path d="M50 100 L90 100 L95 115 L45 115 Z" fill="#F59E0B" fill-opacity="0.85"/>
+
+    <!-- Bubbles -->
+    <circle cx="65" cy="125" r="4" fill="#FFFFFF"/>
+    <circle cx="78" cy="132" r="3" fill="#FFFFFF"/>
+    <circle cx="70" cy="108" r="3" fill="#FFFFFF"/>
+    <circle cx="68" cy="70" r="3.5" fill="#F59E0B"/>
+    <circle cx="73" cy="40" r="2.5" fill="#5B5BD6"/>
+  </g>
+
+  <!-- Benchmark Bar Race Chart Graphic -->
+  <g transform="translate(165, 60)">
+    <rect width="105" height="120" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" filter="drop-shadow(0 4px 12px rgba(0,0,0,0.04))"/>
+    
+    <!-- Bar 1 -->
+    <rect x="15" y="25" width="75" height="10" rx="5" fill="#5B5BD6"/>
+    <rect x="15" y="45" width="60" height="10" rx="5" fill="#14B8A6"/>
+    <rect x="15" y="65" width="45" height="10" rx="5" fill="#F59E0B"/>
+    <rect x="15" y="85" width="30" height="10" rx="5" fill="#94A3B8"/>
+  </g>
+</svg>

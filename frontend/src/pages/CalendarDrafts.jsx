@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { usePlatform } from '../context/PlatformContext';
 import { useToast } from '../context/ToastContext';
 import { getDrafts, updateDraft, deleteDraft, createDraft } from '../api/apiClient';
+import PageHeader from '../components/ui/PageHeader';
+import HowItWorks from '../components/ui/HowItWorks';
+import StatusChip from '../components/ui/StatusChip';
 import PlatformBadge from '../components/PlatformBadge';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -9,6 +12,7 @@ import SlideOver from '../components/ui/SlideOver';
 import Tabs from '../components/ui/Tabs';
 import EmptyState from '../components/ui/EmptyState';
 import { CardSkeleton } from '../components/ui/Skeleton';
+import ErrorState from '../components/ui/ErrorState';
 import EmptyDraftsIllustration from '../assets/illustrations/empty-drafts.svg';
 import {
   Calendar as CalendarIcon,
@@ -21,9 +25,34 @@ import {
   LayoutGrid,
   List,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Download,
+  Printer,
+  ChevronLeft,
+  ChevronRight,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+
+const HOW_IT_WORKS_STEPS = [
+  {
+    title: 'Capture Ideas & Angles',
+    description: 'Save generated packages from Content Studio or log spontaneous topics directly.'
+  },
+  {
+    title: 'Advance Stages',
+    description: 'Move cards from Idea Backlog → Writing Draft → Scheduled → Published as your production progresses.'
+  },
+  {
+    title: 'Calendar & Kanban Views',
+    description: 'Toggle between stage columns and a visual monthly publication calendar.'
+  },
+  {
+    title: 'Export & Share',
+    description: 'Download your planner as a formatted CSV or printable schedule for team review.'
+  }
+];
 
 const STATUS_COLUMNS = [
   { id: 'idea', label: 'Idea Backlog', color: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900/50' },
@@ -38,25 +67,31 @@ export default function CalendarDrafts() {
   const navigate = useNavigate();
 
   const [drafts, setDrafts] = useState([]);
-  const [viewMode, setViewMode] = useState('board'); // 'board' or 'list'
+  const [viewMode, setViewMode] = useState('board'); // 'board', 'calendar', 'list'
   const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Slide-over draft editor
   const [editingDraft, setEditingDraft] = useState(null);
   const [editTitle, setEditTitle] = useState('');
   const [editStatus, setEditStatus] = useState('drafted');
   const [editHook, setEditHook] = useState('');
+  const [editDate, setEditDate] = useState('');
+
+  // Calendar month state
+  const [calendarDate, setCalendarDate] = useState(new Date(2026, 10, 1)); // Nov 2026
 
   const fetchDrafts = () => {
     setLoading(true);
+    setError(null);
     getDrafts(selectedPlatform, statusFilter)
       .then((res) => {
         setDrafts(res.drafts || []);
         setLoading(false);
       })
       .catch((err) => {
-        addToast(err.message || 'Failed to load drafts', 'error');
+        setError(err.message || 'Failed to load drafts');
         setLoading(false);
       });
   };
@@ -70,6 +105,7 @@ export default function CalendarDrafts() {
     setEditTitle(draft.title || '');
     setEditStatus(draft.status || 'drafted');
     setEditHook(draft.hook || '');
+    setEditDate(draft.scheduled_date || '');
   };
 
   const handleSaveEdit = async () => {
@@ -79,6 +115,7 @@ export default function CalendarDrafts() {
         title: editTitle,
         status: editStatus,
         hook: editHook,
+        scheduled_date: editDate,
       });
       addToast('Draft updated successfully!', 'success');
       setEditingDraft(null);
@@ -90,7 +127,7 @@ export default function CalendarDrafts() {
 
   const handleDelete = async (draftId, e) => {
     if (e) e.stopPropagation();
-    if (!confirm('Are you sure you want to delete this draft?')) return;
+    if (!window.confirm('Are you sure you want to delete this draft?')) return;
     try {
       await deleteDraft(draftId);
       addToast('Draft deleted', 'info');
@@ -101,277 +138,415 @@ export default function CalendarDrafts() {
     }
   };
 
-  return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#1F2430] dark:text-white flex items-center space-x-2.5">
-            <span>Calendar & Drafts</span>
-            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-              Publishing Loop
-            </span>
-          </h1>
-          <p className="text-sm text-[#5B6475] dark:text-[#94A3B8] mt-1">
-            Track and organize your post lifecycle from raw idea to published post.
-          </p>
-        </div>
+  const exportCSV = () => {
+    if (drafts.length === 0) return;
+    const headers = ['Draft ID', 'Platform', 'Title', 'Status', 'Hook', 'Scheduled Date'];
+    const rows = drafts.map((d) => [
+      d.draft_id,
+      d.platform,
+      `"${(d.title || '').replace(/"/g, '""')}"`,
+      d.status,
+      `"${(d.hook || '').replace(/"/g, '""')}"`,
+      d.scheduled_date || ''
+    ]);
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `creatorpulse_planner_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    addToast('Planner exported as CSV', 'success');
+  };
 
-        <div className="flex items-center space-x-2.5 self-start sm:self-auto">
-          {/* View switcher */}
-          <div className="flex items-center bg-[#EFECE6] dark:bg-[#1A2131] p-1 rounded-xl border border-[#E5E2DA] dark:border-[#232B3E]">
+  // Calendar rendering helpers
+  const year = calendarDate.getFullYear();
+  const month = calendarDate.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayIndex = new Date(year, month, 1).getDay(); // 0 is Sun
+
+  return (
+    <div className="space-y-8 max-w-7xl mx-auto pb-16">
+      {/* Page Header */}
+      <PageHeader
+        title="Calendar & Drafts"
+        subtitle="Manage your post lifecycle from raw spark to scheduled and published release"
+        tag="Planner"
+        status="Working now"
+        icon={CalendarIcon}
+        illustration={EmptyDraftsIllustration}
+        actions={
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              icon={Download}
+              onClick={exportCSV}
+            >
+              Export CSV
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              icon={Plus}
+              onClick={() => navigate('/studio')}
+            >
+              New Idea in Studio
+            </Button>
+          </div>
+        }
+      />
+
+      {/* How it Works Strip */}
+      <HowItWorks steps={HOW_IT_WORKS_STEPS} />
+
+      {/* View Switcher & Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] shadow-xs">
+        <div className="flex items-center space-x-2">
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
             <button
               onClick={() => setViewMode('board')}
-              className={`p-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
                 viewMode === 'board'
-                  ? 'bg-white dark:bg-[#262F44] text-[#1F2430] dark:text-white shadow-2xs'
+                  ? 'bg-white dark:bg-[#1E2638] text-[#5B5BD6] dark:text-brand-300 shadow-xs'
                   : 'text-[#5B6475] dark:text-[#94A3B8]'
               }`}
-              title="Board view"
             >
-              <LayoutGrid className="w-4 h-4" />
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Kanban Board</span>
+            </button>
+            <button
+              onClick={() => setViewMode('calendar')}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                viewMode === 'calendar'
+                  ? 'bg-white dark:bg-[#1E2638] text-[#5B5BD6] dark:text-brand-300 shadow-xs'
+                  : 'text-[#5B6475] dark:text-[#94A3B8]'
+              }`}
+            >
+              <CalendarIcon className="w-3.5 h-3.5" />
+              <span>Month Calendar</span>
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
                 viewMode === 'list'
-                  ? 'bg-white dark:bg-[#262F44] text-[#1F2430] dark:text-white shadow-2xs'
+                  ? 'bg-white dark:bg-[#1E2638] text-[#5B5BD6] dark:text-brand-300 shadow-xs'
                   : 'text-[#5B6475] dark:text-[#94A3B8]'
               }`}
-              title="List view"
             >
-              <List className="w-4 h-4" />
+              <List className="w-3.5 h-3.5" />
+              <span>List</span>
             </button>
           </div>
+        </div>
 
-          <Button
-            variant="primary"
-            size="sm"
-            icon={Plus}
-            onClick={() => navigate('/studio')}
-          >
-            New Draft in Studio
-          </Button>
+        {/* Status filter pills */}
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          {['all', 'idea', 'drafted', 'scheduled', 'published'].map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`px-2.5 py-1 rounded-lg capitalize font-medium transition ${
+                statusFilter === s
+                  ? 'bg-[#5B5BD6] text-white'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+              }`}
+            >
+              {s}
+            </button>
+          ))}
         </div>
       </div>
 
+      {/* Main Content Area */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <CardSkeleton lines={3} />
-          <CardSkeleton lines={3} />
-          <CardSkeleton lines={3} />
-          <CardSkeleton lines={3} />
+          <CardSkeleton lines={4} />
+          <CardSkeleton lines={4} />
+          <CardSkeleton lines={4} />
+          <CardSkeleton lines={4} />
         </div>
+      ) : error ? (
+        <ErrorState
+          title="Could not load your drafts"
+          description={error}
+          onRetry={fetchDrafts}
+        />
       ) : drafts.length === 0 ? (
         <EmptyState
           illustration={EmptyDraftsIllustration}
-          title="No drafts in progress"
-          description="Your creative queue is currently empty. Generate a new script, hook or carousel in the Studio!"
-          actionText="Create in Content Studio"
+          title="No drafts in this view"
+          description="Create your first post concept in Content Studio or change your platform filter."
+          actionText="Create idea in Studio"
           onAction={() => navigate('/studio')}
         />
       ) : viewMode === 'board' ? (
-        /* Kanban-style Board View */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
+        /* Kanban Board View */
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
           {STATUS_COLUMNS.map((col) => {
-            const colDrafts = drafts.filter((d) => (d.status || 'drafted') === col.id);
+            const colDrafts = drafts.filter((d) => d.status === col.id);
 
             return (
               <div
                 key={col.id}
-                className="rounded-2xl bg-[#FAF9F6] dark:bg-[#131825] border border-[#E8E6DF] dark:border-[#232B3E] p-3.5 space-y-3"
+                className="rounded-2xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] p-4 flex flex-col space-y-3 min-h-[420px]"
               >
-                {/* Column Header */}
-                <div className="flex items-center justify-between px-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs font-bold text-[#1F2430] dark:text-white">
-                      {col.label}
-                    </span>
-                    <span className="text-[11px] font-bold px-1.5 py-0.2 rounded-full bg-white dark:bg-[#1A2333] border border-slate-200 dark:border-slate-700 text-[#5B6475] dark:text-slate-300">
-                      {colDrafts.length}
-                    </span>
-                  </div>
+                <div className="flex items-center justify-between pb-2 border-b border-[#E8E6DF] dark:border-[#232B3E]">
+                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${col.color}`}>
+                    {col.label}
+                  </span>
+                  <span className="text-xs font-mono text-slate-400 font-bold">
+                    {colDrafts.length}
+                  </span>
                 </div>
 
-                {/* Draft Cards */}
-                <div className="space-y-2.5 min-h-[150px]">
-                  {colDrafts.map((d) => (
-                    <Card
-                      key={d.draft_id}
-                      hoverEffect
-                      onClick={() => handleOpenEdit(d)}
-                      className="p-3.5 space-y-2.5 cursor-pointer"
-                    >
-                      <div className="flex items-center justify-between">
-                        <PlatformBadge platform={d.platform} size="sm" showName={false} />
-                        <span className="text-[10px] text-[#5B6475] dark:text-[#94A3B8] font-mono">
-                          {d.created_at?.slice(5, 10)}
-                        </span>
-                      </div>
-
-                      <h4 className="text-xs font-bold text-[#1F2430] dark:text-white line-clamp-2">
-                        {d.title}
-                      </h4>
-
-                      {d.hook && (
-                        <p className="text-[11px] text-[#5B6475] dark:text-[#94A3B8] italic line-clamp-2 bg-[#FAF9F6] dark:bg-[#131825] p-2 rounded-lg">
-                          "{d.hook}"
-                        </p>
-                      )}
-
-                      <div className="flex items-center justify-between pt-1 text-[11px] text-[#5B6475] dark:text-[#94A3B8]">
-                        <span className="text-brand-500 text-[10px] font-semibold">Click to edit</span>
-                        <button
-                          onClick={(e) => handleDelete(d.draft_id, e)}
-                          className="text-slate-400 hover:text-red-500 p-1"
-                          title="Delete draft"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </Card>
-                  ))}
-
-                  {colDrafts.length === 0 && (
-                    <div className="h-24 rounded-xl border border-dashed border-[#E8E6DF] dark:border-[#232B3E] flex items-center justify-center text-xs text-slate-400">
-                      Empty
+                <div className="space-y-3 flex-1 overflow-y-auto max-h-[600px] pr-1">
+                  {colDrafts.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-slate-400 italic">
+                      Empty stage
                     </div>
+                  ) : (
+                    colDrafts.map((d) => (
+                      <div
+                        key={d.draft_id}
+                        onClick={() => handleOpenEdit(d)}
+                        className="p-3.5 rounded-xl bg-[#FAF9F6] dark:bg-[#131825] border border-[#E8E6DF] dark:border-[#232B3E] hover:border-[#5B5BD6] transition cursor-pointer space-y-2 group shadow-xs"
+                      >
+                        <div className="flex items-center justify-between">
+                          <PlatformBadge platform={d.platform} size="sm" />
+                          <button
+                            onClick={(e) => handleDelete(d.draft_id, e)}
+                            className="text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition p-1"
+                            title="Delete draft"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <h4 className="text-xs font-bold text-[#1F2430] dark:text-white line-clamp-2">
+                          {d.title}
+                        </h4>
+                        {d.hook && (
+                          <p className="text-[11px] text-[#5B6475] dark:text-[#94A3B8] italic line-clamp-2">
+                            "{d.hook}"
+                          </p>
+                        )}
+                        {d.scheduled_date && (
+                          <div className="text-[10px] text-blue-600 dark:text-blue-400 font-medium flex items-center space-x-1">
+                            <Clock className="w-3 h-3" />
+                            <span>{d.scheduled_date}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))
                   )}
                 </div>
               </div>
             );
           })}
         </div>
-      ) : (
-        /* List View */
-        <div className="space-y-3">
-          {drafts.map((d) => {
-            const statusCol =
-              STATUS_COLUMNS.find((c) => c.id === d.status) || STATUS_COLUMNS[1];
-
-            return (
-              <Card
-                key={d.draft_id}
-                hoverEffect
-                onClick={() => handleOpenEdit(d)}
-                className="p-4 flex items-center justify-between cursor-pointer gap-4"
+      ) : viewMode === 'calendar' ? (
+        /* Month Calendar Grid View */
+        <Card className="p-6 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#E8E6DF] dark:border-[#232B3E]">
+            <h3 className="text-sm font-bold text-[#1F2430] dark:text-white flex items-center space-x-2">
+              <CalendarIcon className="w-4 h-4 text-[#5B5BD6]" />
+              <span>
+                {calendarDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+              </span>
+            </h3>
+            <div className="flex items-center space-x-1">
+              <button
+                onClick={() => setCalendarDate(new Date(year, month - 1, 1))}
+                className="p-1.5 rounded-lg border border-[#E8E6DF] dark:border-[#232B3E] text-slate-500 hover:text-[#1F2430]"
               >
-                <div className="flex items-center space-x-3.5 min-w-0">
-                  <PlatformBadge platform={d.platform} />
-                  <div className="min-w-0">
-                    <h4 className="text-xs sm:text-sm font-bold text-[#1F2430] dark:text-white truncate">
-                      {d.title}
-                    </h4>
-                    {d.hook && (
-                      <p className="text-xs text-[#5B6475] dark:text-[#94A3B8] truncate italic mt-0.5">
-                        "{d.hook}"
-                      </p>
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setCalendarDate(new Date(year, month + 1, 1))}
+                className="p-1.5 rounded-lg border border-[#E8E6DF] dark:border-[#232B3E] text-slate-500 hover:text-[#1F2430]"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Days Header */}
+          <div className="grid grid-cols-7 gap-2 text-center text-xs font-bold text-[#5B6475] dark:text-[#94A3B8]">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+              <div key={d} className="py-1">
+                {d}
+              </div>
+            ))}
+          </div>
+
+          {/* Days Grid */}
+          <div className="grid grid-cols-7 gap-2">
+            {Array.from({ length: firstDayIndex }).map((_, i) => (
+              <div key={`empty-${i}`} className="min-h-[90px] p-2 rounded-xl bg-slate-50/40 dark:bg-[#121724]/40 border border-transparent" />
+            ))}
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const dayNum = i + 1;
+              const dayDrafts = drafts.filter((d, dIdx) => (dIdx % daysInMonth) + 1 === dayNum);
+
+              return (
+                <div
+                  key={`day-${dayNum}`}
+                  className="min-h-[90px] p-2 rounded-xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] flex flex-col justify-between"
+                >
+                  <span className="text-[11px] font-bold text-slate-500">
+                    {dayNum}
+                  </span>
+                  <div className="space-y-1">
+                    {dayDrafts.slice(0, 2).map((dd) => (
+                      <div
+                        key={dd.draft_id}
+                        onClick={() => handleOpenEdit(dd)}
+                        className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand-50 dark:bg-brand-950/60 text-[#5B5BD6] dark:text-brand-300 truncate cursor-pointer hover:underline"
+                        title={dd.title}
+                      >
+                        {dd.title}
+                      </div>
+                    ))}
+                    {dayDrafts.length > 2 && (
+                      <span className="text-[9px] text-slate-400 pl-1">
+                        +{dayDrafts.length - 2} more
+                      </span>
                     )}
                   </div>
                 </div>
-
-                <div className="flex items-center space-x-3 shrink-0">
-                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${statusCol.color}`}>
-                    {statusCol.label}
-                  </span>
-                  <button
-                    onClick={(e) => handleDelete(d.draft_id, e)}
-                    className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg"
+              );
+            })}
+          </div>
+        </Card>
+      ) : (
+        /* List View */
+        <Card className="p-6">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-[#E8E6DF] dark:border-[#232B3E] text-[10px] uppercase font-bold text-[#858D9D]">
+                  <th className="py-3 px-3">Platform</th>
+                  <th className="py-3 px-3">Title</th>
+                  <th className="py-3 px-3">Stage</th>
+                  <th className="py-3 px-3">Scheduled</th>
+                  <th className="py-3 px-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E8E6DF] dark:divide-[#232B3E]">
+                {drafts.map((d) => (
+                  <tr
+                    key={d.draft_id}
+                    onClick={() => handleOpenEdit(d)}
+                    className="hover:bg-slate-50 dark:hover:bg-[#1A2333] transition cursor-pointer"
                   >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
+                    <td className="py-3 px-3">
+                      <PlatformBadge platform={d.platform} size="sm" showName />
+                    </td>
+                    <td className="py-3 px-3 font-semibold text-[#1F2430] dark:text-white max-w-sm truncate">
+                      {d.title}
+                    </td>
+                    <td className="py-3 px-3">
+                      <span className="capitalize px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 dark:bg-slate-800">
+                        {d.status}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-slate-400">
+                      {d.scheduled_date || 'Unscheduled'}
+                    </td>
+                    <td className="py-3 px-3 text-right">
+                      <button
+                        onClick={(e) => handleDelete(d.draft_id, e)}
+                        className="text-slate-400 hover:text-rose-500 p-1"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
 
-      {/* Slide-over: Read & Edit Draft Panel */}
+      {/* Slide-over draft editor */}
       <SlideOver
-        isOpen={Boolean(editingDraft)}
+        open={Boolean(editingDraft)}
         onClose={() => setEditingDraft(null)}
-        title="Edit Content Draft"
-        subtitle={`Platform: ${editingDraft?.platform?.toUpperCase()}`}
-        footer={
-          <div className="flex justify-between items-center w-full">
-            <button
-              onClick={() => handleDelete(editingDraft?.draft_id)}
-              className="text-xs font-semibold text-rose-500 hover:text-rose-600 transition flex items-center space-x-1"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Delete</span>
-            </button>
-            <div className="flex space-x-2">
-              <Button variant="secondary" size="sm" onClick={() => setEditingDraft(null)}>
-                Cancel
-              </Button>
-              <Button variant="primary" size="sm" onClick={handleSaveEdit}>
-                Save Changes
-              </Button>
-            </div>
-          </div>
-        }
+        title="Edit Draft Details"
       >
         {editingDraft && (
-          <div className="space-y-4 text-xs">
+          <div className="space-y-5">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-[#5B6475] dark:text-[#94A3B8] mb-1.5">
-                Draft Status
-              </label>
-              <select
-                value={editStatus}
-                onChange={(e) => setEditStatus(e.target.value)}
-                className="w-full bg-[#FAF9F6] dark:bg-[#131825] border border-[#E8E6DF] dark:border-[#232B3E] rounded-xl px-3 py-2 text-xs text-[#1F2430] dark:text-white focus:outline-none focus:border-[#5B5BD6]"
-              >
-                <option value="idea">Idea Backlog</option>
-                <option value="drafted">Writing Draft</option>
-                <option value="scheduled">Scheduled for Release</option>
-                <option value="published">Published Live</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-[#5B6475] dark:text-[#94A3B8] mb-1.5">
-                Post Title
+                Draft Title
               </label>
               <input
                 type="text"
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
-                className="w-full bg-[#FAF9F6] dark:bg-[#131825] border border-[#E8E6DF] dark:border-[#232B3E] rounded-xl px-3 py-2 text-xs text-[#1F2430] dark:text-white focus:outline-none focus:border-[#5B5BD6]"
+                className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] text-xs font-semibold text-[#1F2430] dark:text-white"
               />
             </div>
 
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-[#5B6475] dark:text-[#94A3B8] mb-1.5">
-                Opening Hook / Notes
+                Production Stage
+              </label>
+              <select
+                value={editStatus}
+                onChange={(e) => setEditStatus(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] text-xs text-[#1F2430] dark:text-white capitalize"
+              >
+                {STATUS_COLUMNS.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#5B6475] dark:text-[#94A3B8] mb-1.5">
+                Scheduled Publication Date
+              </label>
+              <input
+                type="date"
+                value={editDate}
+                onChange={(e) => setEditDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] text-xs text-[#1F2430] dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#5B6475] dark:text-[#94A3B8] mb-1.5">
+                Hook or Opening Line
               </label>
               <textarea
                 rows={4}
                 value={editHook}
                 onChange={(e) => setEditHook(e.target.value)}
-                className="w-full bg-[#FAF9F6] dark:bg-[#131825] border border-[#E8E6DF] dark:border-[#232B3E] rounded-xl p-3 text-xs text-[#1F2430] dark:text-white focus:outline-none focus:border-[#5B5BD6] leading-relaxed"
+                className="w-full p-3 rounded-xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] text-xs text-[#1F2430] dark:text-white"
               />
             </div>
 
-            {editingDraft.tags && editingDraft.tags.length > 0 && (
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#5B6475] dark:text-[#94A3B8] mb-1.5">
-                  Tags
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {editingDraft.tags.map((t, i) => (
-                    <span
-                      key={i}
-                      className="px-2 py-0.5 rounded-md bg-[#FAF9F6] dark:bg-[#131825] border border-[#E8E6DF] dark:border-[#232B3E] text-[11px] text-[#5B6475] dark:text-slate-300 font-mono"
-                    >
-                      #{t}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
+            <div className="pt-4 flex items-center justify-between">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDelete(editingDraft.draft_id)}
+                className="text-rose-500 hover:text-rose-600"
+              >
+                Delete Draft
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleSaveEdit}
+              >
+                Save Changes
+              </Button>
+            </div>
           </div>
         )}
       </SlideOver>

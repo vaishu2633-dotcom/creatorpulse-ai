@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 
 export default function SlideOver({
   isOpen,
+  open,
   onClose,
   title,
   subtitle,
@@ -11,15 +12,17 @@ export default function SlideOver({
   footer,
   width = 'max-w-md',
 }) {
+  const isVisible = Boolean(open !== undefined ? open : isOpen);
+
   // Listen for Escape key to close
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === 'Escape' && isVisible) {
         onClose();
       }
     };
 
-    if (isOpen) {
+    if (isVisible) {
       document.body.style.overflow = 'hidden';
       window.addEventListener('keydown', handleKeyDown);
     } else {
@@ -30,11 +33,11 @@ export default function SlideOver({
       document.body.style.overflow = '';
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onClose]);
+  }, [isVisible, onClose]);
 
   return (
     <AnimatePresence>
-      {isOpen && (
+      {isVisible && (
         <div className="fixed inset-0 z-50 flex justify-end">
           {/* Dimmed Backdrop */}
           <motion.div

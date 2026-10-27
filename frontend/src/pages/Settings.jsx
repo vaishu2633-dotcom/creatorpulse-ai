@@ -2,11 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { getIntegrations } from '../api/apiClient';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
+import PageHeader from '../components/ui/PageHeader';
+import HowItWorks from '../components/ui/HowItWorks';
+import StatusChip from '../components/ui/StatusChip';
 import PlatformBadge from '../components/PlatformBadge';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import SlideOver from '../components/ui/SlideOver';
 import GuidedTour from '../components/ui/GuidedTour';
+import ErrorState from '../components/ui/ErrorState';
 import ConnectIllustration from '../assets/illustrations/connect-platforms.svg';
 import {
   Settings2,
@@ -22,8 +26,72 @@ import {
   Server,
   ArrowRight,
   ShieldCheck,
-  RotateCcw
+  RotateCcw,
+  Upload,
+  FileText,
+  AlertCircle,
+  HelpCircle,
+  Check
 } from 'lucide-react';
+
+const HOW_IT_WORKS_STEPS = [
+  {
+    title: 'Choose Data Ingestion Method',
+    description: 'Use direct CSV file upload for immediate deep analytics without waiting for developer API approvals.'
+  },
+  {
+    title: 'Export Native Platform CSV',
+    description: 'Download standard performance CSVs from YouTube Studio, Meta Business Suite, X Analytics, or LinkedIn.'
+  },
+  {
+    title: 'Instant Calibration & Refresh',
+    description: 'Upload your file to immediately populate the Dashboard, Trend Explorer, and ViralScope predictor.'
+  }
+];
+
+const PLATFORM_EXPORT_GUIDES = {
+  youtube: {
+    title: 'How to Export YouTube Analytics CSV',
+    steps: [
+      '1. Go to studio.youtube.com and sign in.',
+      '2. In the left navigation, click "Analytics".',
+      '3. In the top-right corner, click "Advanced Mode".',
+      '4. Set your desired date range (e.g., Last 365 Days).',
+      '5. Click the download icon (Export) in the top-right and select "Comma-separated values (.csv)".',
+      '6. Drop the exported CSV file into the upload box below!'
+    ]
+  },
+  instagram: {
+    title: 'How to Export Instagram / Meta Analytics CSV',
+    steps: [
+      '1. Open business.facebook.com and go to Meta Business Suite.',
+      '2. In the left sidebar, click "Insights" and then "Content".',
+      '3. In the top right, select your date range.',
+      '4. Click "Export Data" and choose "Post Metrics (.csv)".',
+      '5. Upload the CSV into CreatorPulse to analyze swipe-throughs and reach.'
+    ]
+  },
+  twitter: {
+    title: 'How to Export X (Twitter) Analytics CSV',
+    steps: [
+      '1. Visit analytics.x.com (or your Creator Studio account).',
+      '2. Click the "Tweets" tab.',
+      '3. Select your time window (Last 28 days or custom).',
+      '4. Click "Export Data" > "By Tweet".',
+      '5. Upload the downloaded CSV file.'
+    ]
+  },
+  linkedin: {
+    title: 'How to Export LinkedIn Analytics CSV',
+    steps: [
+      '1. Go to your LinkedIn Profile or Company Page analytics.',
+      '2. Under "Analytics", select "Posts" or "Updates".',
+      '3. Choose your date range.',
+      '4. In the upper-right corner, click "Export" (.xls or .csv).',
+      '5. Drag and drop the file into CreatorPulse.'
+    ]
+  }
+};
 
 export default function Settings() {
   const { themePreference, setThemePreference } = useTheme();
@@ -31,42 +99,127 @@ export default function Settings() {
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Slide-over state for connection instructions
   const [activePlatformDetail, setActivePlatformDetail] = useState(null);
-  const [activeDataSourceDetail, setActiveDataSourceDetail] = useState(null);
+
+  // CSV Upload state
+  const [csvContent, setCsvContent] = useState('');
+  const [uploadFileName, setUploadFileName] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState(null);
 
   // Guided tour replay
   const [replayTour, setReplayTour] = useState(false);
 
-  useEffect(() => {
+  const fetchSettings = () => {
+    setLoading(true);
+    setError(null);
     getIntegrations()
       .then((res) => {
         setData(res);
         setLoading(false);
       })
-      .catch(() => {
+      .catch((err) => {
+        setError(err.message || 'Failed to load integrations');
         setLoading(false);
       });
+  };
+
+  useEffect(() => {
+    fetchSettings();
   }, []);
 
+  const handleCsvSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result;
+      if (typeof text === 'string') {
+        setCsvContent(text);
+        addToast(`Loaded ${file.name}. Ready to import.`, 'info');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleImportCsv = async () => {
+    if (!csvContent.trim()) {
+      addToast('Please select a valid CSV file first.', 'error');
+      return;
+    }
+
+    setUploading(true);
+    setUploadResult(null);
+
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/settings/upload-csv-json', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csv_text: csvContent })
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || 'Failed to import CSV');
+      }
+
+      const result = await res.json();
+      setUploadResult(result);
+      addToast(`Successfully imported ${result.imported_count} posts into dataset!`, 'success');
+      setCsvContent('');
+      setUploadFileName('');
+    } catch (err) {
+      addToast(err.message || 'CSV Import failed', 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6 max-w-7xl mx-auto">
+        <div className="h-44 rounded-3xl bg-white dark:bg-[#171D2B] animate-pulse border border-[#E8E6DF] dark:border-[#232B3E]" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="h-48 rounded-2xl bg-white dark:bg-[#171D2B] animate-pulse" />
+          <div className="h-48 rounded-2xl bg-white dark:bg-[#171D2B] animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto">
+        <ErrorState
+          title="Could not load connection settings"
+          description={error}
+          onRetry={fetchSettings}
+        />
+      </div>
+    );
+  }
+
   const integrations = data?.integrations || [];
-  const dataSources = data?.data_sources || [];
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#1F2430] dark:text-white flex items-center space-x-2.5">
-          <span>Connect Accounts & Preferences</span>
-          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-            Settings
-          </span>
-        </h1>
-        <p className="text-sm text-[#5B6475] dark:text-[#94A3B8] mt-1 max-w-2xl">
-          Connect your channels, customize interface themes, or review ingestion pipelines.
-        </p>
-      </div>
+    <div className="space-y-8 max-w-7xl mx-auto pb-16">
+      {/* Page Header */}
+      <PageHeader
+        title="Connect Accounts"
+        subtitle="Manage official API connections, import native CSV post analytics, and customize your workspace"
+        tag="Setup"
+        status="Coming soon"
+        icon={Settings2}
+        illustration={ConnectIllustration}
+      />
+
+      {/* How it Works Strip */}
+      <HowItWorks steps={HOW_IT_WORKS_STEPS} />
 
       {/* Theme Selection Section */}
       <Card className="p-6 space-y-4">
@@ -98,12 +251,8 @@ export default function Settings() {
               <Sun className="w-5 h-5" />
             </div>
             <div>
-              <div className="font-bold text-xs sm:text-sm text-[#1F2430] dark:text-white">
-                Light Theme (Default)
-              </div>
-              <div className="text-[11px] text-[#5B6475] dark:text-[#94A3B8]">
-                Warm off-white paper canvas
-              </div>
+              <div className="font-bold text-xs">Light Theme</div>
+              <div className="text-[10px] text-slate-400">Warm off-white background</div>
             </div>
           </button>
 
@@ -120,25 +269,21 @@ export default function Settings() {
                 : 'bg-[#FAF9F6] dark:bg-[#131825] border-[#E8E6DF] dark:border-[#232B3E] text-[#5B6475] dark:text-[#94A3B8] hover:border-slate-300'
             }`}
           >
-            <div className="w-9 h-9 rounded-xl bg-slate-800 text-slate-200 flex items-center justify-center shrink-0">
-              <Moon className="w-5 h-5 text-brand-400" />
+            <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+              <Moon className="w-5 h-5" />
             </div>
             <div>
-              <div className="font-bold text-xs sm:text-sm text-[#1F2430] dark:text-white">
-                Dark Theme
-              </div>
-              <div className="text-[11px] text-[#5B6475] dark:text-[#94A3B8]">
-                Deep navy-charcoal night mode
-              </div>
+              <div className="font-bold text-xs">Dark Theme</div>
+              <div className="text-[10px] text-slate-400">Deep navy-charcoal cards</div>
             </div>
           </button>
 
-          {/* System */}
+          {/* Follow System */}
           <button
             type="button"
             onClick={() => {
               setThemePreference('system');
-              addToast('Theme following operating system', 'info', 2000);
+              addToast('Theme following operating system preference', 'info', 2000);
             }}
             className={`p-4 rounded-xl text-left border transition flex items-center space-x-3 ${
               themePreference === 'system'
@@ -146,56 +291,84 @@ export default function Settings() {
                 : 'bg-[#FAF9F6] dark:bg-[#131825] border-[#E8E6DF] dark:border-[#232B3E] text-[#5B6475] dark:text-[#94A3B8] hover:border-slate-300'
             }`}
           >
-            <div className="w-9 h-9 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
               <Laptop className="w-5 h-5" />
             </div>
             <div>
-              <div className="font-bold text-xs sm:text-sm text-[#1F2430] dark:text-white">
-                Follow System
-              </div>
-              <div className="text-[11px] text-[#5B6475] dark:text-[#94A3B8]">
-                Matches device OS setting
-              </div>
+              <div className="font-bold text-xs">Follow System</div>
+              <div className="text-[10px] text-slate-400">Matches Windows OS settings</div>
             </div>
           </button>
         </div>
       </Card>
 
-      {/* Guided Tour Replay */}
-      <Card variant="tintedTeal" className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-teal-200 dark:border-teal-900/40">
-        <div className="flex items-center space-x-3">
-          <div className="w-9 h-9 rounded-xl bg-teal-500 text-white flex items-center justify-center shadow-xs">
-            <Compass className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-[#1F2430] dark:text-white">
-              Want a quick refresher tour?
-            </h3>
-            <p className="text-xs text-[#5B6475] dark:text-[#94A3B8]">
-              Replay the 4-step onboarding guide introducing CreatorPulse features.
-            </p>
-          </div>
+      {/* CSV File Upload Section */}
+      <Card className="p-6 space-y-5">
+        <div>
+          <h2 className="text-base font-bold text-[#1F2430] dark:text-white flex items-center space-x-2">
+            <FileSpreadsheet className="w-5 h-5 text-emerald-500" />
+            <span>Direct CSV Post Ingestion (Works Immediately)</span>
+          </h2>
+          <p className="text-xs text-[#5B6475] dark:text-[#94A3B8] mt-0.5">
+            Import your native post export CSV without waiting for developer API keys.
+          </p>
         </div>
 
-        <Button
-          variant="teal"
-          size="sm"
-          icon={RotateCcw}
-          onClick={() => setReplayTour(true)}
-        >
-          Replay Tour
-        </Button>
+        <div className="border-2 border-dashed border-[#E8E6DF] dark:border-[#232B3E] rounded-2xl p-6 text-center hover:bg-slate-50 dark:hover:bg-[#141A28] transition cursor-pointer">
+          <input
+            type="file"
+            accept=".csv,.txt"
+            id="settings-csv-upload"
+            onChange={handleCsvSelect}
+            className="hidden"
+          />
+          <label htmlFor="settings-csv-upload" className="cursor-pointer block space-y-2">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
+              <Upload className="w-6 h-6" />
+            </div>
+            <div className="text-sm font-bold text-[#1F2430] dark:text-white">
+              {uploadFileName ? uploadFileName : 'Drop analytics CSV here or click to browse'}
+            </div>
+            <div className="text-xs text-[#5B6475] dark:text-[#94A3B8] max-w-sm mx-auto">
+              Auto-detects platform, views, likes, comments, shares, and captions.
+            </div>
+          </label>
+        </div>
+
+        {csvContent && (
+          <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#141A28] border border-[#E8E6DF] dark:border-[#232B3E] flex items-center justify-between">
+            <div className="text-xs text-slate-700 dark:text-slate-300">
+              <span className="font-bold">Ready to import:</span> {csvContent.split('\n').length} rows in {uploadFileName}
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={uploading}
+              icon={CheckCircle2}
+              onClick={handleImportCsv}
+            >
+              Import into CreatorPulse
+            </Button>
+          </div>
+        )}
+
+        {uploadResult && (
+          <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/40 text-xs text-emerald-800 dark:text-emerald-300 flex items-center space-x-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{uploadResult.message} Total posts in dataset: {uploadResult.total_posts}.</span>
+          </div>
+        )}
       </Card>
 
-      {/* 4 Social Platforms Connect Cards */}
+      {/* 4 Social Platforms Connect Cards (Truthfully Labeled "Coming soon") */}
       <div className="space-y-4">
         <div>
           <h2 className="text-base font-bold text-[#1F2430] dark:text-white flex items-center space-x-2">
             <Link2 className="w-4 h-4 text-[#5B5BD6]" />
-            <span>Connect Creator Accounts</span>
+            <span>Direct API Connectors</span>
           </h2>
           <p className="text-xs text-[#5B6475] dark:text-[#94A3B8] mt-0.5">
-            Click any platform to inspect connection options (API, CSV upload, or sample data).
+            Click any platform to view export instructions and upcoming OAuth connector status.
           </p>
         </div>
 
@@ -210,9 +383,7 @@ export default function Settings() {
               <div>
                 <div className="flex items-center justify-between mb-2.5">
                   <PlatformBadge platform={item.id} />
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#FAF9F6] dark:bg-[#131825] border border-[#E8E6DF] dark:border-[#232B3E] text-[#5B6475] dark:text-[#94A3B8]">
-                    {item.auth_type}
-                  </span>
+                  <StatusChip status="Coming soon" size="sm" />
                 </div>
 
                 <h3 className="text-sm font-bold text-[#1F2430] dark:text-white">
@@ -224,8 +395,8 @@ export default function Settings() {
               </div>
 
               <div className="flex items-center justify-between pt-3 border-t border-[#EFECE6] dark:border-[#232B3E] text-xs">
-                <span className="text-[11px] text-amber-700 dark:text-amber-300 font-semibold bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-900/50">
-                  {item.status}
+                <span className="text-[11px] text-slate-500 font-mono">
+                  {item.auth_type}
                 </span>
 
                 <Button
@@ -236,7 +407,7 @@ export default function Settings() {
                     setActivePlatformDetail(item);
                   }}
                 >
-                  {item.action}
+                  View Guide
                 </Button>
               </div>
             </Card>
@@ -244,136 +415,51 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* 3 Data Ingestion Options */}
-      <Card className="p-6 space-y-5">
-        <div>
-          <h2 className="text-base font-bold text-[#1F2430] dark:text-white flex items-center space-x-2">
-            <Database className="w-4 h-4 text-[#5B5BD6]" />
-            <span>3 Ways to Provide Data</span>
-          </h2>
-          <p className="text-xs text-[#5B6475] dark:text-[#94A3B8] mt-0.5">
-            Designed for privacy and flexibility — no lock-in.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {dataSources.map((ds, i) => (
-            <div
-              key={i}
-              onClick={() => setActiveDataSourceDetail(ds)}
-              className="p-4 rounded-xl bg-[#FAF9F6] dark:bg-[#131825] border border-[#E8E6DF] dark:border-[#232B3E] space-y-2 hover:border-brand-300 transition cursor-pointer"
-            >
-              <div className="flex items-center space-x-2">
-                {i === 0 && <Globe className="w-4 h-4 text-[#5B5BD6]" />}
-                {i === 1 && <FileSpreadsheet className="w-4 h-4 text-emerald-500" />}
-                {i === 2 && <Database className="w-4 h-4 text-teal-500" />}
-                <h3 className="text-xs font-bold text-[#1F2430] dark:text-white">
-                  {ds.type}
-                </h3>
-              </div>
-              <p className="text-xs text-[#5B6475] dark:text-[#94A3B8] leading-relaxed">
-                {ds.notes}
-              </p>
-              <div className="text-[11px] text-[#5B5BD6] dark:text-brand-300 font-semibold pt-1">
-                {ds.suitability} &rarr;
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Slide-over: Platform Connect Details */}
+      {/* Slide-over: Platform Connect Details & CSV Export Instructions */}
       <SlideOver
-        isOpen={Boolean(activePlatformDetail)}
+        open={Boolean(activePlatformDetail)}
         onClose={() => setActivePlatformDetail(null)}
-        title={`Connect ${activePlatformDetail?.name}`}
-        subtitle={`Authentication: ${activePlatformDetail?.auth_type}`}
-        footer={
-          <div className="flex justify-end space-x-2">
-            <Button variant="secondary" size="sm" onClick={() => setActivePlatformDetail(null)}>
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => {
-                addToast(`${activePlatformDetail?.name} connector scheduled for live API v2.0!`, 'info');
-                setActivePlatformDetail(null);
-              }}
-            >
-              Request API Access
-            </Button>
-          </div>
-        }
+        title={activePlatformDetail?.name ? `Connecting ${activePlatformDetail.name}` : 'Platform Guide'}
       >
         {activePlatformDetail && (
-          <div className="space-y-5 text-xs sm:text-sm">
-            <div className="p-4 rounded-xl bg-brand-50 dark:bg-brand-950/40 border border-brand-200 dark:border-brand-800 text-[#313083] dark:text-brand-300 space-y-1">
-              <span className="font-bold text-xs uppercase tracking-wider block">
-                How Connection Works
-              </span>
+          <div className="space-y-6">
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#141A28] border border-[#E8E6DF] dark:border-[#232B3E] space-y-2">
+              <div className="flex items-center space-x-2">
+                <PlatformBadge platform={activePlatformDetail.id} size="sm" showName />
+                <StatusChip status="Coming soon" size="sm" />
+              </div>
+              <p className="text-xs text-[#5B6475] dark:text-[#94A3B8]">
+                {activePlatformDetail.description}
+              </p>
+            </div>
+
+            {/* Official Export Guide for this platform */}
+            {PLATFORM_EXPORT_GUIDES[activePlatformDetail.id] && (
+              <div className="p-4 rounded-xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] space-y-3">
+                <div className="text-xs font-bold text-[#1F2430] dark:text-white flex items-center space-x-1.5">
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
+                  <span>{PLATFORM_EXPORT_GUIDES[activePlatformDetail.id].title}</span>
+                </div>
+                <div className="space-y-2 text-xs text-[#5B6475] dark:text-[#94A3B8]">
+                  {PLATFORM_EXPORT_GUIDES[activePlatformDetail.id].steps.map((st, i) => (
+                    <div key={i} className="leading-relaxed">
+                      {st}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 text-xs text-amber-900 dark:text-amber-300 space-y-1">
+              <div className="font-bold">OAuth 2.0 Direct API Status:</div>
               <p className="leading-relaxed">
-                In v2.0, you'll authorize your channel via OAuth 2.0 with read-only permissions.
-                CreatorPulse AI ingests post telemetry to compute your baseline and alert you to viral breakouts.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <h4 className="font-bold text-[#1F2430] dark:text-white">
-                Planned Features for {activePlatformDetail.name}:
-              </h4>
-              <ul className="space-y-1.5 text-[#5B6475] dark:text-[#94A3B8]">
-                <li className="flex items-center space-x-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                  <span>Automatic background sync every 6 hours</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                  <span>Audience retention curve anomaly detection</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                  <span>Rate limits: {activePlatformDetail.rate_limit}</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        )}
-      </SlideOver>
-
-      {/* Slide-over: Data Source Details */}
-      <SlideOver
-        isOpen={Boolean(activeDataSourceDetail)}
-        onClose={() => setActiveDataSourceDetail(null)}
-        title={activeDataSourceDetail?.type}
-        subtitle={activeDataSourceDetail?.suitability}
-        footer={
-          <div className="flex justify-end">
-            <Button variant="secondary" size="sm" onClick={() => setActiveDataSourceDetail(null)}>
-              Close
-            </Button>
-          </div>
-        }
-      >
-        {activeDataSourceDetail && (
-          <div className="space-y-4 text-xs sm:text-sm">
-            <p className="text-[#5B6475] dark:text-[#94A3B8] leading-relaxed">
-              {activeDataSourceDetail.notes}
-            </p>
-            <div className="p-3.5 rounded-xl bg-[#FAF9F6] dark:bg-[#131825] border border-[#E8E6DF] dark:border-[#232B3E]">
-              <span className="font-bold text-[#1F2430] dark:text-white block mb-1">
-                Zero API Lock-in
-              </span>
-              <p className="text-xs text-[#5B6475] dark:text-[#94A3B8] leading-relaxed">
-                If you prefer not to grant OAuth API access, you can download your channel analytics CSV from YouTube Studio or Meta Suite and drop it directly into CreatorPulse.
+                Direct OAuth login for {activePlatformDetail.name} is slated for Production release.
+                Use the CSV drag-and-drop feature above to import your channel data today.
               </p>
             </div>
           </div>
         )}
       </SlideOver>
-
-      {/* Guided Tour Modal if replayed */}
-      <GuidedTour forceOpen={replayTour} onClose={() => setReplayTour(false)} />
     </div>
   );
 }

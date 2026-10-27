@@ -243,6 +243,7 @@ def get_accuracy_scoreboard(platform: Optional[str] = None) -> Dict[str, Any]:
         
     # Compute metrics
     brier_sum = 0.0
+    actual_positives = 0
     tp = fp = fn = tn = 0
     
     # 5 Calibration Bins: 0-20%, 20-40%, 40-60%, 60-80%, 80-100%
@@ -257,6 +258,8 @@ def get_accuracy_scoreboard(platform: Optional[str] = None) -> Dict[str, Any]:
     for p in evaluated:
         prob = p.get("predicted_prob", 0.0)
         actual = 1 if p.get("actual_outcome") else 0
+        if actual == 1:
+            actual_positives += 1
         brier_sum += (prob - actual) ** 2
         
         pred_label = 1 if prob >= 0.15 else 0 # Breakout threshold
@@ -289,16 +292,36 @@ def get_accuracy_scoreboard(platform: Optional[str] = None) -> Dict[str, Any]:
             "actual_breakout_rate": round(actual_rate * 100, 1)
         })
 
-    brier = round(brier_sum / len(evaluated), 4)
+    n = len(evaluated)
+    brier = round(brier_sum / n, 4)
     precision = round(tp / max(1, tp + fp), 3)
     recall = round(tp / max(1, tp + fn), 3)
+
+    # Base rate of breakout occurrences in sample
+    base_rate = actual_positives / n if n > 0 else 0.05
+    # Naive baseline forecasting Brier score: predicting constant p = base_rate
+    # E[Brier_baseline] = p * (1-p)
+    baseline_brier = round(base_rate * (1.0 - base_rate), 4)
+
+    # Truthful evaluation label comparing against naive guessing
+    if brier < baseline_brier - 0.015:
+        brier_label = "Better than guessing"
+    elif abs(brier - baseline_brier) <= 0.015:
+        brier_label = "About the same as guessing"
+    else:
+        brier_label = "Worse than guessing"
 
     return {
         "metadata": get_system_metadata(),
         "total_predictions": len(preds),
-        "evaluated_count": len(evaluated),
-        "pending_count": len(preds) - len(evaluated),
+        "evaluated_count": n,
+        "sample_size": n,
+        "low_sample_warning": n < 30,
+        "pending_count": len(preds) - n,
         "brier_score": brier,
+        "baseline_brier_score": baseline_brier,
+        "brier_evaluation_label": brier_label,
+        "baseline_rate": round(base_rate, 4),
         "precision": precision,
         "recall": recall,
         "calibration_bins": calibration_bins,
@@ -354,3 +377,179 @@ def get_imbalance_lab_results() -> Dict[str, Any]:
         return {"error": "results.json not found. Run train.py first."}
     with open(results_path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+# ----------------- VibeCheck Reports Storage -----------------
+
+def get_vibecheck_reports(limit: int = 50) -> List[Dict[str, Any]]:
+    reports = _load_json("vibecheck_reports.json")
+    reports.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    return reports[:limit]
+
+def get_vibecheck_report_by_id(report_id: str) -> Optional[Dict[str, Any]]:
+    reports = _load_json("vibecheck_reports.json")
+    for r in reports:
+        if r.get("report_id") == report_id:
+            return r
+    return None
+
+def save_vibecheck_report(report_data: Dict[str, Any]) -> Dict[str, Any]:
+    reports = _load_json("vibecheck_reports.json")
+    if "report_id" not in report_data:
+        report_data["report_id"] = f"vibe_{uuid.uuid4().hex[:8]}"
+    if "created_at" not in report_data:
+        report_data["created_at"] = datetime.now(timezone.utc).isoformat()
+    
+    # Prepend to history
+    reports.insert(0, report_data)
+    _save_json("vibecheck_reports.json", reports)
+    return report_data
+
+def delete_vibecheck_report(report_id: str) -> bool:
+    reports = _load_json("vibecheck_reports.json")
+    new_reports = [r for r in reports if r.get("report_id") != report_id]
+    if len(new_reports) < len(reports):
+        _save_json("vibecheck_reports.json", new_reports)
+        return True
+    return False
+
+# ----------------- CSV Import for Settings -----------------
+
+def import_posts_from_csv(csv_content: str) -> Dict[str, Any]:
+    """
+    Parses user-uploaded CSV of social media posts, validates columns,
+    normalizes to CreatorPulse DAL schema, appends to posts.json, and updates metadata.
+    """
+    import csv
+    import io
+
+    posts = _load_json("posts.json")
+    existing_ids = {p.get("post_id") for p in posts}
+
+    try:
+        reader = csv.DictReader(io.StringIO(csv_content))
+        if not reader.fieldnames:
+            return {"success": False, "error": "CSV file contains no header row."}
+        
+        # Field mapping
+        cols = {f.lower().strip(): f for f in reader.fieldnames}
+        
+        imported_count = 0
+        skipped_count = 0
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        for idx, row in enumerate(reader):
+            # Extract platform
+            platform = "instagram"
+            for p_cand in ["platform", "network", "channel"]:
+                if p_cand in cols and row[cols[p_cand]].strip():
+                    platform = row[cols[p_cand]].strip().lower()
+                    break
+
+            # Extract views
+            views = 0
+            for v_cand in ["views", "impressions", "reach"]:
+                if v_cand in cols and row[cols[v_cand]].strip():
+                    try:
+                        views = int(float(row[cols[v_cand]]))
+                        break
+                    except (ValueError, TypeError):
+                        pass
+
+            # Extract likes
+            likes = 0
+            for l_cand in ["likes", "like_count", "reactions"]:
+                if l_cand in cols and row[cols[l_cand]].strip():
+                    try:
+                        likes = int(float(row[cols[l_cand]]))
+                        break
+                    except (ValueError, TypeError):
+                        pass
+
+            # Extract comments
+            comments = 0
+            for c_cand in ["comments", "comment_count", "replies"]:
+                if c_cand in cols and row[cols[c_cand]].strip():
+                    try:
+                        comments = int(float(row[cols[c_cand]]))
+                        break
+                    except (ValueError, TypeError):
+                        pass
+
+            # Extract shares
+            shares = 0
+            for s_cand in ["shares", "retweets", "reposts"]:
+                if s_cand in cols and row[cols[s_cand]].strip():
+                    try:
+                        shares = int(float(row[cols[s_cand]]))
+                        break
+                    except (ValueError, TypeError):
+                        pass
+
+            # Extract text / title
+            caption = ""
+            for t_cand in ["caption", "content", "text", "title", "post_text"]:
+                if t_cand in cols and row[cols[t_cand]].strip():
+                    caption = row[cols[t_cand]].strip()
+                    break
+
+            # Extract post_type
+            post_type = "post"
+            for pt_cand in ["post_type", "type", "format"]:
+                if pt_cand in cols and row[cols[pt_cand]].strip():
+                    post_type = row[cols[pt_cand]].strip().lower()
+                    break
+
+            # Extract published_at
+            published_at = now_iso
+            for d_cand in ["published_at", "date", "created_at", "timestamp"]:
+                if d_cand in cols and row[cols[d_cand]].strip():
+                    published_at = row[cols[d_cand]].strip()
+                    break
+
+            # Post ID
+            post_id = f"csv_post_{uuid.uuid4().hex[:8]}"
+
+            # Calculate engagement rate
+            total_eng = likes + comments + shares
+            engagement_rate = round(total_eng / max(1, views), 4)
+
+            # Determine breakout status (relative to 6% benchmark)
+            is_breakout = engagement_rate >= 0.06 or (views > 10000 and total_eng > 600)
+
+            post_record = {
+                "post_id": post_id,
+                "platform": platform,
+                "post_type": post_type,
+                "caption": caption or f"Imported post #{idx + 1}",
+                "published_at": published_at,
+                "views": views,
+                "likes": likes,
+                "comments": comments,
+                "shares": shares,
+                "impressions": views,
+                "engagement_rate": engagement_rate,
+                "is_breakout": is_breakout,
+                "source": "user_csv_upload"
+            }
+
+            posts.insert(0, post_record)
+            imported_count += 1
+
+        if imported_count > 0:
+            _save_json("posts.json", posts)
+            global LAST_REFRESHED
+            LAST_REFRESHED = now_iso
+
+        return {
+            "success": True,
+            "imported_count": imported_count,
+            "skipped_count": skipped_count,
+            "total_posts": len(posts),
+            "message": f"Successfully parsed and imported {imported_count} posts into CreatorPulse dataset."
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Failed to parse CSV file: {str(e)}"
+        }

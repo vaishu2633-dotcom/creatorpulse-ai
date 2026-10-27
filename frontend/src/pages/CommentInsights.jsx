@@ -2,11 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePlatform } from '../context/PlatformContext';
 import { getCommentsSummary } from '../api/apiClient';
+import PageHeader from '../components/ui/PageHeader';
+import HowItWorks from '../components/ui/HowItWorks';
+import StatusChip from '../components/ui/StatusChip';
 import PlatformBadge from '../components/PlatformBadge';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Tooltip from '../components/ui/Tooltip';
+import ErrorState from '../components/ui/ErrorState';
 import { CardSkeleton } from '../components/ui/Skeleton';
+import AudienceListeningIllustration from '../assets/illustrations/audience-listening.svg';
 import {
   MessageSquareHeart,
   Smile,
@@ -16,7 +21,9 @@ import {
   Tag,
   Sparkles,
   ArrowRight,
-  Lightbulb
+  Lightbulb,
+  MessageSquare,
+  SearchCheck
 } from 'lucide-react';
 import {
   PieChart,
@@ -26,6 +33,25 @@ import {
   Tooltip as RechartsTooltip,
   Legend
 } from 'recharts';
+
+const HOW_IT_WORKS_STEPS = [
+  {
+    title: 'Listen to Viewers',
+    description: 'Aggregates audience comments and discussions across your channels into a single pulse.'
+  },
+  {
+    title: 'Mood Ring & Sentiment',
+    description: 'Breaks down comment tone into positive praise, constructive neutral feedback, and negative critique.'
+  },
+  {
+    title: 'Identify Unanswered Questions',
+    description: 'Detects frequently repeated questions that signal high-demand tutorial topics.'
+  },
+  {
+    title: 'Convert to Studio Ideas',
+    description: 'One click loads any viewer question into Content Studio to answer it in your next post.'
+  }
+];
 
 const SENTIMENT_COLORS = {
   Positive: '#10B981',
@@ -40,31 +66,29 @@ export default function CommentInsights() {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedTheme, setSelectedTheme] = useState('all');
 
-  useEffect(() => {
-    let isMounted = true;
+  const fetchComments = () => {
     setLoading(true);
     setError(null);
     getCommentsSummary(selectedPlatform)
       .then((res) => {
-        if (!isMounted) return;
         setSummary(res);
         setLoading(false);
       })
       .catch((err) => {
-        if (!isMounted) return;
         setError(err.message || 'Failed to load comments summary');
         setLoading(false);
       });
+  };
 
-    return () => {
-      isMounted = false;
-    };
+  useEffect(() => {
+    fetchComments();
   }, [selectedPlatform, lastRefreshed]);
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 max-w-7xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <CardSkeleton />
           <CardSkeleton />
@@ -76,11 +100,12 @@ export default function CommentInsights() {
 
   if (error) {
     return (
-      <div className="space-y-6">
-        <div className="p-6 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-200">
-          <h2 className="text-base font-bold mb-1">Failed to load Audience Voice</h2>
-          <p className="text-sm">{error}</p>
-        </div>
+      <div className="max-w-7xl mx-auto">
+        <ErrorState
+          title="Failed to load Audience Voice"
+          description={error}
+          onRetry={fetchComments}
+        />
       </div>
     );
   }
@@ -95,183 +120,201 @@ export default function CommentInsights() {
     navigate(`/studio?topic=${encodeURIComponent(questionText)}&platform=${platform}`);
   };
 
+  const themes = summary?.top_themes || [];
+  const repeatedQuestions = summary?.repeated_questions || [];
+
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#1F2430] dark:text-white flex items-center space-x-2.5">
-          <span>Audience Voice</span>
-          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-pink-50 dark:bg-pink-950/60 text-pink-700 dark:text-pink-300 border border-pink-200 dark:border-pink-800">
-            Community Signals
-          </span>
-        </h1>
-        <p className="text-sm text-[#5B6475] dark:text-[#94A3B8] mt-1 max-w-2xl">
-          Understand community mood, trending feedback themes, and repeated viewer questions that can fuel your next posts.
-        </p>
+    <div className="space-y-8 max-w-7xl mx-auto pb-16">
+      {/* Page Header */}
+      <PageHeader
+        title="Audience Voice"
+        subtitle="Listen to recurring viewer questions, sentiment moods, and high-interest topics"
+        tag="Listening"
+        status="Uses sample data"
+        icon={MessageSquareHeart}
+        illustration={AudienceListeningIllustration}
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            icon={SearchCheck}
+            onClick={() => navigate('/vibecheck')}
+          >
+            Deep VibeCheck AI
+          </Button>
+        }
+      />
+
+      {/* How it Works Strip */}
+      <HowItWorks steps={HOW_IT_WORKS_STEPS} />
+
+      {/* 3 Metric Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Total Comments Analyzed */}
+        <Card className="p-5" hoverEffect>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-[#5B6475] dark:text-[#94A3B8]">
+              Comments Monitored
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 flex items-center justify-center">
+              <MessageSquare className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-3xl font-extrabold text-[#1F2430] dark:text-white mt-2">
+            {(summary?.total_comments || 0).toLocaleString()}
+          </div>
+          <div className="text-xs text-[#5B6475] dark:text-[#94A3B8] mt-1">
+            Across active community threads
+          </div>
+        </Card>
+
+        {/* Positive Sentiment */}
+        <Card className="p-5" hoverEffect>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-[#5B6475] dark:text-[#94A3B8]">
+              Positive Reception
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 flex items-center justify-center">
+              <Smile className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-2 font-mono">
+            {summary?.sentiment_breakdown?.positive}%
+          </div>
+          <div className="text-xs text-[#5B6475] dark:text-[#94A3B8] mt-1">
+            High encouragement and praise
+          </div>
+        </Card>
+
+        {/* Repeated Questions */}
+        <Card className="p-5" hoverEffect>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-[#5B6475] dark:text-[#94A3B8]">
+              Audience Questions
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950 text-amber-600 flex items-center justify-center">
+              <HelpCircle className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-3xl font-extrabold text-amber-600 dark:text-amber-400 mt-2 font-mono">
+            {repeatedQuestions.length}
+          </div>
+          <div className="text-xs text-[#5B6475] dark:text-[#94A3B8] mt-1">
+            Ready-to-answer content opportunities
+          </div>
+        </Card>
       </div>
 
-      {/* Mood Summary with Friendly Icons & Donut Chart */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Sentiment Donut Chart Card */}
-        <Card className="p-6 flex flex-col items-center justify-center">
-          <div className="flex items-center justify-between w-full mb-2">
-            <h2 className="text-sm font-bold text-[#1F2430] dark:text-white">
-              Overall Community Mood
-            </h2>
-            <Tooltip text="Distribution of positive reactions vs neutral inquiries vs constructive critiques." showIcon />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left: Sentiment Donut (5 cols) */}
+        <Card className="lg:col-span-5 p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-[#1F2430] dark:text-white flex items-center space-x-2">
+              <Sparkles className="w-4 h-4 text-[#5B5BD6]" />
+              <span>Audience Mood Ring</span>
+            </h3>
+            <span className="text-xs text-slate-400">VADER Polarity</span>
           </div>
 
-          <div className="w-full h-52">
+          <div className="h-60 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={sentimentData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={50}
-                  outerRadius={75}
-                  paddingAngle={5}
+                  innerRadius={60}
+                  outerRadius={85}
+                  paddingAngle={4}
                   dataKey="value"
                 >
-                  {sentimentData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={SENTIMENT_COLORS[entry.name]} />
+                  {sentimentData.map((entry) => (
+                    <Cell
+                      key={`cell-${entry.name}`}
+                      fill={SENTIMENT_COLORS[entry.name]}
+                    />
                   ))}
                 </Pie>
-                <RechartsTooltip
-                  contentStyle={{
-                    backgroundColor: '#FFFFFF',
-                    borderColor: '#E8E6DF',
-                    borderRadius: '0.75rem',
-                    fontSize: '12px',
-                  }}
-                  formatter={(val) => [`${val}%`, 'Share']}
-                />
-                <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                <RechartsTooltip />
+                <Legend wrapperStyle={{ fontSize: '12px' }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
-        </Card>
 
-        {/* 3 Mood Metric Cards */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {/* Positive */}
-            <Card variant="tintedTeal" className="p-5 text-center space-y-2 border-teal-200 dark:border-teal-900/40" hoverEffect>
-              <div className="w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center mx-auto shadow-xs">
-                <Smile className="w-5 h-5 fill-white" />
-              </div>
-              <div className="text-3xl font-extrabold text-emerald-700 dark:text-emerald-300">
-                {summary?.sentiment_breakdown?.positive}%
-              </div>
-              <div className="text-xs font-semibold text-emerald-800 dark:text-emerald-200">
-                Positive Praise
-              </div>
-            </Card>
-
-            {/* Neutral */}
-            <Card className="p-5 text-center space-y-2" hoverEffect>
-              <div className="w-9 h-9 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center mx-auto">
-                <Meh className="w-5 h-5" />
-              </div>
-              <div className="text-3xl font-extrabold text-[#1F2430] dark:text-white">
-                {summary?.sentiment_breakdown?.neutral}%
-              </div>
-              <div className="text-xs font-semibold text-[#5B6475] dark:text-[#94A3B8]">
-                Inquiries & Questions
-              </div>
-            </Card>
-
-            {/* Critique */}
-            <Card variant="tintedPeach" className="p-5 text-center space-y-2 border-rose-200 dark:border-rose-900/40" hoverEffect>
-              <div className="w-9 h-9 rounded-full bg-rose-500 text-white flex items-center justify-center mx-auto shadow-xs">
-                <Frown className="w-5 h-5 fill-white" />
-              </div>
-              <div className="text-3xl font-extrabold text-rose-700 dark:text-rose-300">
-                {summary?.sentiment_breakdown?.negative}%
-              </div>
-              <div className="text-xs font-semibold text-rose-800 dark:text-rose-200">
-                Feedback & Critiques
-              </div>
-            </Card>
-          </div>
-
-          {/* Top Discussion Topics as Chips */}
-          <Card className="p-5 space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[#858D9D]">
-              Frequent Discussion Topics
-            </h3>
+          {/* Top Discussion Topics */}
+          <div className="pt-2 space-y-2">
+            <div className="text-xs font-bold uppercase tracking-wider text-[#5B6475] dark:text-[#94A3B8]">
+              Top Discussion Themes
+            </div>
             <div className="flex flex-wrap gap-2">
-              {summary?.top_themes?.map((th, i) => (
-                <div
-                  key={i}
-                  className="px-3.5 py-1.5 rounded-xl bg-[#FAF9F6] dark:bg-[#131825] border border-[#E8E6DF] dark:border-[#232B3E] text-xs font-semibold text-[#1F2430] dark:text-slate-200 flex items-center space-x-2"
+              {themes.map((t) => (
+                <button
+                  key={t.theme}
+                  onClick={() => setSelectedTheme(t.theme)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                    selectedTheme === t.theme
+                      ? 'bg-[#5B5BD6] text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
+                  }`}
                 >
-                  <Tag className="w-3 h-3 text-[#5B5BD6]" />
-                  <span className="capitalize">{th.theme}</span>
-                  <span className="text-[11px] text-[#5B6475] dark:text-[#94A3B8] font-mono">
-                    ({th.count})
-                  </span>
-                </div>
+                  {t.theme} ({t.count})
+                </button>
               ))}
             </div>
-          </Card>
-        </div>
-      </div>
+          </div>
+        </Card>
 
-      {/* Repeated Audience Questions (Idea Fuel) */}
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-base font-bold text-[#1F2430] dark:text-white flex items-center space-x-2">
-            <HelpCircle className="w-4 h-4 text-[#5B5BD6]" />
-            <span>Audience Questions (Your Next Content Goldmine)</span>
-          </h2>
-          <p className="text-xs text-[#5B6475] dark:text-[#94A3B8] mt-0.5">
-            Turn actual viewer curiosities into dedicated tutorials or shorts with one click.
-          </p>
-        </div>
+        {/* Right: Unanswered Viewer Questions with "Turn into Studio Idea" (7 cols) */}
+        <Card className="lg:col-span-7 p-6 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#E8E6DF] dark:border-[#232B3E]">
+            <div>
+              <h3 className="text-sm font-bold text-[#1F2430] dark:text-white flex items-center space-x-2">
+                <Lightbulb className="w-4 h-4 text-amber-500" />
+                <span>Viewer Questions to Answer ({repeatedQuestions.length})</span>
+              </h3>
+              <p className="text-xs text-[#5B6475] dark:text-[#94A3B8]">
+                Proven curiosity signals from your actual comment threads
+              </p>
+            </div>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {summary?.repeated_questions?.map((q) => (
-            <Card
-              key={q.comment_id}
-              className="p-5 flex flex-col justify-between space-y-3"
-              hoverEffect
-            >
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-6 h-6 rounded-full bg-[#EFECE6] dark:bg-[#202738] flex items-center justify-center font-bold text-xs text-[#5B5BD6]">
-                      {(q.author?.[0] || '?').toUpperCase()}
-                    </div>
-                    <span className="text-xs font-bold text-[#1F2430] dark:text-white">
-                      @{q.author}
+          <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+            {repeatedQuestions.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-400">
+                No repeated questions found for this filter.
+              </div>
+            ) : (
+              repeatedQuestions.map((q, idx) => (
+                <div
+                  key={idx}
+                  className="p-4 rounded-xl bg-[#FAF9F6] dark:bg-[#131825] border border-[#E8E6DF] dark:border-[#232B3E] space-y-2.5 hover:border-brand-300 transition"
+                >
+                  <div className="flex items-center justify-between">
+                    <PlatformBadge platform={q.platform} size="sm" showName />
+                    <span className="text-[11px] font-mono text-slate-400">
+                      {q.author}
                     </span>
                   </div>
-                  <PlatformBadge platform={q.platform} size="sm" />
+
+                  <p className="text-xs font-semibold text-[#1F2430] dark:text-slate-100 leading-relaxed">
+                    "{q.text}"
+                  </p>
+
+                  <div className="flex justify-end pt-1">
+                    <Button
+                      variant="teal"
+                      size="sm"
+                      icon={Sparkles}
+                      onClick={() => handleTurnIntoIdea(q.text, q.platform)}
+                    >
+                      Turn into Studio Idea
+                    </Button>
+                  </div>
                 </div>
-
-                <p className="text-xs sm:text-sm text-[#1F2430] dark:text-slate-200 italic leading-relaxed bg-[#FAF9F6] dark:bg-[#131825] p-3 rounded-xl border border-[#E8E6DF] dark:border-[#232B3E]">
-                  "{q.text}"
-                </p>
-              </div>
-
-              <div className="flex items-center justify-between pt-2 border-t border-[#EFECE6] dark:border-[#232B3E]">
-                <span className="text-[11px] text-[#5B6475] dark:text-[#94A3B8] capitalize">
-                  Theme: <strong>{q.theme}</strong>
-                </span>
-
-                <Button
-                  variant="primary"
-                  size="sm"
-                  icon={Sparkles}
-                  onClick={() => handleTurnIntoIdea(q.text, q.platform)}
-                >
-                  Turn into Content Idea
-                </Button>
-              </div>
-            </Card>
-          ))}
-        </div>
+              ))
+            )}
+          </div>
+        </Card>
       </div>
     </div>
   );

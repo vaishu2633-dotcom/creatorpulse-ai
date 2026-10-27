@@ -15,7 +15,10 @@ import SlideOver from '../components/ui/SlideOver';
 import AnimatedCounter from '../components/ui/AnimatedCounter';
 import { CardSkeleton, TableSkeleton } from '../components/ui/Skeleton';
 import Tooltip from '../components/ui/Tooltip';
+import HowItWorks from '../components/ui/HowItWorks';
+import StatusChip from '../components/ui/StatusChip';
 import HeroIllustration from '../assets/illustrations/hero-creator.svg';
+import { formatIsoDateTime } from '../utils/timeFormat';
 import {
   Users,
   Eye,
@@ -188,6 +191,24 @@ export default function Dashboard() {
           />
         </div>
       </div>
+
+      {/* How it Works Collapsible Strip */}
+      <HowItWorks
+        steps={[
+          {
+            title: 'Live Cross-Platform Overview',
+            description: 'Monitor audience growth, views, and engagement rates across YouTube, Instagram, X, and LinkedIn.'
+          },
+          {
+            title: 'Breakout Detection',
+            description: 'Algorithms automatically detect posts exceeding your 90th percentile baseline engagement.'
+          },
+          {
+            title: "Today's Focus Recommendations",
+            description: 'Act on algorithmic suggestions derived from your highest-converting release times and topics.'
+          }
+        ]}
+      />
 
       {/* 4 Summary Cards (with Animated Counter) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -46,6 +46,7 @@ def create_draft(req: DraftCreateRequest):
     return saved
 
 @router.put("/{draft_id}")
+@router.patch("/{draft_id}")
 def update_draft(draft_id: str, req: DraftUpdateRequest):
     updates = {k: v for k, v in req.model_dump().items() if v is not None}
     updated = data_access.update_draft(draft_id, updates)

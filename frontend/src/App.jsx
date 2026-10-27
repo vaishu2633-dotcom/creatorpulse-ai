@@ -15,6 +15,7 @@ import ImbalanceLab from './pages/ImbalanceLab';
 import CalendarDrafts from './pages/CalendarDrafts';
 import CommentInsights from './pages/CommentInsights';
 import Settings from './pages/Settings';
+import VibeCheck from './pages/VibeCheck';
 
 export default function App() {
   return (
@@ -25,10 +26,12 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Layout />}>
                 <Route index element={<Dashboard />} />
+                <Route path="results" element={<PredictionHistory />} />
+                <Route path="vibecheck" element={<VibeCheck />} />
                 <Route path="trends" element={<TrendExplorer />} />
                 <Route path="predictor" element={<ViralPredictor />} />
                 <Route path="studio" element={<ContentStudio />} />
-                <Route path="history" element={<PredictionHistory />} />
+                <Route path="history" element={<Navigate to="/results" replace />} />
                 <Route path="ml-lab" element={<ImbalanceLab />} />
                 <Route path="drafts" element={<CalendarDrafts />} />
                 <Route path="comments" element={<CommentInsights />} />

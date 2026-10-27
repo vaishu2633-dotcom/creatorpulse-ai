@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" fill="none">
+  <defs>
+    <linearGradient id="audBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EC4899" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#8B5CF6" stop-opacity="0.04"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="320" height="240" rx="20" fill="url(#audBg)"/>
+
+  <!-- Centered Mood Ring (Donut) -->
+  <g transform="translate(85, 45)">
+    <!-- Positive segment -->
+    <circle cx="75" cy="75" r="50" stroke="#10B981" stroke-width="16" stroke-dasharray="210 320" stroke-linecap="round"/>
+    <!-- Inquiries segment -->
+    <circle cx="75" cy="75" r="50" stroke="#94A3B8" stroke-width="16" stroke-dasharray="70 320" stroke-dashoffset="-215" stroke-linecap="round"/>
+    <!-- Critiques segment -->
+    <circle cx="75" cy="75" r="50" stroke="#F43F5E" stroke-width="16" stroke-dasharray="35 320" stroke-dashoffset="-290" stroke-linecap="round"/>
+
+    <!-- Center Icon Circle -->
+    <circle cx="75" cy="75" r="30" fill="#FFFFFF" filter="drop-shadow(0 4px 10px rgba(0,0,0,0.06))"/>
+    <!-- Soundwave / Speech symbol -->
+    <path d="M63 75 H67 M70 68 V82 M75 62 V88 M80 68 V82 M83 75 H87" stroke="#5B5BD6" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+
+  <!-- Floating Question / Feedback bubble -->
+  <g transform="translate(195, 35)">
+    <rect width="80" height="36" rx="10" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" filter="drop-shadow(0 4px 10px rgba(0,0,0,0.05))"/>
+    <circle cx="16" cy="18" r="6" fill="#EC4899"/>
+    <rect x="28" y="15" width="40" height="6" rx="3" fill="#64748B"/>
+    <!-- Speech tail -->
+    <path d="M25 36 L20 42 L30 36 Z" fill="#FFFFFF"/>
+  </g>
+
+  <g transform="translate(45, 160)">
+    <rect width="88" height="32" rx="10" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" filter="drop-shadow(0 4px 10px rgba(0,0,0,0.05))"/>
+    <circle cx="15" cy="16" r="5" fill="#10B981"/>
+    <rect x="26" y="13" width="46" height="6" rx="3" fill="#64748B"/>
+  </g>
+</svg>

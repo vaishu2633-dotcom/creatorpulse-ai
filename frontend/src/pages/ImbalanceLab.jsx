@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { getMlResults } from '../api/apiClient';
+import PageHeader from '../components/ui/PageHeader';
+import HowItWorks from '../components/ui/HowItWorks';
+import StatusChip from '../components/ui/StatusChip';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import SlideOver from '../components/ui/SlideOver';
 import Tabs from '../components/ui/Tabs';
 import Tooltip from '../components/ui/Tooltip';
+import ErrorState from '../components/ui/ErrorState';
 import { CardSkeleton } from '../components/ui/Skeleton';
+import ResearchLabIllustration from '../assets/illustrations/research-lab.svg';
 import {
   FlaskConical,
   BarChart2,
@@ -26,6 +31,21 @@ import {
   ResponsiveContainer,
   CartesianGrid
 } from 'recharts';
+
+const HOW_IT_WORKS_STEPS = [
+  {
+    title: 'Select Hit Rarity',
+    description: 'Use the slider to see how models behave when breakouts are 1 in 5 (20%) down to 1 in 100 (1%).'
+  },
+  {
+    title: 'Compare 8 ML Techniques',
+    description: 'Benchmark standard baseline against Class Weights, SMOTE oversampling, and Balanced Random Forest.'
+  },
+  {
+    title: 'Review Honest Test Results',
+    description: 'Measure precision, recall, and PR-AUC to ensure high accuracy isn\'t simply guessing "no hit" every time.'
+  }
+];
 
 const PLAIN_METHODS = {
   baseline_none: {
@@ -97,29 +117,27 @@ export default function ImbalanceLab() {
   // Slide-over inspection for method explanation
   const [activeMethodKey, setActiveMethodKey] = useState(null);
 
-  useEffect(() => {
-    let isMounted = true;
+  const fetchData = () => {
     setLoading(true);
+    setError(null);
     getMlResults()
       .then((res) => {
-        if (!isMounted) return;
-        setData(res.data);
+        setData(res);
         setLoading(false);
       })
       .catch((err) => {
-        if (!isMounted) return;
-        setError(err.message || 'Failed to load model test results');
+        setError(err.message || 'Failed to fetch ML lab results');
         setLoading(false);
       });
+  };
 
-    return () => {
-      isMounted = false;
-    };
+  useEffect(() => {
+    fetchData();
   }, []);
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 max-w-7xl mx-auto">
         <div className="h-32 rounded-2xl bg-white dark:bg-[#171D2B] animate-pulse" />
         <CardSkeleton />
         <CardSkeleton />
@@ -129,11 +147,12 @@ export default function ImbalanceLab() {
 
   if (error) {
     return (
-      <div className="space-y-6">
-        <div className="p-6 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-200">
-          <h2 className="text-base font-bold mb-1">Failed to load Model Tests</h2>
-          <p className="text-sm">{error}</p>
-        </div>
+      <div className="max-w-7xl mx-auto">
+        <ErrorState
+          title="Failed to load Model Tests"
+          description={error}
+          onRetry={fetchData}
+        />
       </div>
     );
   }
@@ -156,34 +175,34 @@ export default function ImbalanceLab() {
   });
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#1F2430] dark:text-white flex items-center space-x-2.5">
-          <span>Model Tests</span>
-          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-[#5B5BD6] dark:text-brand-300 border border-brand-200 dark:border-brand-800">
-            How we handle rare hits
-          </span>
-        </h1>
-        <p className="text-sm text-[#5B6475] dark:text-[#94A3B8] mt-1 max-w-3xl">
-          Hit posts are naturally rare (5% to 10% of all content). Here is how we train models to detect them accurately without being fooled by plain accuracy.
-        </p>
+    <div className="space-y-8 max-w-7xl mx-auto pb-16">
+      {/* Page Header */}
+      <PageHeader
+        title="Model Tests"
+        subtitle="How we train machine learning models to detect rare breakout posts without false confidence"
+        tag="Research Lab"
+        status="Uses sample data"
+        icon={FlaskConical}
+        illustration={ResearchLabIllustration}
+      />
 
-        {/* Friendly Plain Explanation of Rare Events */}
-        <div className="mt-4 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 text-xs text-amber-900 dark:text-amber-200 space-y-1.5 leading-relaxed">
-          <div className="flex items-center space-x-2 font-bold text-amber-950 dark:text-amber-100">
-            <Lightbulb className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-            <span>Why "Plain Accuracy" is a trap for creator analytics</span>
-          </div>
-          <p>
-            If only 1 in 100 posts goes viral, a lazy AI model could guess "Not a hit" for every single post and boast a 99% accuracy score — while failing to help you even once!
-            That is why we use <strong>PR-AUC, F1, and Precision-Recall</strong> instead of plain accuracy.
-          </p>
+      {/* How it Works Strip */}
+      <HowItWorks steps={HOW_IT_WORKS_STEPS} />
+
+      {/* Plain Explanation Banner */}
+      <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 text-xs text-amber-900 dark:text-amber-200 space-y-1.5 leading-relaxed shadow-xs">
+        <div className="flex items-center space-x-2 font-bold text-amber-950 dark:text-amber-100">
+          <Lightbulb className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+          <span>Why "Plain Accuracy" is a trap for creator analytics</span>
         </div>
+        <p>
+          If only 1 in 100 posts goes viral, a naive model could simply predict "Not a hit" for every single post and boast a 99% accuracy score — while failing to help you even once!
+          That is why CreatorPulse evaluates models on <strong>PR-AUC, F1, and Precision-Recall</strong> instead of plain accuracy.
+        </p>
       </div>
 
-      {/* Rarity Scenario Chips */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-3 rounded-2xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] shadow-soft">
+      {/* Rarity Scenario Chips & Metric Selector */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] shadow-xs">
         <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 sm:pb-0">
           {[
             { id: '80_20', label: '1 in 5 is a hit (80:20)' },
@@ -206,7 +225,7 @@ export default function ImbalanceLab() {
         </div>
 
         {/* Metric Selector */}
-        <div className="flex items-center space-x-2 shrink-0 px-1">
+        <div className="flex items-center space-x-2 shrink-0">
           <span className="text-xs font-semibold text-[#5B6475] dark:text-[#94A3B8]">
             Compare by:
           </span>
@@ -228,7 +247,7 @@ export default function ImbalanceLab() {
       <Card className="p-6 space-y-4">
         <div>
           <h2 className="text-base font-bold text-[#1F2430] dark:text-white">
-            Performance: {METRIC_OPTIONS.find((m) => m.id === activeMetric)?.label}
+            Test Results: {METRIC_OPTIONS.find((m) => m.id === activeMetric)?.label}
           </h2>
           <p className="text-xs text-[#5B6475] dark:text-[#94A3B8] mt-0.5">
             Scenario: {currentScenario?.name} • Evaluated on 360 held-out recent chronological posts
@@ -252,6 +271,7 @@ export default function ImbalanceLab() {
                 width={150}
               />
               <RechartsTooltip
+                formatter={(val) => [Number(val).toFixed(4), METRIC_OPTIONS.find((m) => m.id === activeMetric)?.label]}
                 contentStyle={{
                   backgroundColor: '#FFFFFF',
                   borderColor: '#E8E6DF',
@@ -265,47 +285,44 @@ export default function ImbalanceLab() {
         </div>
       </Card>
 
-      {/* Detailed Methods Grid (Clickable to open SlideOver) */}
+      {/* Cards of Techniques with Flip Explanations */}
       <div className="space-y-4">
-        <h2 className="text-base font-bold text-[#1F2430] dark:text-white">
-          Techniques Tested (Click any for plain explanation)
-        </h2>
+        <div>
+          <h3 className="text-sm font-bold text-[#1F2430] dark:text-white">
+            8 Imbalanced Learning Techniques Tested
+          </h3>
+          <p className="text-xs text-[#5B6475] dark:text-[#94A3B8] mt-0.5">
+            Click any method card for mathematical details and implementation notes.
+          </p>
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {Object.entries(methodsObj).map(([key, m]) => {
-            const info = PLAIN_METHODS[key] || { title: key, tech: key };
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Object.entries(methodsObj).map(([key, metrics]) => {
+            const info = PLAIN_METHODS[key] || { title: key, tech: key, desc: '' };
 
             return (
               <Card
                 key={key}
                 hoverEffect
                 onClick={() => setActiveMethodKey(key)}
-                className="p-5 flex flex-col justify-between cursor-pointer space-y-3"
+                className="p-5 flex flex-col justify-between space-y-3 cursor-pointer"
               >
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <h3 className="text-sm font-bold text-[#1F2430] dark:text-white">
-                      {info.title}
-                    </h3>
-                    <span className="text-xs font-bold text-[#5B5BD6] dark:text-brand-300 font-mono">
-                      Score: {m[activeMetric]}
-                    </span>
-                  </div>
-                  <div className="text-[11px] font-mono text-slate-400">
+                  <div className="text-[10px] font-mono font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
                     {info.tech}
                   </div>
-                  <p className="text-xs text-[#5B6475] dark:text-[#94A3B8] mt-2 line-clamp-2 leading-relaxed">
+                  <h4 className="text-sm font-bold text-[#1F2430] dark:text-white">
+                    {info.title}
+                  </h4>
+                  <p className="text-xs text-[#5B6475] dark:text-[#94A3B8] mt-1 line-clamp-2">
                     {info.desc}
                   </p>
                 </div>
 
-                <div className="flex items-center justify-between pt-3 border-t border-[#EFECE6] dark:border-[#232B3E] text-xs">
-                  <span className="text-[#5B6475] dark:text-[#94A3B8]">
-                    F1: <strong className="text-[#1F2430] dark:text-white font-mono">{m.f1}</strong> • Rec: <strong className="text-[#1F2430] dark:text-white font-mono">{m.recall}</strong>
-                  </span>
-                  <span className="text-[#5B5BD6] font-semibold flex items-center space-x-1">
-                    <span>Learn more</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                <div className="pt-2 border-t border-[#EFECE6] dark:border-[#232B3E] flex items-center justify-between text-xs">
+                  <span className="text-slate-400 text-[11px]">Quality (PR-AUC)</span>
+                  <span className="font-mono font-bold text-[#5B5BD6] dark:text-brand-300">
+                    {metrics.pr_auc}
                   </span>
                 </div>
               </Card>
@@ -314,49 +331,53 @@ export default function ImbalanceLab() {
         </div>
       </div>
 
-      {/* Slide-over: Method Plain Language Explainer */}
+      {/* Slide-over Inspection */}
       <SlideOver
-        isOpen={Boolean(activeMethodKey)}
+        open={Boolean(activeMethodKey)}
         onClose={() => setActiveMethodKey(null)}
-        title={PLAIN_METHODS[activeMethodKey]?.title}
-        subtitle={PLAIN_METHODS[activeMethodKey]?.tech}
-        footer={
-          <div className="flex justify-end">
-            <Button variant="secondary" size="sm" onClick={() => setActiveMethodKey(null)}>
-              Close
-            </Button>
-          </div>
-        }
+        title={PLAIN_METHODS[activeMethodKey]?.title || 'Technique Breakdown'}
       >
         {activeMethodKey && (
-          <div className="space-y-5 text-xs sm:text-sm">
-            <div className="p-4 rounded-xl bg-brand-50 dark:bg-brand-950/40 border border-brand-200 dark:border-brand-800 text-[#313083] dark:text-brand-300">
-              <span className="font-bold text-xs uppercase tracking-wider block mb-1">
-                How it works in plain terms
+          <div className="space-y-5">
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#141A28] border border-[#E8E6DF] dark:border-[#232B3E] space-y-1">
+              <span className="text-[10px] font-mono text-slate-400">
+                Technical identifier: {PLAIN_METHODS[activeMethodKey]?.tech}
               </span>
-              <p className="leading-relaxed">
+              <p className="text-xs text-[#1F2430] dark:text-slate-200 leading-relaxed">
                 {PLAIN_METHODS[activeMethodKey]?.desc}
               </p>
             </div>
 
-            <div className="space-y-1.5">
-              <span className="font-bold text-[#1F2430] dark:text-white">
-                Practical impact on your hit alerts:
-              </span>
-              <p className="text-[#5B6475] dark:text-[#94A3B8] leading-relaxed">
+            <div className="p-4 rounded-xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] space-y-2">
+              <div className="text-xs font-bold text-[#5B6475] dark:text-[#94A3B8] uppercase tracking-wider">
+                Practical Creator Impact
+              </div>
+              <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
                 {PLAIN_METHODS[activeMethodKey]?.impact}
               </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-[#FAF9F6] dark:bg-[#131825] border border-[#E8E6DF] dark:border-[#232B3E] space-y-2">
-              <span className="font-bold text-xs uppercase tracking-wider text-[#858D9D] block">
-                Recorded benchmark numbers in active scenario:
-              </span>
-              <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                <div>Quality (PR-AUC): <strong className="text-[#5B5BD6]">{methodsObj[activeMethodKey]?.pr_auc}</strong></div>
-                <div>F1 Score: <strong className="text-[#1F2430] dark:text-white">{methodsObj[activeMethodKey]?.f1}</strong></div>
-                <div>Hits Caught (Recall): <strong className="text-emerald-600">{methodsObj[activeMethodKey]?.recall}</strong></div>
-                <div>Precision: <strong className="text-indigo-600">{methodsObj[activeMethodKey]?.precision}</strong></div>
+            <div className="p-4 rounded-xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] space-y-2">
+              <div className="text-xs font-bold text-[#5B6475] dark:text-[#94A3B8] uppercase tracking-wider">
+                Scenario Performance ({activeRatio.replace('_', ':')})
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                <div>
+                  <span className="text-slate-400">PR-AUC:</span>{' '}
+                  <strong className="font-mono">{methodsObj[activeMethodKey]?.pr_auc}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-400">F1 Score:</span>{' '}
+                  <strong className="font-mono">{methodsObj[activeMethodKey]?.f1}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-400">Precision:</span>{' '}
+                  <strong className="font-mono">{methodsObj[activeMethodKey]?.precision}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-400">Recall:</span>{' '}
+                  <strong className="font-mono">{methodsObj[activeMethodKey]?.recall}</strong>
+                </div>
               </div>
             </div>
           </div>
