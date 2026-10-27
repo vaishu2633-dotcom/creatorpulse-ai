@@ -11,19 +11,19 @@
 
 ## 🌟 Key Features & Core Pillars
 
-CreatorPulse AI delivers three main pillars tailored specifically for modern creators:
+CreatorPulse AI delivers four main pillars tailored specifically for modern creators:
 
 1. **Creator Intelligence (Dashboard, Trends & Audience Voice)**
    - **Cross-Platform Dashboard**: Aggregated summary cards (followers, impressions, engagement rates, breakout count) and an interactive 30-day engagement trajectory area chart.
    - **Data Provenance & Freshness**: Every card explicitly reports data origin (`Data source: mock data`) and a last-refreshed timestamp.
-   - **Trend Explorer**: Detect emerging conversation angles across platforms with 24-hour, 7-day, and 30-day velocity filters and narrative strength gauges. One-click sends trending topics directly into the Content Studio.
+   - **Trend Explorer**: Detect emerging conversation angles across platforms with interactive SVG Bubble Radar (bubble size = momentum, color = platform), map/grid view switcher, and 24-hour, 7-day, and 30-day velocity filters.
    - **Audience Voice (Comment Insights)**: Community mood breakdown (positive, neutral, critiques) paired with repeated viewer questions that can be transformed into content ideas with a single click.
 
 2. **ViralScope Prediction Engine**
    - **Calibrated Hit Probability**: Predicts the likelihood that a draft post achieves a "breakout" hit status (e.g., `"18% (usual baseline: 5%)"`), never promising certainty.
    - **Contextual Anchoring & Diagnostics**: Displays realistic performance bounds (ranges), confidence ratings (low/medium/high), top algorithmic reasoning factors, and 3 comparable past posts.
    - **Customizable Percentile Strictness**: Adjust performance thresholds (`Top 20%`, `Top 10%`, `Top 5%`, or `Top 1% rare breakout`).
-   - **Prediction Results & Scoreboard**: Comprehensive historical audit table tracking past predictions against actual post views, featuring a Brier score accuracy loss meter and calibration chart.
+   - **Prediction Results & Mathematical Scoreboard**: Comprehensive historical audit table tracking past predictions against actual post views, featuring a mathematically sound Brier score comparison against naive baseline guessing ($B_{\text{baseline}} = p(1-p)$), sample size indicator ($N$), and low-sample warning banner when $N < 30$.
 
 3. **ReelGenius Content Studio & Operations**
    - **Platform-Tailored Formats**:
@@ -33,8 +33,20 @@ CreatorPulse AI delivers three main pillars tailored specifically for modern cre
      - *LinkedIn*: Narrative story post and actionable 5-point listicle.
    - **Multi-Lingual Generation**: Seamlessly outputs scripts and copy in **English**, **Hindi (हिंदी)**, and **Marathi (मराठी)**.
    - **Best Ideas Tournament**: Automatically generates 10 creative angles, scores each with the ViralScope prediction service, and ranks them by hit potential.
-   - **Calendar & Drafts**: Kanban-style board and list views to track ideas through the creator lifecycle (`Idea`, `Drafted`, `Scheduled`, `Published`).
+   - **Calendar & Drafts**: Kanban-style board (`Idea`, `Writing`, `Scheduled`, `Published`) and calendar grid view with CSV export and reliable error states.
    - **Model Tests (Imbalance Lab)**: Interactive benchmark comparison of 8 class-imbalance mitigation techniques (class weights, ROS, SMOTE, SMOTE-Tomek, Balanced Random Forest, XGBoost, and Threshold Tuning) across 4 extreme rarity ratios (80:20, 90:10, 95:5, 99:1).
+
+4. **VibeCheck AI (Community Sentiment & Emotional Analysis Engine)**
+   - **Multi-Source Ingestion**:
+     - *YouTube Data API v3*: Direct comment threads with API quota handling and sample data fallback.
+     - *Instagram & TikTok*: Public oEmbed metadata adapters with transparent policy disclosures.
+     - *Manual Ingestion*: Pasted raw comments, uploaded CSV comment files, and SRT/transcript parser.
+     - *Whisper Audio Guide*: Step-by-step instructions for local offline transcription using OpenAI Whisper.
+   - **VADER Sentiment Engine**: Compound, positive, neutral, and negative sentiment distribution with built-in sarcasm disclaimers.
+   - **8-Category Emotional Vibe Clustering**: Categorizes comments into *Enthusiastic*, *Curious & Inquiring*, *Critical & Skeptical*, *Humorous & Memeing*, *Supportive & Wholesome*, *Confused & Puzzled*, *Frustrated & Annoyed*, and *Neutral & Informative*.
+   - **Spam & Bot Detection**: Flags spam patterns (crypto scams, WhatsApp contacts, automated bot bots) with 1-click comment isolation.
+   - **Evidence-Backed Recommendations**: Concrete creator action items explicitly citing supporting comment volume (e.g., *"14 viewers asked about setup costs"*).
+   - **Persistent History & Export**: Saves full analysis reports and exports clean CSVs.
 
 ---
 
@@ -47,17 +59,18 @@ CreatorPulse AI delivers three main pillars tailored specifically for modern cre
   - Lucide React (creator-focused iconography)
   - Recharts (responsive trajectory area charts, calibration bar charts, and mood donut visualizations)
   - React Router v7
-* **Backend**:
+* **Backend & Analytics**:
   - Python 3.10+ / 3.12
   - FastAPI (REST API with CORS and modular routers)
   - Pydantic v2 (data schema contracts)
   - Uvicorn (high-performance ASGI web server)
-* **Machine Learning & Analytics**:
+  - VADER Sentiment (`vaderSentiment` for rule-based text sentiment)
   - scikit-learn (CalibratedClassifierCV, RandomForest, LogisticRegression, time-based splits)
   - imbalanced-learn (SMOTE, SMOTE-Tomek, BalancedRandomForestClassifier, RandomOverSampler)
   - XGBoost (gradient boosting with weighted loss)
+  - httpx (async HTTP requests for YouTube and oEmbed endpoints)
 * **Storage & Persistence**:
-  - Zero-database prototype using pure JSON flat files managed strictly through an isolated Data Access Layer (DAL).
+  - Zero-database prototype using pure JSON flat files managed strictly through an isolated Data Access Layer (DAL). Supports real CSV post analytics ingestion.
 
 ---
 
@@ -67,8 +80,8 @@ CreatorPulse AI delivers three main pillars tailored specifically for modern cre
 creatorpulse-ai/
 ├── backend/
 │   ├── main.py                     # FastAPI server entry point & CORS configuration
-│   ├── .env.example                # Example environment configuration
-│   ├── requirements.txt            # Python dependencies (FastAPI, scikit-learn, etc.)
+│   ├── .env.example                # Example environment configuration (YouTube, LLM keys)
+│   ├── requirements.txt            # Python dependencies (FastAPI, scikit-learn, VADER, etc.)
 │   ├── ml/
 │   │   ├── generate_data.py        # Generates synthetic data across 4 platforms
 │   │   ├── train.py                # Time-based split training & imbalance benchmarking
@@ -77,22 +90,33 @@ creatorpulse-ai/
 │   ├── services/
 │   │   ├── data_access.py          # EXCLUSIVE Data Access Layer (DAL) for all reads/writes
 │   │   ├── prediction.py           # Calibrated prediction inference & diagnostics
-│   │   └── content_generator.py    # Multi-lingual templates & external LLM adapter
-│   ├── routers/                    # Feature routers (dashboard, trends, studio, etc.)
-│   └── data/                       # Mock data files (posts, creators, snapshots, drafts)
+│   │   ├── content_generator.py    # Multi-lingual templates & external LLM adapter
+│   │   └── vibecheck/              # VibeCheck AI engine & multi-platform adapters
+│   │       ├── base.py             # Data models & adapter interface
+│   │       ├── youtube_adapter.py  # YouTube Data API v3 & sample fallback
+│   │       ├── instagram_adapter.py# Instagram oEmbed adapter
+│   │       ├── tiktok_adapter.py   # TikTok oEmbed adapter
+│   │       ├── manual_adapter.py   # User paste, SRT transcripts & CSV parser
+│   │       └── analysis.py         # VADER sentiment, 8 vibes & spam detection
+│   ├── routers/                    # Feature routers (dashboard, trends, studio, vibecheck, etc.)
+│   └── data/                       # Mock data files (posts, creators, snapshots, drafts, reports)
 ├── frontend/
 │   ├── src/
 │   │   ├── api/apiClient.js        # Centralized typed API client
 │   │   ├── context/                # ThemeContext, ToastContext, PlatformContext
+│   │   ├── utils/timeFormat.js     # Clean 12-hour/24-hour time & date formatting
 │   │   ├── components/             # Reusable UI cards, slide-overs, badges, navbar
-│   │   │   ├── ui/                 # Accessible button, card, tabs, skeleton loaders
+│   │   │   ├── ui/                 # Input, Select, Modal, Table, ErrorState, PageHeader, HowItWorks
 │   │   │   └── SocialIcons.jsx     # Official platform brand SVG icons
-│   │   ├── assets/illustrations/   # On-brand local SVG illustrations
-│   │   └── pages/                  # 9 creator feature pages
+│   │   ├── assets/illustrations/   # On-brand local SVG illustrations (no external deps)
+│   │   └── pages/                  # 10 creator feature pages (Dashboard, VibeCheck, Predictor, etc.)
 │   ├── package.json
 │   ├── vite.config.js              # Vite bundler configuration & backend API proxy
 │   └── eslint.config.js            # Code hygiene & undefined identifier rules
+├── tests/
+│   └── test_backend.py             # Pytest suite testing all routers & VibeCheck engine
 ├── docs/                           # Project reports, whitepapers, and documentation
+├── AUDIT.md                        # Complete feature audit matrix & verification logs
 ├── .gitignore                      # Safe multi-stack ignore rules
 └── README.md                       # Master project overview and documentation
 ```
@@ -133,10 +157,14 @@ python -m backend.ml.train
 
 # Step C: Start the FastAPI backend server
 uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
+
+# Step D: (Optional) Run the complete backend test suite
+python -m pytest tests/test_backend.py
 ```
 
 * Backend will be active at: `http://127.0.0.1:8000`
 * Interactive OpenAPI Swagger docs: `http://127.0.0.1:8000/docs`
+* Environment variables: Copy `backend/.env.example` to `backend/.env` to configure optional `YOUTUBE_API_KEY` (for live YouTube comments) or `LLM_API_KEY`. Without keys, the app automatically runs in graceful mock/sample mode.
 
 ---
 
