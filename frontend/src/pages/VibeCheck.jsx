@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import PageHeader from '../components/ui/PageHeader';
 import HowItWorks from '../components/ui/HowItWorks';
 import StatusChip from '../components/ui/StatusChip';
@@ -7,6 +8,7 @@ import Button from '../components/ui/Button';
 import SlideOver from '../components/ui/SlideOver';
 import ErrorState from '../components/ui/ErrorState';
 import { useToast } from '../context/ToastContext';
+import { analyzeVibe, getVibeCheckHistory, deleteVibeCheckReport } from '../api/apiClient';
 import {
   SearchCheck,
   Sparkles,
@@ -84,6 +86,8 @@ export default function VibeCheck() {
   const [sentimentFilter, setSentimentFilter] = useState('all');
   const [copiedWhisper, setCopiedWhisper] = useState(false);
 
+  const location = useLocation();
+
   // History slide-over
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyReports, setHistoryReports] = useState([]);
@@ -95,11 +99,26 @@ export default function VibeCheck() {
   useEffect(() => {
     fetchSupportedPlatforms();
     fetchHistory();
-  }, []);
+
+    // Check URL query parameters (e.g. from Dashboard VibeCheck strip)
+    const params = new URLSearchParams(location.search);
+    const targetUrl = params.get('url');
+    const autoAnalyze = params.get('auto');
+
+    if (targetUrl) {
+      setUrlInput(targetUrl);
+      setActiveTab('url');
+      if (autoAnalyze === 'true') {
+        setTimeout(() => {
+          runAnalysisForUrl(targetUrl);
+        }, 200);
+      }
+    }
+  }, [location.search]);
 
   const fetchSupportedPlatforms = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/vibecheck/supported-platforms');
+      const res = await fetch('/api/vibecheck/supported-platforms');
       if (res.ok) {
         const data = await res.json();
         setPlatformsInfo(data.platforms || []);
@@ -112,15 +131,40 @@ export default function VibeCheck() {
   const fetchHistory = async () => {
     setLoadingHistory(true);
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/vibecheck/history');
-      if (res.ok) {
-        const data = await res.json();
-        setHistoryReports(data.reports || []);
-      }
+      const data = await getVibeCheckHistory();
+      setHistoryReports(data.reports || []);
     } catch {
       // quiet fallback
     } finally {
       setLoadingHistory(false);
+    }
+  };
+
+  const runAnalysisForUrl = async (url) => {
+    setError(null);
+    setLoading(true);
+    setLoadingStep(1);
+
+    const stepInterval = setInterval(() => {
+      setLoadingStep((prev) => (prev < 4 ? prev + 1 : prev));
+    }, 700);
+
+    try {
+      const data = await analyzeVibe({
+        target: url,
+        input_type: 'url',
+        save_to_history: true,
+      });
+      clearInterval(stepInterval);
+      setAnalysis(data);
+      addToast('VibeCheck analysis completed successfully!', 'success');
+      fetchHistory();
+    } catch (err) {
+      clearInterval(stepInterval);
+      setError(err.message || 'Could not complete analysis.');
+    } finally {
+      setLoading(false);
+      setLoadingStep(0);
     }
   };
 
@@ -181,23 +225,11 @@ export default function VibeCheck() {
     }
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/vibecheck/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
+      const data = await analyzeVibe(payload);
       clearInterval(stepInterval);
-
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.detail || 'Analysis request failed');
-      }
-
-      const data = await res.json();
       setAnalysis(data);
       addToast('VibeCheck analysis completed successfully!', 'success');
-      fetchHistory(); // refresh history list
+      fetchHistory();
     } catch (err) {
       clearInterval(stepInterval);
       setError(err.message || 'Could not complete analysis. Check server connection.');
@@ -236,13 +268,9 @@ export default function VibeCheck() {
   const deleteReport = async (reportId, e) => {
     e.stopPropagation();
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/vibecheck/history/${reportId}`, {
-        method: 'DELETE'
-      });
-      if (res.ok) {
-        setHistoryReports((prev) => prev.filter((r) => r.report_id !== reportId));
-        addToast('Report deleted', 'info');
-      }
+      await deleteVibeCheckReport(reportId);
+      setHistoryReports((prev) => prev.filter((r) => r.report_id !== reportId));
+      addToast('Report deleted', 'info');
     } catch {
       addToast('Failed to delete report', 'error');
     }

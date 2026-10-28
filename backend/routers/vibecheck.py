@@ -18,6 +18,8 @@ from backend.services.vibecheck import (
     VibeAnalyzer
 )
 
+import os
+
 router = APIRouter(prefix="/api/vibecheck", tags=["VibeCheck AI"])
 
 # Initialize adapters
@@ -25,6 +27,20 @@ yt_adapter = YouTubeAdapter()
 ig_adapter = InstagramAdapter()
 tt_adapter = TikTokAdapter()
 manual_adapter = ManualAdapter()
+
+
+@router.get("/status")
+def get_vibecheck_status():
+    """Returns whether live YouTube API is configured or operating in sample mode."""
+    api_key = os.getenv("YOUTUBE_API_KEY", "").strip()
+    is_live = bool(api_key)
+    return {
+        "youtube_api_configured": is_live,
+        "status": "live" if is_live else "limited",
+        "badge_label": "Live" if is_live else "Limited",
+        "badge_color": "green" if is_live else "gray",
+        "message": "Connected to official YouTube Data API v3" if is_live else "Operating in sample data mode (add YOUTUBE_API_KEY in backend/.env for live comments)"
+    }
 
 
 class AnalyzeRequest(BaseModel):
