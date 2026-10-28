@@ -52,22 +52,22 @@
 }
 
 :root {
-  --bg-page: #F7F6F3;
+  --bg-page: #F8F7FC;
   --bg-card: #FFFFFF;
-  --bg-card-subtle: #FAF9F6;
-  --border-card: #E8E6DF;
-  --text-main: #1F2430;
-  --text-muted: #5B6475;
-  --text-soft: #858D9D;
+  --bg-card-subtle: #F5F3FF;
+  --border-card: #EAE7F5;
+  --text-main: #1E1B4B;
+  --text-muted: #64748B;
+  --text-soft: #94A3B8;
   color-scheme: light;
 }
 
 .dark {
-  --bg-page: #0F1420;
-  --bg-card: #171D2B;
-  --bg-card-subtle: #131825;
-  --border-card: #232B3E;
-  --text-main: #F1F5F9;
+  --bg-page: #0B0F19;
+  --bg-card: #131927;
+  --bg-card-subtle: #192033;
+  --border-card: #1F293D;
+  --text-main: #F8FAFC;
   --text-muted: #94A3B8;
   --text-soft: #64748B;
   color-scheme: dark;

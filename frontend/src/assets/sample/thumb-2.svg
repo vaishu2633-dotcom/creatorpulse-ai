@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="320" height="180" fill="none">
+  <defs>
+    <linearGradient id="g2" x1="0" y1="0" x2="320" y2="180" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0284C7"/>
+      <stop offset="100%" stop-color="#2563EB"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="180" rx="16" fill="url(#g2)"/>
+  <circle cx="260" cy="140" r="70" fill="#ffffff" fill-opacity="0.08"/>
+  
+  <!-- AI Neural Network graphic -->
+  <rect x="36" y="36" width="248" height="108" rx="12" fill="#0B132B" fill-opacity="0.75" stroke="#38BDF8" stroke-width="1.5" stroke-opacity="0.5"/>
+  <circle cx="70" cy="90" r="14" fill="#38BDF8" fill-opacity="0.3" stroke="#38BDF8" stroke-width="2"/>
+  <circle cx="160" cy="65" r="14" fill="#818CF8" fill-opacity="0.3" stroke="#818CF8" stroke-width="2"/>
+  <circle cx="160" cy="115" r="14" fill="#818CF8" fill-opacity="0.3" stroke="#818CF8" stroke-width="2"/>
+  <circle cx="250" cy="90" r="14" fill="#34D399" fill-opacity="0.3" stroke="#34D399" stroke-width="2"/>
+  
+  <line x1="84" y1="90" x2="146" y2="65" stroke="#BAE6FD" stroke-width="2" stroke-dasharray="4 3"/>
+  <line x1="84" y1="90" x2="146" y2="115" stroke="#BAE6FD" stroke-width="2" stroke-dasharray="4 3"/>
+  <line x1="174" y1="65" x2="236" y2="90" stroke="#BAE6FD" stroke-width="2" stroke-dasharray="4 3"/>
+  <line x1="174" y1="115" x2="236" y2="90" stroke="#BAE6FD" stroke-width="2" stroke-dasharray="4 3"/>
+</svg>

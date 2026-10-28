@@ -5,25 +5,25 @@ import Button from './Button';
 
 const TOUR_STEPS = [
   {
-    title: 'Welcome to CreatorPulse AI! 👋',
-    desc: 'Your friendly copilot for YouTube, Instagram, X, and LinkedIn. We help you create with confidence instead of guessing.',
+    title: 'Welcome to CreatorPulse AI',
+    desc: 'Your friendly studio for YouTube, Instagram, X, and LinkedIn. We help you create with confidence instead of guessing.',
     icon: Sparkles,
     color: 'text-brand-500 bg-brand-50 dark:bg-brand-950/50',
   },
   {
-    title: 'Pillar 1: Discover Trends & Insights 📈',
+    title: 'Pillar 1: Discover Trends & Insights',
     desc: 'Explore breakout topic velocity before saturation, track your audience sentiment, and see what questions viewers are asking.',
     icon: Compass,
     color: 'text-teal-500 bg-teal-50 dark:bg-teal-950/50',
   },
   {
-    title: 'Pillar 2: Predict Your Hit Chance 🎯',
+    title: 'Pillar 2: Predict Your Hit Chance',
     desc: 'Test drafted hooks and titles. We calculate your statistical hit probability against your usual rate, with realistic confidence bounds.',
     icon: BarChart3,
     color: 'text-coral-500 bg-coral-50 dark:bg-coral-950/50',
   },
   {
-    title: 'Pillar 3: Content Studio & Rankings ✍️',
+    title: 'Pillar 3: Content Studio & Rankings',
     desc: 'Craft platform-native scripts, carousels, and threads in English, Hindi, or Marathi. Run the Best Ideas Tournament to pick winning angles.',
     icon: PenTool,
     color: 'text-lavender-500 bg-lavender-50 dark:bg-lavender-950/50',

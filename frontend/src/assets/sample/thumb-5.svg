@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="320" height="180" fill="none">
+  <defs>
+    <linearGradient id="g5" x1="0" y1="0" x2="320" y2="180" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#9333EA"/>
+      <stop offset="100%" stop-color="#DB2777"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="180" rx="16" fill="url(#g5)"/>
+  
+  <!-- Carousel slide stack graphic -->
+  <rect x="50" y="55" width="220" height="90" rx="10" fill="#3B0764" fill-opacity="0.5"/>
+  <rect x="40" y="45" width="220" height="90" rx="10" fill="#581C87" fill-opacity="0.7"/>
+  <rect x="30" y="35" width="220" height="90" rx="10" fill="#180228" fill-opacity="0.9" stroke="#F472B6" stroke-width="1.5" stroke-opacity="0.5"/>
+  
+  <rect x="46" y="50" width="80" height="8" rx="4" fill="#F472B6"/>
+  <rect x="46" y="66" width="130" height="6" rx="3" fill="#E9D5FF" fill-opacity="0.7"/>
+  <rect x="46" y="78" width="110" height="6" rx="3" fill="#E9D5FF" fill-opacity="0.5"/>
+  <circle cx="215" cy="80" r="18" fill="#F472B6" fill-opacity="0.2"/>
+  <polygon points="211,73 223,80 211,87" fill="#F472B6"/>
+</svg>

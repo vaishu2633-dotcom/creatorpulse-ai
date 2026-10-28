@@ -27,8 +27,11 @@ const ACCENT_COLORS = {
 export default function PageHeader({
   title,
   subtitle,
+  description,
   tag,
+  pageTag,
   status = 'Uses sample data',
+  statusChip,
   icon: Icon,
   accent = 'indigo',
   illustration,
@@ -39,17 +42,20 @@ export default function PageHeader({
   className = '',
 }) {
   const accentClass = ACCENT_COLORS[accent] || ACCENT_COLORS.indigo;
+  const effectiveTag = tag || pageTag;
+  const effectiveStatus = statusChip || status;
+  const effectiveSubtitle = subtitle || description;
 
   return (
     <div className={`space-y-4 ${className}`}>
       {/* Top Banner Card */}
-      <div className="relative p-6 sm:p-7 rounded-3xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] shadow-soft overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="relative p-6 sm:p-7 rounded-3xl bg-white dark:bg-[#131927] border border-[#EAE7F5] dark:border-[#1F293D] shadow-xs overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
         {/* Left Side: Identity & Meta */}
         <div className="space-y-3 z-10 max-w-2xl">
           {/* Tag & Status Row */}
           <div className="flex flex-wrap items-center gap-2">
-            {tag && <PageTag tag={tag} />}
-            {status && <StatusChip status={status} size="sm" />}
+            {effectiveTag && <PageTag tag={effectiveTag} />}
+            {effectiveStatus && <StatusChip status={effectiveStatus} size="sm" />}
           </div>
 
           {/* Title with Feature Icon */}
@@ -61,15 +67,15 @@ export default function PageHeader({
                 <Icon className="w-5 h-5" />
               </div>
             )}
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#1F2430] dark:text-white">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#1E1B4B] dark:text-white">
               {title}
             </h1>
           </div>
 
           {/* Plain Plain-Language Sentence Subtitle */}
-          {subtitle && (
-            <p className="text-sm text-[#5B6475] dark:text-[#94A3B8] leading-relaxed">
-              {subtitle}
+          {effectiveSubtitle && (
+            <p className="text-sm text-[#64748B] dark:text-[#94A3B8] leading-relaxed">
+              {effectiveSubtitle}
             </p>
           )}
 

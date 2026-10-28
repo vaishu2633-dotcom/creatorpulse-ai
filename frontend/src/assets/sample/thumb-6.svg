@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="320" height="180" fill="none">
+  <defs>
+    <linearGradient id="g6" x1="0" y1="0" x2="320" y2="180" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#475569"/>
+      <stop offset="100%" stop-color="#1E293B"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="180" rx="16" fill="url(#g6)"/>
+  
+  <!-- System Architecture / Data Nodes -->
+  <rect x="30" y="30" width="260" height="120" rx="12" fill="#0F172A" fill-opacity="0.9" stroke="#94A3B8" stroke-width="1.5" stroke-opacity="0.3"/>
+  <rect x="50" y="50" width="60" height="35" rx="6" fill="#334155" stroke="#38BDF8" stroke-width="1.5"/>
+  <rect x="190" y="50" width="70" height="35" rx="6" fill="#334155" stroke="#A78BFA" stroke-width="1.5"/>
+  <rect x="120" y="95" width="80" height="35" rx="6" fill="#334155" stroke="#34D399" stroke-width="1.5"/>
+  
+  <line x1="110" y1="67" x2="190" y2="67" stroke="#94A3B8" stroke-width="2" stroke-dasharray="3 3"/>
+  <line x1="80" y1="85" x2="135" y2="95" stroke="#94A3B8" stroke-width="2" stroke-dasharray="3 3"/>
+  <line x1="210" y1="85" x2="175" y2="95" stroke="#94A3B8" stroke-width="2" stroke-dasharray="3 3"/>
+</svg>

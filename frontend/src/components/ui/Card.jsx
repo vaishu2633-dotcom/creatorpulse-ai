@@ -13,19 +13,19 @@ export default function Card({
   const isClickable = Boolean(onClick);
 
   const baseStyles =
-    'rounded-2xl border transition-all duration-200 overflow-hidden';
+    'rounded-3xl border transition-all duration-200 overflow-hidden';
   
   const variantStyles = {
     default:
-      'bg-white dark:bg-[#171D2B] border-[#E8E6DF] dark:border-[#232B3E] shadow-soft',
+      'bg-white dark:bg-[#131927] border-[#EAE7F5] dark:border-[#1F293D] shadow-xs',
     subtle:
-      'bg-[#FAF9F6] dark:bg-[#131825] border-[#EAE7E0] dark:border-[#1E2536]',
+      'bg-[#F8F7FC] dark:bg-[#0E1422] border-[#EAE7F5] dark:border-[#1B2438]',
     tintedIndigo:
-      'bg-[#F5F3FF] dark:bg-[#1A1F36] border-[#DDD6FE] dark:border-[#2D3559]',
+      'bg-violet-50/70 dark:bg-violet-950/30 border-violet-100 dark:border-violet-900/40',
     tintedTeal:
-      'bg-[#F0FDFA] dark:bg-[#132328] border-[#CCFBF1] dark:border-[#1A383F]',
+      'bg-teal-50/70 dark:bg-teal-950/30 border-teal-100 dark:border-teal-900/40',
     tintedPeach:
-      'bg-[#FFF7ED] dark:bg-[#251D1E] border-[#FFEDD5] dark:border-[#3D2927]',
+      'bg-amber-50/70 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900/40',
   };
 
   const hoverStyles = hoverEffect || isClickable
