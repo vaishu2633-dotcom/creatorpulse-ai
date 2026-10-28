@@ -10,7 +10,7 @@ export default function Layout() {
   const location = useLocation();
 
   return (
-    <div className="flex min-h-screen bg-[#F7F6F3] dark:bg-[#0F1420] text-[#1F2430] dark:text-[#F1F5F9] transition-colors">
+    <div className="flex min-h-screen bg-[#F8F7FC] dark:bg-[#0B0F19] text-[#1E1B4B] dark:text-[#F8FAFC] transition-colors">
       {/* Sidebar (Desktop collapsible & mobile drawer) */}
       <Sidebar
         mobileOpen={mobileSidebarOpen}
