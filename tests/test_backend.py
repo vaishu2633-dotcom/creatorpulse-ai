@@ -247,3 +247,51 @@ Alex K: Can you do a follow-up video explaining the LUT setup in DaVinci?
     # Delete check
     del_res = client.delete(f"/api/vibecheck/history/{report_id}")
     assert del_res.status_code == 200
+
+
+def test_vibecheck_status():
+    """Verify VibeCheck status endpoint reports API key configuration state."""
+    res = client.get("/api/vibecheck/status")
+    assert res.status_code == 200
+    data = res.json()
+    assert "youtube_api_configured" in data
+    assert "status" in data
+    assert data["status"] in ["live", "limited"]
+
+
+def test_competitors_benchmarking():
+    """Verify competitor benchmarking, limits, and deletion."""
+    # 1. Summary
+    res = client.get("/api/competitors/summary")
+    assert res.status_code == 200
+    data = res.json()
+    assert "user_channel" in data
+    assert "competitors" in data
+    assert "chart_series" in data
+    assert len(data["competitors"]) <= 3
+
+    # 2. Add competitor validation (empty query error)
+    bad_res = client.post("/api/competitors/add", json={"query": " "})
+    assert bad_res.status_code == 400
+
+    # 3. Add valid competitor
+    # If already 3, test limit or delete one first
+    if len(data["competitors"]) >= 3:
+        to_del = data["competitors"][-1]["id"]
+        del_res = client.delete(f"/api/competitors/{to_del}")
+        assert del_res.status_code == 200
+
+    add_res = client.post("/api/competitors/add", json={
+        "query": "@tech_lead_channel",
+        "platform": "youtube"
+    })
+    assert add_res.status_code == 200
+    added = add_res.json()
+    assert added["success"] is True
+    assert "competitor" in added
+    new_id = added["competitor"]["id"]
+
+    # 4. Clean up added competitor
+    cleanup_res = client.delete(f"/api/competitors/{new_id}")
+    assert cleanup_res.status_code == 200
+

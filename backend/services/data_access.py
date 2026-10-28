@@ -553,3 +553,87 @@ def import_posts_from_csv(csv_content: str) -> Dict[str, Any]:
             "success": False,
             "error": f"Failed to parse CSV file: {str(e)}"
         }
+
+
+# ==========================================
+# COMPETITOR ANALYSIS DATA ACCESS METHODS
+# ==========================================
+
+COMPETITORS_FILE = os.path.join(DATA_DIR, "competitors.json")
+
+def get_competitors() -> List[Dict[str, Any]]:
+    """Loads current competitor list (up to 3 competitors)."""
+    if not os.path.exists(COMPETITORS_FILE):
+        return []
+    with open(COMPETITORS_FILE, "r", encoding="utf-8") as f:
+        try:
+            return json.load(f)
+        except json.JSONDecodeError:
+            return []
+
+def save_competitors(competitors: List[Dict[str, Any]]) -> None:
+    """Saves updated competitors list to JSON."""
+    with open(COMPETITORS_FILE, "w", encoding="utf-8") as f:
+        json.dump(competitors, f, indent=2)
+
+def add_competitor(competitor: Dict[str, Any]) -> Dict[str, Any]:
+    """Adds a new competitor profile (enforces max 3)."""
+    current = get_competitors()
+    if len(current) >= 3:
+        raise ValueError("Maximum of 3 competitor channels allowed for comparison.")
+    
+    # Check duplicate handle
+    handle = competitor.get("handle", "").lower().strip()
+    if any(c.get("handle", "").lower().strip() == handle for c in current):
+        raise ValueError(f"Competitor with handle '{handle}' is already added.")
+
+    current.append(competitor)
+    save_competitors(current)
+    return competitor
+
+def delete_competitor(comp_id: str) -> bool:
+    """Removes a competitor by ID."""
+    current = get_competitors()
+    filtered = [c for c in current if c.get("id") != comp_id]
+    if len(filtered) < len(current):
+        save_competitors(filtered)
+        return True
+    return False
+
+def get_user_channel_benchmark() -> Dict[str, Any]:
+    """Retrieves the active user channel profile for head-to-head benchmarking."""
+    creators = get_creators(platform="youtube")
+    user = creators[0] if creators else {
+        "name": "DevPulse with Alex",
+        "handle": "@devpulse_alex",
+        "follower_count": 84500,
+        "baseline_engagement_rate": 0.052
+    }
+    
+    # Compute user stats from post data
+    posts = get_posts(platform="youtube", limit=100)
+    avg_views = int(sum(p.get("views", 0) for p in posts) / max(len(posts), 1)) if posts else 42300
+    
+    return {
+        "id": "user_channel",
+        "name": user.get("name", "DevPulse with Alex"),
+        "handle": user.get("handle", "@devpulse_alex"),
+        "platform": "youtube",
+        "subscriber_count": user.get("follower_count", 84500),
+        "avg_views": avg_views,
+        "posts_per_week": 3.2,
+        "engagement_rate": user.get("baseline_engagement_rate", 0.052),
+        "avatar": "",
+        "top_posts": [
+            {
+                "title": p.get("caption", "Untitled Post"),
+                "views": p.get("views", 0),
+                "likes": p.get("likes", 0),
+                "comments": p.get("comments", 0),
+                "published_at": p.get("published_at", ""),
+                "engagement_rate": p.get("engagement_rate", 0.05)
+            } for p in sorted(posts, key=lambda x: x.get("views", 0), reverse=True)[:3]
+        ] if posts else [],
+        "is_sample": True
+    }
+

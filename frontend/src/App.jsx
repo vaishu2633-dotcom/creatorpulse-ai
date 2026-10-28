@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import { PlatformProvider } from './context/PlatformContext';
+import { UserProvider } from './context/UserContext';
 import Layout from './components/Layout';
 
 // Pages
@@ -16,30 +17,34 @@ import CalendarDrafts from './pages/CalendarDrafts';
 import CommentInsights from './pages/CommentInsights';
 import Settings from './pages/Settings';
 import VibeCheck from './pages/VibeCheck';
+import CompetitorAnalysis from './pages/CompetitorAnalysis';
 
 export default function App() {
   return (
     <ThemeProvider>
       <ToastProvider>
         <PlatformProvider>
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Layout />}>
-                <Route index element={<Dashboard />} />
-                <Route path="results" element={<PredictionHistory />} />
-                <Route path="vibecheck" element={<VibeCheck />} />
-                <Route path="trends" element={<TrendExplorer />} />
-                <Route path="predictor" element={<ViralPredictor />} />
-                <Route path="studio" element={<ContentStudio />} />
-                <Route path="history" element={<Navigate to="/results" replace />} />
-                <Route path="ml-lab" element={<ImbalanceLab />} />
-                <Route path="drafts" element={<CalendarDrafts />} />
-                <Route path="comments" element={<CommentInsights />} />
-                <Route path="settings" element={<Settings />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Route>
-            </Routes>
-          </BrowserRouter>
+          <UserProvider>
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<Layout />}>
+                  <Route index element={<Dashboard />} />
+                  <Route path="results" element={<PredictionHistory />} />
+                  <Route path="vibecheck" element={<VibeCheck />} />
+                  <Route path="trends" element={<TrendExplorer />} />
+                  <Route path="predictor" element={<ViralPredictor />} />
+                  <Route path="studio" element={<ContentStudio />} />
+                  <Route path="history" element={<Navigate to="/results" replace />} />
+                  <Route path="ml-lab" element={<ImbalanceLab />} />
+                  <Route path="competitors" element={<CompetitorAnalysis />} />
+                  <Route path="drafts" element={<CalendarDrafts />} />
+                  <Route path="comments" element={<CommentInsights />} />
+                  <Route path="settings" element={<Settings />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Route>
+              </Routes>
+            </BrowserRouter>
+          </UserProvider>
         </PlatformProvider>
       </ToastProvider>
     </ThemeProvider>

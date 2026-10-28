@@ -120,3 +120,39 @@ export const getIntegrations = () =>
 
 export const getHealth = () =>
   request('/api/health');
+
+// ----------------- VibeCheck AI -----------------
+export const getVibeCheckStatus = () =>
+  request('/api/vibecheck/status');
+
+export const analyzeVibe = (payload) =>
+  request('/api/vibecheck/analyze', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const getVibeCheckHistory = () =>
+  request('/api/vibecheck/history');
+
+export const getVibeCheckReportById = (reportId) =>
+  request(`/api/vibecheck/history/${reportId}`);
+
+export const deleteVibeCheckReport = (reportId) =>
+  request(`/api/vibecheck/history/${reportId}`, {
+    method: 'DELETE',
+  });
+
+// ----------------- Competitor Analysis -----------------
+export const getCompetitorSummary = () =>
+  request('/api/competitors/summary');
+
+export const addCompetitor = (payload) =>
+  request('/api/competitors/add', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const deleteCompetitor = (compId) =>
+  request(`/api/competitors/${compId}`, {
+    method: 'DELETE',
+  });

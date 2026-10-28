@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 220" fill="none">
+  <!-- Competitor Analysis & Benchmarking Illustration -->
+  <defs>
+    <linearGradient id="compBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#3B82F6" stop-opacity="0.08"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="220" rx="20" fill="url(#compBg)"/>
+
+  <!-- Podium / Bar Comparison Grid -->
+  <rect x="40" y="110" width="60" height="80" rx="8" fill="#818CF8" fill-opacity="0.85"/>
+  <rect x="130" y="70" width="60" height="120" rx="8" fill="#6366F1"/>
+  <rect x="220" y="130" width="60" height="60" rx="8" fill="#A5B4FC" fill-opacity="0.75"/>
+
+  <!-- User Channel Crown / Badge on Center Bar -->
+  <circle cx="160" cy="50" r="18" fill="#F59E0B"/>
+  <path d="M152 50 L156 42 L160 48 L164 42 L168 50 Z" fill="#FFFFFF"/>
+
+  <!-- Floating Stats Badges -->
+  <rect x="35" y="40" width="70" height="24" rx="6" fill="#FFFFFF" filter="drop-shadow(0 4px 6px rgba(0,0,0,0.06))"/>
+  <text x="70" y="56" fill="#4338CA" font-family="sans-serif" font-size="10" font-weight="bold" text-anchor="middle">5.8% ER</text>
+
+  <rect x="215" y="60" width="70" height="24" rx="6" fill="#FFFFFF" filter="drop-shadow(0 4px 6px rgba(0,0,0,0.06))"/>
+  <text x="250" y="76" fill="#2563EB" font-family="sans-serif" font-size="10" font-weight="bold" text-anchor="middle">142k Subs</text>
+</svg>

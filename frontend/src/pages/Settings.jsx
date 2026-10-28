@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getIntegrations } from '../api/apiClient';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
+import { useUser } from '../context/UserContext';
 import PageHeader from '../components/ui/PageHeader';
 import HowItWorks from '../components/ui/HowItWorks';
 import StatusChip from '../components/ui/StatusChip';
@@ -31,7 +32,10 @@ import {
   FileText,
   AlertCircle,
   HelpCircle,
-  Check
+  Check,
+  User as UserIcon,
+  Trash2,
+  Camera,
 } from 'lucide-react';
 
 const HOW_IT_WORKS_STEPS = [
@@ -96,10 +100,16 @@ const PLATFORM_EXPORT_GUIDES = {
 export default function Settings() {
   const { themePreference, setThemePreference } = useTheme();
   const { addToast } = useToast();
+  const { user, updateAvatar, removeAvatar, updateProfile } = useUser();
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Avatar and profile form state
+  const [userName, setUserName] = useState(user.name || '');
+  const [channelName, setChannelName] = useState(user.channelName || '');
+  const fileInputRef = useRef(null);
 
   // Slide-over state for connection instructions
   const [activePlatformDetail, setActivePlatformDetail] = useState(null);
@@ -131,6 +141,43 @@ export default function Settings() {
     fetchSettings();
   }, []);
 
+  const handleAvatarFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate type
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      addToast('Please upload a JPG, PNG, or WebP image.', 'error');
+      return;
+    }
+
+    // Validate size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      addToast('Image size exceeds 2MB limit.', 'error');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result;
+      if (typeof dataUrl === 'string') {
+        updateAvatar(dataUrl);
+        addToast('Custom profile photo saved successfully!', 'success');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveProfile = (e) => {
+    e.preventDefault();
+    updateProfile({
+      name: userName.trim() || 'Alex Rivera',
+      channelName: channelName.trim() || 'Creator Channel',
+    });
+    addToast('Profile information updated!', 'success');
+  };
+
   const handleCsvSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -157,7 +204,7 @@ export default function Settings() {
     setUploadResult(null);
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/settings/upload-csv-json', {
+      const res = await fetch('/api/settings/upload-csv-json', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ csv_text: csvContent })
@@ -220,6 +267,99 @@ export default function Settings() {
 
       {/* How it Works Strip */}
       <HowItWorks steps={HOW_IT_WORKS_STEPS} />
+
+      {/* Creator Profile & Custom Avatar */}
+      <Card className="p-6 space-y-5">
+        <div>
+          <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+            <UserIcon className="w-4 h-4 text-violet-600" />
+            <span>Creator Profile & Custom Avatar</span>
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Personalize your workspace name and profile picture. Stored safely in your local browser workspace.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+          <div className="relative group shrink-0">
+            {user.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={user.name}
+                className="w-20 h-20 rounded-2xl object-cover border-2 border-violet-200 dark:border-violet-800 shadow-md"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white flex items-center justify-center font-bold text-xl shadow-md">
+                {user.initials || 'CP'}
+              </div>
+            )}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute -bottom-1 -right-1 p-2 rounded-xl bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 shadow-md hover:bg-slate-50 transition"
+              title="Upload custom photo"
+            >
+              <Camera className="w-4 h-4 text-violet-600" />
+            </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleAvatarFile}
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+            />
+          </div>
+
+          <div className="flex-1 space-y-3 w-full">
+            <form onSubmit={handleSaveProfile} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Creator Name
+                </label>
+                <input
+                  type="text"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  placeholder="e.g. Alex Rivera"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs focus:ring-2 focus:ring-violet-500/30"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Channel / Brand Name
+                </label>
+                <input
+                  type="text"
+                  value={channelName}
+                  onChange={(e) => setChannelName(e.target.value)}
+                  placeholder="e.g. DevPulse with Alex"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs focus:ring-2 focus:ring-violet-500/30"
+                />
+              </div>
+              <div className="sm:col-span-2 flex items-center gap-3 pt-1">
+                <Button
+                  type="submit"
+                  className="rounded-xl text-xs font-semibold px-4 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white"
+                >
+                  Save Profile
+                </Button>
+                {user.avatarUrl && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      removeAvatar();
+                      addToast('Reset avatar to initials fallback', 'info');
+                    }}
+                    className="text-xs font-medium text-rose-600 hover:text-rose-700 flex items-center gap-1.5"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Remove Photo</span>
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+        </div>
+      </Card>
 
       {/* Theme Selection Section */}
       <Card className="p-6 space-y-4">
