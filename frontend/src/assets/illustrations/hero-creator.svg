@@ -1,85 +1,104 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 280" fill="none">
-  <!-- Friendly Creator Pulse Hero Illustration -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 300" fill="none">
+  <!-- Creator with Laptop, Tripod Camera & Potted Plant -->
   <defs>
-    <linearGradient id="heroGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#5B5BD6" stop-opacity="0.15"/>
-      <stop offset="100%" stop-color="#14B8A6" stop-opacity="0.08"/>
+    <linearGradient id="heroBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7C3AED" stop-opacity="0.12"/>
+      <stop offset="50%" stop-color="#4F46E5" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#06B6D4" stop-opacity="0.06"/>
     </linearGradient>
-    <linearGradient id="badgeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#5B5BD6"/>
-      <stop offset="100%" stop-color="#818CF8"/>
+    <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#4F46E5"/>
     </linearGradient>
-    <linearGradient id="accentTeal" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#14B8A6"/>
-      <stop offset="100%" stop-color="#2DD4BF"/>
+    <linearGradient id="camGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#334155"/>
+      <stop offset="100%" stop-color="#0F172A"/>
     </linearGradient>
-    <linearGradient id="warmOrange" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#F97316"/>
-      <stop offset="100%" stop-color="#FDBA74"/>
+    <linearGradient id="plantGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981"/>
+      <stop offset="100%" stop-color="#059669"/>
     </linearGradient>
   </defs>
 
-  <!-- Background organic soft bubble -->
-  <path d="M60 140 C50 60, 160 30, 260 50 C350 70, 370 180, 310 230 C240 280, 80 240, 60 140 Z" fill="url(#heroGrad1)"/>
-  
-  <!-- Desk/Base Surface -->
-  <ellipse cx="200" cy="240" rx="140" ry="16" fill="#E2E8F0" opacity="0.6"/>
+  <!-- Soft organic glow background -->
+  <path d="M70 150 C60 60, 190 20, 310 40 C430 60, 440 210, 370 260 C280 310, 80 270, 70 150 Z" fill="url(#heroBg)"/>
 
-  <!-- Character Torso & Clothes -->
-  <rect x="155" y="160" width="90" height="75" rx="36" fill="#5B5BD6"/>
-  <path d="M175 160 Q200 185 225 160" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+  <!-- Studio Floor & Desk Shadow -->
+  <ellipse cx="230" cy="265" rx="190" ry="18" fill="#CBD5E1" fill-opacity="0.45"/>
 
-  <!-- Neck & Head -->
-  <rect x="188" y="140" width="24" height="25" rx="6" fill="#FBD38D"/>
-  <circle cx="200" cy="115" r="34" fill="#FBD38D"/>
-
-  <!-- Hair (friendly modern cut) -->
-  <path d="M168 115 C166 85, 230 75, 234 110 C220 95, 185 95, 175 118 Z" fill="#2D3748"/>
-  <circle cx="166" cy="112" r="5" fill="#2D3748"/>
-  <circle cx="233" cy="112" r="5" fill="#2D3748"/>
-
-  <!-- Cheerful Face -->
-  <circle cx="190" cy="114" r="3.5" fill="#2D3748"/>
-  <circle cx="210" cy="114" r="3.5" fill="#2D3748"/>
-  <!-- Smile -->
-  <path d="M192 124 Q200 133 208 124" stroke="#2D3748" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-  <!-- Rosy cheeks -->
-  <circle cx="183" cy="122" r="4" fill="#FEB2B2" opacity="0.8"/>
-  <circle cx="217" cy="122" r="4" fill="#FEB2B2" opacity="0.8"/>
-
-  <!-- Laptop on stand -->
-  <rect x="140" y="195" width="120" height="32" rx="6" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2"/>
-  <path d="M130 227 L270 227 L260 234 L140 234 Z" fill="#94A3B8"/>
-  <rect x="180" y="204" width="40" height="14" rx="3" fill="#5B5BD6" opacity="0.2"/>
-
-  <!-- Floating Content Idea Cards -->
-  <!-- Left analytics card -->
-  <g transform="translate(45, 60)">
-    <rect width="90" height="65" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" filter="drop-shadow(0px 8px 16px rgba(0,0,0,0.06))"/>
-    <circle cx="22" cy="20" r="10" fill="url(#accentTeal)"/>
-    <path d="M18 20 L21 23 L26 17" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    <rect x="38" y="14" width="40" height="6" rx="3" fill="#64748B"/>
-    <rect x="38" y="24" width="26" height="4" rx="2" fill="#94A3B8"/>
-    <!-- Mini sparkline -->
-    <path d="M14 48 L32 38 L48 44 L68 32 L78 36" stroke="#14B8A6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- CAMERA ON TRIPOD (Left side) -->
+  <g id="tripod-camera">
+    <!-- Legs -->
+    <line x1="85" y1="165" x2="45" y2="265" stroke="#475569" stroke-width="3" stroke-linecap="round"/>
+    <line x1="85" y1="165" x2="85" y2="265" stroke="#334155" stroke-width="3" stroke-linecap="round"/>
+    <line x1="85" y1="165" x2="125" y2="265" stroke="#475569" stroke-width="3" stroke-linecap="round"/>
+    <ellipse cx="85" cy="165" rx="12" ry="5" fill="#1E293B"/>
+    <!-- Center column & Mount -->
+    <rect x="82" y="140" width="6" height="25" rx="2" fill="#64748B"/>
+    <!-- Camera Body -->
+    <rect x="62" y="115" width="46" height="30" rx="6" fill="url(#camGrad)" stroke="#475569" stroke-width="1.5"/>
+    <rect x="74" y="108" width="14" height="7" rx="2" fill="#475569"/>
+    <!-- Camera Lens -->
+    <rect x="108" y="121" width="14" height="18" rx="3" fill="#1E293B" stroke="#64748B" stroke-width="1.5"/>
+    <circle cx="85" cy="130" r="8" fill="#0284C7" fill-opacity="0.8"/>
+    <circle cx="87" cy="128" r="3" fill="#E0F2FE"/>
+    <!-- Recording Red Dot -->
+    <circle cx="69" cy="122" r="2.5" fill="#EF4444"/>
   </g>
 
-  <!-- Right viral hit card -->
-  <g transform="translate(265, 80)">
-    <rect width="92" height="68" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" filter="drop-shadow(0px 8px 16px rgba(0,0,0,0.06))"/>
-    <circle cx="22" cy="22" r="11" fill="url(#warmOrange)"/>
-    <!-- Fire/Spark icon -->
-    <path d="M22 15 C20 18, 17 20, 19 25 C20 27, 24 27, 25 24 C26 21, 23 19, 22 15 Z" fill="#FFFFFF"/>
-    <rect x="40" y="16" width="38" height="6" rx="3" fill="#1F2430"/>
-    <rect x="40" y="26" width="24" height="4" rx="2" fill="#F97316"/>
-    <rect x="14" y="44" width="64" height="12" rx="4" fill="#FFF7ED"/>
-    <text x="46" y="53" font-size="8" font-family="system-ui" font-weight="bold" fill="#C2410C" text-anchor="middle">Hit Chance +3.8x</text>
+  <!-- POTTED PLANT (Right side) -->
+  <g id="plant">
+    <!-- Pot -->
+    <polygon points="360,215 390,215 383,260 367,260" fill="#EA580C"/>
+    <ellipse cx="375" cy="215" rx="16" ry="4" fill="#C2410C"/>
+    <!-- Leaves -->
+    <path d="M375 212 C365 180, 335 185, 340 165 C355 175, 370 195, 375 212 Z" fill="url(#plantGrad)"/>
+    <path d="M375 212 C385 175, 415 180, 410 160 C395 170, 380 195, 375 212 Z" fill="#34D399"/>
+    <path d="M375 212 C370 170, 385 155, 375 145 C365 160, 370 190, 375 212 Z" fill="#059669"/>
   </g>
 
-  <!-- Friendly Floating Sparks & Stars -->
-  <path d="M125 45 Q128 35 131 45 Q141 48 131 51 Q128 61 125 51 Q115 48 125 45 Z" fill="#F59E0B"/>
-  <circle cx="260" cy="40" r="4" fill="#818CF8"/>
-  <circle cx="95" cy="180" r="5" fill="#2DD4BF"/>
-  <circle cx="315" cy="190" r="6" fill="#F472B6"/>
-  <path d="M290 160 Q292 152 294 160 Q302 162 294 164 Q292 172 290 164 Q282 162 290 160 Z" fill="#5B5BD6"/>
+  <!-- CREATOR WITH LAPTOP (Center) -->
+  <g id="creator">
+    <!-- Body / Hoodie -->
+    <path d="M185 255 L185 200 C185 182, 275 182, 275 200 L275 255 Z" fill="url(#bodyGrad)"/>
+    <!-- White Inner Collar -->
+    <path d="M215 185 Q230 205 245 185" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" fill="none"/>
+
+    <!-- Neck & Head -->
+    <rect x="220" y="165" width="20" height="22" rx="5" fill="#FCD34D"/>
+    <circle cx="230" cy="140" r="30" fill="#FCD34D"/>
+
+    <!-- Hair -->
+    <path d="M202 140 C200 110, 258 100, 260 135 C248 122, 218 122, 208 142 Z" fill="#1E293B"/>
+    <circle cx="201" cy="138" r="4.5" fill="#1E293B"/>
+    <circle cx="259" cy="138" r="4.5" fill="#1E293B"/>
+
+    <!-- Friendly Eyes & Smile -->
+    <circle cx="221" cy="140" r="3" fill="#1E293B"/>
+    <circle cx="239" cy="140" r="3" fill="#1E293B"/>
+    <path d="M224 148 Q230 156 236 148" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+    <circle cx="215" cy="146" r="3" fill="#FCA5A5" fill-opacity="0.8"/>
+    <circle cx="245" cy="146" r="3" fill="#FCA5A5" fill-opacity="0.8"/>
+
+    <!-- Headphones -->
+    <path d="M200 135 C198 112, 262 112, 260 135" stroke="#6366F1" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <rect x="196" y="130" width="8" height="15" rx="3" fill="#4338CA"/>
+    <rect x="256" y="130" width="8" height="15" rx="3" fill="#4338CA"/>
+
+    <!-- Laptop Desk Stand & Open Laptop -->
+    <rect x="180" y="222" width="100" height="25" rx="4" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+    <polygon points="170,247 290,247 280,253 180,253" fill="#94A3B8"/>
+    <!-- Screen glow with creator analytics -->
+    <rect x="210" y="227" width="40" height="15" rx="2" fill="#6366F1" fill-opacity="0.2"/>
+    <line x1="214" y1="233" x2="228" y2="233" stroke="#4F46E5" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="214" y1="237" x2="242" y2="237" stroke="#06B6D4" stroke-width="1.5" stroke-linecap="round"/>
+  </g>
+
+  <!-- Ambient Sparkles -->
+  <g id="sparkles">
+    <path d="M150 70 Q152 60 154 70 Q164 72 154 74 Q152 84 150 74 Q140 72 150 70 Z" fill="#F59E0B"/>
+    <path d="M320 80 Q322 72 324 80 Q332 82 324 84 Q322 92 320 84 Q312 82 320 80 Z" fill="#8B5CF6"/>
+    <circle cx="130" cy="110" r="3.5" fill="#38BDF8"/>
+    <circle cx="330" cy="140" r="3.5" fill="#34D399"/>
+  </g>
 </svg>

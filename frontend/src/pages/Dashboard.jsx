@@ -1,5 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion, useReducedMotion } from 'framer-motion';
 import { usePlatform } from '../context/PlatformContext';
+import { useUser } from '../context/UserContext';
+import { useToast } from '../context/ToastContext';
 import {
   getDashboardSummary,
   getSnapshots,
@@ -7,36 +11,43 @@ import {
   getTopPosts,
   getBottomPosts,
 } from '../api/apiClient';
+import { getSampleThumbnail } from '../assets/sample/sampleThumbnails';
 import PlatformBadge from '../components/PlatformBadge';
-import BreakoutBadge from '../components/BreakoutBadge';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import SlideOver from '../components/ui/SlideOver';
 import AnimatedCounter from '../components/ui/AnimatedCounter';
-import { CardSkeleton, TableSkeleton } from '../components/ui/Skeleton';
 import Tooltip from '../components/ui/Tooltip';
 import HowItWorks from '../components/ui/HowItWorks';
-import StatusChip from '../components/ui/StatusChip';
 import HeroIllustration from '../assets/illustrations/hero-creator.svg';
 import { formatIsoDateTime } from '../utils/timeFormat';
+import { YoutubeIcon, InstagramIcon, TwitterIcon, LinkedinIcon } from '../components/SocialIcons';
 import {
-  Users,
+  Sparkles,
+  ArrowRight,
+  PenTool,
+  Link as LinkIcon,
+  Zap,
+  Rocket,
+  SearchCheck,
+  TrendingUp,
+  Compass,
+  Calendar,
+  BarChart3,
+  Flame,
+  Lightbulb,
+  Play,
+  MoreVertical,
+  Check,
+  Copy,
+  ExternalLink,
+  ChevronRight,
   Eye,
   Heart,
-  Flame,
-  ArrowUpRight,
-  Sparkles,
-  TrendingUp,
-  Lightbulb,
-  ArrowRight,
-  Filter,
-  CheckCircle2,
-  Calendar,
-  Share2,
   MessageSquare,
+  Users,
   AlertCircle,
-  RefreshCw,
-  PenTool
+  Share2,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -45,620 +56,816 @@ import {
   YAxis,
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
-  CartesianGrid
+  CartesianGrid,
 } from 'recharts';
-import { useNavigate } from 'react-router-dom';
+
+const HOW_IT_WORKS_STEPS = [
+  {
+    title: 'Monitor Cross-Platform Pulse',
+    description: 'Track audience growth and breakout post velocity across YouTube, Instagram, X, and LinkedIn.',
+  },
+  {
+    title: 'Analyze Content Resonance',
+    description: 'Run VibeCheck on recent videos to understand audience sentiment, repeated questions, and community mood.',
+  },
+  {
+    title: 'Plan Your Next Breakout',
+    description: 'Predict hit probability before filming, generate tailored concepts in Studio, and schedule in your Planner.',
+  },
+];
+
+// Helper to estimate video / post duration badge
+function getDurationBadge(postType, index = 0) {
+  if (postType === 'video' || postType === 'long_video') {
+    const times = ['8:24', '12:15', '16:40', '6:50', '10:12'];
+    return times[index % times.length];
+  }
+  if (postType === 'reel' || postType === 'short') {
+    const times = ['0:45', '0:58', '0:32', '1:00', '0:24'];
+    return times[index % times.length];
+  }
+  if (postType === 'carousel') return '5 slides';
+  if (postType === 'thread' || postType === 'tweet') return '7 posts';
+  return '3 min';
+}
+
+// Helper to compute relative time string
+function getTimeAgo(dateStr, idx = 0) {
+  if (!dateStr) return `${idx + 1}d ago`;
+  try {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diffHours = Math.round((now - d) / (1000 * 60 * 60));
+    if (diffHours < 24) return `${Math.max(diffHours, 1)}h ago`;
+    const diffDays = Math.round(diffHours / 24);
+    if (diffDays < 30) return `${diffDays}d ago`;
+    return `${Math.round(diffDays / 7)}w ago`;
+  } catch {
+    return `${idx + 1}d ago`;
+  }
+}
 
 export default function Dashboard() {
-  const { selectedPlatform, lastRefreshed, refreshData } = usePlatform();
   const navigate = useNavigate();
+  const { selectedPlatform } = usePlatform();
+  const { user } = useUser();
+  const { addToast } = useToast();
+  const shouldReduceMotion = useReducedMotion();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [summary, setSummary] = useState(null);
   const [snapshots, setSnapshots] = useState([]);
   const [recentPosts, setRecentPosts] = useState([]);
-  const [topPosts, setTopPosts] = useState([]);
-  const [bottomPosts, setBottomPosts] = useState([]);
-  const [postTypeFilter, setPostTypeFilter] = useState('all');
-
-  // Slide-over post inspect state
   const [activePost, setActivePost] = useState(null);
 
+  // VibeCheck URL bar state
+  const [vibeUrl, setVibeUrl] = useState('');
+  const [urlError, setUrlError] = useState('');
+
+  // Kebab menu state: post_id or null
+  const [openKebab, setOpenKebab] = useState(null);
+  const kebabRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (kebabRef.current && !kebabRef.current.contains(event.target)) {
+        setOpenKebab(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const loadData = () => {
-    let isMounted = true;
     setLoading(true);
     setError(null);
-
     Promise.all([
       getDashboardSummary(selectedPlatform),
       getSnapshots(selectedPlatform, 30),
-      getRecentPosts(selectedPlatform, postTypeFilter, 12),
-      getTopPosts(selectedPlatform, 4),
-      getBottomPosts(selectedPlatform, 4),
+      getRecentPosts(selectedPlatform, 'all', 15),
     ])
-      .then(([sumRes, snapRes, postsRes, topRes, botRes]) => {
-        if (!isMounted) return;
+      .then(([sumRes, snapRes, postsRes]) => {
         setSummary(sumRes || {});
         setSnapshots((snapRes && snapRes.snapshots) || []);
         setRecentPosts((postsRes && postsRes.posts) || []);
-        setTopPosts((topRes && topRes.posts) || []);
-        setBottomPosts((botRes && botRes.posts) || []);
         setLoading(false);
       })
       .catch((err) => {
-        if (!isMounted) return;
-        setError(err.message || 'Failed to load your creator insights');
+        setError(err.message || 'Failed to load creator insights');
         setLoading(false);
       });
-
-    return () => {
-      isMounted = false;
-    };
   };
 
   useEffect(() => {
-    const cleanup = loadData();
-    return cleanup;
-  }, [selectedPlatform, postTypeFilter, lastRefreshed]);
+    loadData();
+  }, [selectedPlatform]);
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="h-44 rounded-3xl bg-white dark:bg-[#171D2B] animate-pulse border border-[#E8E6DF] dark:border-[#232B3E]" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <CardSkeleton />
-          <CardSkeleton />
-          <CardSkeleton />
-          <CardSkeleton />
-        </div>
-        <div className="h-72 rounded-2xl bg-white dark:bg-[#171D2B] animate-pulse border border-[#E8E6DF] dark:border-[#232B3E]" />
-      </div>
-    );
-  }
+  // Baseline metrics for dynamic status computation
+  const baselineEngagement = summary?.average_engagement_rate || 0.052;
+  const avgViews = summary?.total_views && summary?.total_posts ? (summary.total_views / summary.total_posts) : 15000;
 
-  if (error) {
-    return (
-      <div className="p-8 rounded-3xl bg-white dark:bg-[#171D2B] border border-rose-200 dark:border-rose-900/40 text-center space-y-4 shadow-soft">
-        <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center mx-auto">
-          <AlertCircle className="w-6 h-6" />
-        </div>
-        <h2 className="text-lg font-bold text-[#1F2430] dark:text-white">
-          Could not load insights
-        </h2>
-        <p className="text-xs text-[#5B6475] dark:text-[#94A3B8] max-w-sm mx-auto">
-          {error}. Make sure the backend API server is running on port 8000.
-        </p>
-        <Button variant="primary" size="sm" icon={RefreshCw} onClick={loadData}>
-          Try Again
-        </Button>
-      </div>
-    );
-  }
+  // Compute status chip for each post dynamically
+  const getPostStatus = (post) => {
+    const er = post.engagement_rate || 0;
+    const views = post.views || 0;
 
-  // Safe formatted chart data
-  const chartData = (snapshots || []).map((s) => ({
-    date: s?.date ? String(s.date).slice(5) : '',
-    views: typeof s?.views === 'number' ? s.views : 0,
-    er_percent: typeof s?.engagement_rate === 'number' ? Number((s.engagement_rate * 100).toFixed(2)) : 0,
-  }));
+    if (er >= 1.2 * baselineEngagement) {
+      return {
+        label: 'Performing Well',
+        color: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800',
+        tooltip: `Performing Well: engagement (${(er * 100).toFixed(1)}%) is above 120% of your channel average (${(baselineEngagement * 100).toFixed(1)}%).`,
+      };
+    }
+    if (views >= 1.3 * avgViews && er >= 1.0 * baselineEngagement) {
+      return {
+        label: 'Trending',
+        color: 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/60 dark:text-violet-300 dark:border-violet-800',
+        tooltip: `Trending: views (${views.toLocaleString()}) are 130%+ of your channel average (${Math.round(avgViews).toLocaleString()}).`,
+      };
+    }
+    if (er >= 0.8 * baselineEngagement) {
+      return {
+        label: 'Stable',
+        color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800',
+        tooltip: `Stable: engagement (${(er * 100).toFixed(1)}%) is within standard range (80%-120% of baseline ${(baselineEngagement * 100).toFixed(1)}%).`,
+      };
+    }
+    return {
+      label: 'Below usual',
+      color: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800',
+      tooltip: `Below usual: engagement (${(er * 100).toFixed(1)}%) is under 80% of your channel baseline (${(baselineEngagement * 100).toFixed(1)}%).`,
+    };
+  };
+
+  const handleVibeCheckSubmit = (e) => {
+    e.preventDefault();
+    setUrlError('');
+    const trimmed = vibeUrl.trim();
+
+    if (!trimmed) {
+      setUrlError('Please paste a public video, Reel, or Short URL.');
+      return;
+    }
+
+    // Basic URL validation
+    const validPatterns = [
+      /youtube\.com/i,
+      /youtu\.be/i,
+      /instagram\.com/i,
+      /tiktok\.com/i,
+      /twitter\.com/i,
+      /x\.com/i,
+      /vimeo\.com/i,
+      /^https?:\/\//i,
+    ];
+
+    const isValid = validPatterns.some((pattern) => pattern.test(trimmed));
+    if (!isValid) {
+      setUrlError('Please enter a valid URL (YouTube, Instagram, TikTok, or X).');
+      return;
+    }
+
+    navigate(`/vibecheck?url=${encodeURIComponent(trimmed)}&auto=true`);
+  };
+
+  // Quick Action Tiles Config
+  const quickActions = [
+    {
+      id: 'vibecheck',
+      title: 'Analyze URL',
+      subtitle: 'VibeCheck AI',
+      icon: SearchCheck,
+      highlight: true,
+      onClick: () => navigate('/vibecheck'),
+    },
+    {
+      id: 'studio',
+      title: 'Generate Content',
+      subtitle: 'AI Content Studio',
+      icon: PenTool,
+      onClick: () => navigate('/studio'),
+    },
+    {
+      id: 'trends',
+      title: 'Check Trends',
+      subtitle: 'Trend Explorer',
+      icon: Compass,
+      onClick: () => navigate('/trends'),
+    },
+    {
+      id: 'predict',
+      title: 'Predict Performance',
+      subtitle: 'Post Predictor',
+      icon: Sparkles,
+      onClick: () => navigate('/predictor'),
+    },
+    {
+      id: 'calendar',
+      title: 'View Calendar',
+      subtitle: 'Content Planner',
+      icon: Calendar,
+      onClick: () => navigate('/drafts'),
+    },
+    {
+      id: 'reports',
+      title: 'Open Reports',
+      subtitle: 'Analytics & Insights',
+      icon: BarChart3,
+      onClick: () => navigate('/results'),
+    },
+  ];
 
   return (
-    <div className="space-y-8">
-      {/* Friendly Hero Banner with Local Illustration */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#EEF2FF] via-[#F5F3FF] to-[#FAF9F6] dark:from-[#171E30] dark:via-[#161B29] dark:to-[#121622] border border-[#DDD6FE] dark:border-[#2B354D] p-6 sm:p-8 shadow-soft">
-        <div className="relative z-10 max-w-xl space-y-3">
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/80 dark:bg-[#1E273A] border border-brand-200 dark:border-brand-800 text-xs font-semibold text-[#5B5BD6] dark:text-brand-300">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Welcome back, Alex! 👋</span>
-          </div>
-
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#1F2430] dark:text-white">
-            Your Creator Insights & Growth Loop
-          </h1>
-
-          <p className="text-sm text-[#5B6475] dark:text-[#94A3B8] leading-relaxed">
-            Here is how your channels are performing this week. Test a new hook before publishing
-            to see its estimated hit chance against your usual rate.
-          </p>
-
-          <div className="pt-2 flex flex-wrap gap-2.5">
-            <Button
-              variant="primary"
-              size="sm"
-              icon={Sparkles}
-              onClick={() => navigate('/predictor')}
-            >
-              Predict a Post
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={PenTool}
-              onClick={() => navigate('/studio')}
-            >
-              Open Studio
-            </Button>
-          </div>
-        </div>
-
-        {/* Hero Illustration */}
-        <div className="hidden lg:block absolute right-4 -bottom-4 w-72 h-64 pointer-events-none select-none">
-          <img
-            src={HeroIllustration}
-            alt="Friendly content creator with ideas and analytics"
-            className="w-full h-full object-contain"
-          />
-        </div>
-      </div>
-
-      {/* How it Works Collapsible Strip */}
-      <HowItWorks
-        steps={[
-          {
-            title: 'Live Cross-Platform Overview',
-            description: 'Monitor audience growth, views, and engagement rates across YouTube, Instagram, X, and LinkedIn.'
-          },
-          {
-            title: 'Breakout Detection',
-            description: 'Algorithms automatically detect posts exceeding your 90th percentile baseline engagement.'
-          },
-          {
-            title: "Today's Focus Recommendations",
-            description: 'Act on algorithmic suggestions derived from your highest-converting release times and topics.'
-          }
-        ]}
-      />
-
-      {/* 4 Summary Cards (with Animated Counter) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Audience */}
-        <Card className="p-5" hoverEffect>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#5B6475] dark:text-[#94A3B8]">
-              Total Audience
-            </span>
-            <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-              <Users className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-[#1F2430] dark:text-white mt-3">
-            <AnimatedCounter value={summary?.total_followers || 0} />
-          </div>
-          <div className="flex items-center space-x-1 text-xs text-emerald-600 dark:text-emerald-400 mt-1 font-medium">
-            <ArrowUpRight className="w-3.5 h-3.5" />
-            <span>Monitored across {summary?.creators_monitored || 1} accounts</span>
-          </div>
-        </Card>
-
-        {/* Content Views */}
-        <Card className="p-5" hoverEffect>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#5B6475] dark:text-[#94A3B8]">
-              Content Views
-            </span>
-            <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-[#5B5BD6] dark:text-brand-300 flex items-center justify-center">
-              <Eye className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-[#1F2430] dark:text-white mt-3">
-            <AnimatedCounter
-              value={summary?.total_views || 0}
-              formatter={(v) =>
-                v > 1000000 ? `${(v / 1000000).toFixed(1)}M` : Math.round(v).toLocaleString()
-              }
-            />
-          </div>
-          <div className="text-xs text-[#5B6475] dark:text-[#94A3B8] mt-1">
-            Across {summary?.total_posts || 0} posts
-          </div>
-        </Card>
-
-        {/* Usual Engagement Rate */}
-        <Card className="p-5" hoverEffect>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#5B6475] dark:text-[#94A3B8]">
-              Usual Engagement
-            </span>
-            <div className="w-8 h-8 rounded-xl bg-pink-50 dark:bg-pink-950/50 text-pink-500 flex items-center justify-center">
-              <Heart className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-[#1F2430] dark:text-white mt-3">
-            <AnimatedCounter
-              value={(summary?.average_engagement_rate || 0) * 100}
-              formatter={(v) => `${v.toFixed(1)}%`}
-            />
-          </div>
-          <div className="text-xs text-[#5B6475] dark:text-[#94A3B8] mt-1">
-            {summary?.total_engagements ? summary.total_engagements.toLocaleString() : '0'} total reactions
-          </div>
-        </Card>
-
-        {/* Hit Posts */}
-        <Card variant="tintedIndigo" className="p-5" hoverEffect>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-1">
-              <span className="text-xs font-bold text-[#5B5BD6] dark:text-brand-300">
-                Hit Posts
+    <div className="space-y-8 pb-12">
+      {/* 1. HERO BANNER */}
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-violet-50/90 via-indigo-50/60 to-purple-50/80 dark:from-violet-950/20 dark:via-indigo-950/20 dark:to-slate-900 border border-violet-100 dark:border-violet-900/40 p-6 sm:p-10 shadow-xs">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          {/* Hero Left Content */}
+          <div className="lg:col-span-7 space-y-4">
+            <div className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-white/90 dark:bg-slate-800/90 border border-violet-200/80 dark:border-violet-800/60 shadow-2xs">
+              <Sparkles className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
+              <span className="text-xs font-bold text-violet-900 dark:text-violet-200">
+                Welcome back, {user.name ? user.name.split(' ')[0] : 'Creator'}!
               </span>
-              <Tooltip text="Posts that reached the top 10% engagement tier compared to your usual average." showIcon />
             </div>
-            <div className="w-8 h-8 rounded-xl bg-[#5B5BD6] text-white flex items-center justify-center shadow-xs">
-              <Flame className="w-4 h-4 fill-white" />
+
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
+              Your Creator Insights &{' '}
+              <span className="bg-gradient-to-r from-violet-600 to-indigo-600 dark:from-violet-400 dark:to-indigo-400 bg-clip-text text-transparent">
+                Growth Loop
+              </span>
+            </h1>
+
+            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 max-w-xl leading-relaxed">
+              Discover emerging trends, predict breakout probabilities against your historical baseline, and craft high-impact content across all your channels.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <Button
+                variant="primary"
+                onClick={() => navigate('/predictor')}
+                className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl px-5 py-3 font-semibold text-xs flex items-center gap-2 shadow-md hover:shadow-lg transition"
+              >
+                <span>Predict a Post</span>
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => navigate('/studio')}
+                className="border border-violet-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 hover:bg-white text-slate-800 dark:text-slate-200 rounded-xl px-5 py-3 font-semibold text-xs flex items-center gap-2 shadow-2xs hover:shadow-xs transition"
+              >
+                <PenTool className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+                <span>Open Studio</span>
+              </Button>
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-[#5B5BD6] dark:text-brand-200 mt-3">
-            <AnimatedCounter
-              value={(summary?.breakout_rate || 0) * 100}
-              formatter={(v) => `${v.toFixed(1)}%`}
-            />
+
+          {/* Hero Right: Illustration + Floating Cards */}
+          <div className="lg:col-span-5 relative flex items-center justify-center">
+            <div className="relative w-full max-w-[380px] aspect-[4/3] flex items-center justify-center">
+              <img
+                src={HeroIllustration}
+                alt="Creator workspace with laptop, camera on tripod, and plant"
+                className="w-full h-full object-contain drop-shadow-sm select-none"
+              />
+
+              {/* Floating Card 1: Grow Faster (Top Left) */}
+              <motion.div
+                animate={shouldReduceMotion ? {} : { y: [0, -7, 0] }}
+                transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
+                className="absolute -top-2 left-2 sm:-left-4 bg-white/95 dark:bg-slate-800/95 backdrop-blur-md rounded-2xl p-2.5 sm:p-3 border border-slate-200/80 dark:border-slate-700 shadow-md flex items-center space-x-2.5 z-10"
+              >
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-[11px] font-bold text-slate-800 dark:text-white leading-none">
+                    Grow Faster
+                  </div>
+                  <div className="text-[10px] text-emerald-600 font-semibold mt-0.5">
+                    +340% velocity
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Floating Card 2: Create Better (Top Right) */}
+              <motion.div
+                animate={shouldReduceMotion ? {} : { y: [0, 8, 0] }}
+                transition={{ duration: 5.2, repeat: Infinity, ease: 'easeInOut', delay: 0.6 }}
+                className="absolute -top-3 right-0 sm:-right-4 bg-white/95 dark:bg-slate-800/95 backdrop-blur-md rounded-2xl p-2.5 sm:p-3 border border-slate-200/80 dark:border-slate-700 shadow-md flex items-center space-x-2.5 z-10"
+              >
+                <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center">
+                  <Lightbulb className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-[11px] font-bold text-slate-800 dark:text-white leading-none">
+                    Create Better
+                  </div>
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    10 ranked hooks
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Floating Card 3: More Reach (Bottom Left) */}
+              <motion.div
+                animate={shouldReduceMotion ? {} : { y: [0, -6, 0] }}
+                transition={{ duration: 4.8, repeat: Infinity, ease: 'easeInOut', delay: 1.2 }}
+                className="absolute bottom-2 left-4 sm:-left-2 bg-white/95 dark:bg-slate-800/95 backdrop-blur-md rounded-2xl p-2.5 sm:p-3 border border-slate-200/80 dark:border-slate-700 shadow-md flex items-center space-x-2.5 z-10"
+              >
+                <div className="w-8 h-8 rounded-xl bg-violet-50 dark:bg-violet-950/60 text-violet-600 flex items-center justify-center">
+                  <Play className="w-4 h-4 fill-violet-600" />
+                </div>
+                <div>
+                  <div className="text-[11px] font-bold text-slate-800 dark:text-white leading-none">
+                    More Reach
+                  </div>
+                  <div className="text-[10px] text-violet-600 font-semibold mt-0.5">
+                    Breakout radar
+                  </div>
+                </div>
+              </motion.div>
+            </div>
           </div>
-          <div className="text-xs text-[#5B6475] dark:text-brand-300/80 mt-1 font-medium">
-            {summary?.breakout_count || 0} posts hit the top tier
+        </div>
+      </section>
+
+      {/* 2. VIBECHECK AI STRIP */}
+      <section>
+        <Card className="p-6 sm:p-7 rounded-3xl border border-violet-100 dark:border-slate-800 shadow-xs bg-white dark:bg-[#131927]">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+            {/* Left form area */}
+            <div className="lg:col-span-8 space-y-3">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-teal-500 to-indigo-600 text-white flex items-center justify-center shadow-xs">
+                  <SearchCheck className="w-5 h-5" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-extrabold text-base text-slate-900 dark:text-white">
+                    VibeCheck AI
+                  </h2>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300 border border-violet-200 dark:border-violet-800">
+                    New
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Analyze viewer sentiment, tone distribution, and audience questions on any public video or reel.
+              </p>
+
+              <form onSubmit={handleVibeCheckSubmit} className="space-y-2">
+                <div className="flex flex-col sm:flex-row items-center gap-2.5">
+                  <div className="relative flex-1 w-full">
+                    <LinkIcon className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={vibeUrl}
+                      onChange={(e) => {
+                        setVibeUrl(e.target.value);
+                        if (urlError) setUrlError('');
+                      }}
+                      placeholder="Paste a public Reel, Short, or video URL..."
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    className="w-full sm:w-auto shrink-0 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl px-5 py-2.5 font-semibold text-xs flex items-center justify-center gap-2 shadow-xs hover:shadow-md transition"
+                  >
+                    <span>Analyze Vibe</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </div>
+                {urlError && (
+                  <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">
+                    {urlError}
+                  </p>
+                )}
+              </form>
+
+              {/* Supported platform quick chips */}
+              <div className="flex items-center gap-2 pt-1 text-[11px] text-slate-400">
+                <span>Supported:</span>
+                <button
+                  type="button"
+                  onClick={() => setVibeUrl('https://www.youtube.com/watch?v=sample_video')}
+                  className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-violet-600 transition"
+                >
+                  YouTube
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVibeUrl('https://www.instagram.com/reel/sample_reel')}
+                  className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-violet-600 transition"
+                >
+                  Instagram
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVibeUrl('https://www.tiktok.com/@creator/video/sample')}
+                  className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-violet-600 transition"
+                >
+                  TikTok
+                </button>
+                <span className="text-[10px] text-slate-400 font-medium">+ more</span>
+              </div>
+            </div>
+
+            {/* Right instant insights card */}
+            <div className="lg:col-span-4 bg-violet-50/70 dark:bg-violet-950/30 border border-violet-100 dark:border-violet-900/40 rounded-2xl p-4 space-y-2.5">
+              <div className="text-xs font-bold text-violet-900 dark:text-violet-200">
+                Get instant insights on:
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <span className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-900 text-[11px] font-semibold text-violet-700 dark:text-violet-300 border border-violet-200/60 dark:border-violet-800/60 shadow-2xs">
+                  Sentiment
+                </span>
+                <span className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-900 text-[11px] font-semibold text-teal-700 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/60 shadow-2xs">
+                  Audience mood
+                </span>
+                <span className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-900 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 shadow-2xs">
+                  Top themes
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 pt-1 leading-relaxed">
+                Extract repeated questions, viewer praise, and criticism backed by comment evidence counts.
+              </p>
+            </div>
           </div>
         </Card>
-      </div>
+      </section>
 
-      {/* "What to do today" Suggestions Card */}
-      <Card variant="tintedTeal" className="p-5 sm:p-6 border-teal-200 dark:border-teal-900/40">
-        <div className="flex items-start space-x-3.5">
-          <div className="w-10 h-10 rounded-2xl bg-teal-500 text-white flex items-center justify-center shrink-0 shadow-soft">
-            <Lightbulb className="w-5 h-5 fill-white" />
-          </div>
-          <div className="space-y-3 flex-1 min-w-0">
+      {/* 3. TWO-COLUMN SECTION: RECENT ACTIVITY & QUICK ACTIONS */}
+      <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left: Recent Activity (8 cols) */}
+        <div className="lg:col-span-7 space-y-4">
+          <Card className="p-6 rounded-3xl border border-violet-100 dark:border-slate-800 shadow-xs bg-white dark:bg-[#131927]">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center">
+                  <Zap className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                    Recent Activity
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {summary?.metadata?.data_source === 'mock data (JSON storage)'
+                      ? 'Sample activity'
+                      : 'Latest posts from your connected accounts'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => navigate('/results')}
+                className="text-xs font-semibold text-violet-600 dark:text-violet-400 hover:text-violet-700 flex items-center gap-1"
+              >
+                <span>View all</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Post rows */}
+            <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+              {recentPosts.slice(0, 6).map((post, idx) => {
+                const status = getPostStatus(post);
+                const duration = getDurationBadge(post.post_type, idx);
+                const timeAgo = getTimeAgo(post.published_at, idx);
+                const thumb = getSampleThumbnail(idx, post.post_type);
+
+                return (
+                  <div
+                    key={post.post_id || idx}
+                    className="py-3.5 flex items-center justify-between gap-3 group hover:bg-slate-50/70 dark:hover:bg-slate-800/40 px-2 rounded-2xl transition"
+                  >
+                    {/* Thumbnail + info */}
+                    <div
+                      onClick={() => setActivePost(post)}
+                      className="flex items-center space-x-3 min-w-0 cursor-pointer flex-1"
+                    >
+                      <div className="relative w-16 h-11 rounded-xl overflow-hidden shrink-0 bg-slate-900 border border-slate-200/80 dark:border-slate-700">
+                        <img
+                          src={thumb}
+                          alt={post.caption || 'Post thumbnail'}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                        <span className="absolute bottom-1 right-1 px-1 py-0.2 rounded bg-black/80 text-white font-mono text-[9px] font-bold">
+                          {duration}
+                        </span>
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <PlatformBadge platform={post.platform} size="sm" showLabel={false} />
+                          <h4 className="font-bold text-xs text-slate-900 dark:text-white truncate group-hover:text-violet-600 transition">
+                            {post.caption || 'Untitled Post'}
+                          </h4>
+                        </div>
+
+                        {/* Stats line */}
+                        <div className="flex items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400">
+                          <span className="flex items-center gap-1">
+                            <Eye className="w-3 h-3 text-slate-400" />
+                            {post.views?.toLocaleString()}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Heart className="w-3 h-3 text-rose-500/70" />
+                            {post.likes?.toLocaleString()}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <MessageSquare className="w-3 h-3 text-slate-400" />
+                            {post.comments?.toLocaleString()}
+                          </span>
+                          <span className="text-slate-400">• {timeAgo}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Status Chip + Kebab */}
+                    <div className="flex items-center space-x-2 shrink-0">
+                      <Tooltip content={status.tooltip} position="top">
+                        <span
+                          className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border cursor-help shadow-2xs ${status.color}`}
+                        >
+                          {status.label}
+                        </span>
+                      </Tooltip>
+
+                      <div className="relative">
+                        <button
+                          onClick={() => setOpenKebab(openKebab === post.post_id ? null : post.post_id)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                          aria-label="More post options"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+
+                        {openKebab === post.post_id && (
+                          <div
+                            ref={kebabRef}
+                            className="absolute right-0 mt-1 w-44 rounded-2xl bg-white dark:bg-[#1E2638] border border-slate-200 dark:border-slate-700 shadow-xl py-1.5 z-40 text-xs"
+                          >
+                            <button
+                              onClick={() => {
+                                setOpenKebab(null);
+                                setActivePost(post);
+                              }}
+                              className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition text-slate-700 dark:text-slate-300"
+                            >
+                              Open details
+                            </button>
+                            <button
+                              onClick={() => {
+                                setOpenKebab(null);
+                                navigate('/predictor');
+                              }}
+                              className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition text-slate-700 dark:text-slate-300"
+                            >
+                              Predict again
+                            </button>
+                            <button
+                              onClick={() => {
+                                setOpenKebab(null);
+                                navigate('/studio');
+                              }}
+                              className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition text-slate-700 dark:text-slate-300"
+                            >
+                              Turn into idea
+                            </button>
+                            <button
+                              onClick={() => {
+                                setOpenKebab(null);
+                                navigator.clipboard?.writeText(window.location.origin);
+                                addToast('Post link copied to clipboard', 'success');
+                              }}
+                              className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition text-slate-700 dark:text-slate-300 flex items-center justify-between"
+                            >
+                              <span>Copy link</span>
+                              <Copy className="w-3 h-3 text-slate-400" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        </div>
+
+        {/* Right: Quick Actions (5 cols) */}
+        <div className="lg:col-span-5 space-y-4">
+          <Card className="p-6 rounded-3xl border border-violet-100 dark:border-slate-800 shadow-xs bg-white dark:bg-[#131927]">
+            <div className="flex items-center space-x-2.5 pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="w-8 h-8 rounded-xl bg-violet-50 dark:bg-violet-950/60 text-violet-600 flex items-center justify-center">
+                <Rocket className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                  Quick Actions
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Jump directly into intelligence and creation tools
+                </p>
+              </div>
+            </div>
+
+            {/* 3x2 responsive grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-4">
+              {quickActions.map((action) => {
+                const Icon = action.icon;
+                return (
+                  <button
+                    key={action.id}
+                    onClick={action.onClick}
+                    className={`group text-left p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between h-32 hover:-translate-y-1 hover:shadow-md ${
+                      action.highlight
+                        ? 'bg-gradient-to-br from-violet-50 to-indigo-50/60 dark:from-violet-950/40 dark:to-slate-900 border-violet-200 dark:border-violet-800 shadow-2xs'
+                        : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 shadow-2xs'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between w-full">
+                      <div
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                          action.highlight
+                            ? 'bg-violet-600 text-white shadow-xs'
+                            : 'bg-slate-100 dark:bg-slate-800 text-violet-600 dark:text-violet-400'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-violet-600 group-hover:translate-x-1 transition" />
+                    </div>
+
+                    <div>
+                      <div className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-violet-600 transition">
+                        {action.title}
+                      </div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                        {action.subtitle}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+        </div>
+      </section>
+
+      {/* 4. CROSS-PLATFORM ANALYTICS TRAJECTORY */}
+      <section className="space-y-4">
+        <Card className="p-6 sm:p-8 rounded-3xl border border-violet-100 dark:border-slate-800 shadow-xs bg-white dark:bg-[#131927]">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
             <div>
-              <h2 className="text-base font-bold text-[#1F2430] dark:text-white">
-                What to do today (Creator Suggestions)
-              </h2>
-              <p className="text-xs text-[#5B6475] dark:text-[#94A3B8] mt-0.5">
-                Friendly algorithmic cues to give your content the best opportunity.
+              <div className="flex items-center gap-2">
+                <h3 className="font-extrabold text-lg text-slate-900 dark:text-white">
+                  30-Day Cross-Platform Trajectory
+                </h3>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                  Sample Data
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Visualizing view velocity, impressions, and follower growth trajectory over time.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="p-3.5 rounded-xl bg-white/80 dark:bg-[#17212E] border border-teal-100 dark:border-teal-900/30 text-xs space-y-1">
-                <span className="font-bold text-teal-800 dark:text-teal-300 block">
-                  1. Best Posting Window
-                </span>
-                <p className="text-[#5B6475] dark:text-[#94A3B8]">
-                  Thursday between 5:00 PM – 7:00 PM historically yields +24% higher early watch-time.
-                </p>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="w-3 h-3 rounded-full bg-violet-600" />
+                <span className="text-slate-600 dark:text-slate-300 font-medium">Views</span>
               </div>
-
-              <div className="p-3.5 rounded-xl bg-white/80 dark:bg-[#17212E] border border-teal-100 dark:border-teal-900/30 text-xs space-y-1">
-                <span className="font-bold text-teal-800 dark:text-teal-300 block">
-                  2. Trending Angle to Catch
-                </span>
-                <p className="text-[#5B6475] dark:text-[#94A3B8]">
-                  "Cursor AI Fullstack Build" is accelerating (+84% velocity). Turn it into a concept.
-                </p>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-white/80 dark:bg-[#17212E] border border-teal-100 dark:border-teal-900/30 text-xs space-y-1">
-                <span className="font-bold text-teal-800 dark:text-teal-300 block">
-                  3. Community Fuel
-                </span>
-                <p className="text-[#5B6475] dark:text-[#94A3B8]">
-                  Viewers repeatedly asked how to profile memory in production. Great short post topic!
-                </p>
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="w-3 h-3 rounded-full bg-teal-500" />
+                <span className="text-slate-600 dark:text-slate-300 font-medium">Engagements</span>
               </div>
             </div>
           </div>
-        </div>
-      </Card>
 
-      {/* Engagement Trajectory Chart */}
-      <Card className="p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-2">
-          <div>
-            <h2 className="text-base font-bold text-[#1F2430] dark:text-white flex items-center space-x-2">
-              <span>Views & Engagement Trajectory</span>
-              <Tooltip text="Daily snapshot of views and engagement over the past 30 days." showIcon />
-            </h2>
-            <p className="text-xs text-[#5B6475] dark:text-[#94A3B8] mt-0.5">
-              30-day historical activity curve
-            </p>
-          </div>
-          <div className="flex items-center space-x-4 text-xs font-medium">
-            <div className="flex items-center space-x-1.5">
-              <span className="w-3 h-3 rounded-full bg-[#5B5BD6] inline-block"></span>
-              <span className="text-[#5B6475] dark:text-[#94A3B8]">Views</span>
-            </div>
-            <div className="flex items-center space-x-1.5">
-              <span className="w-3 h-3 rounded-full bg-[#14B8A6] inline-block"></span>
-              <span className="text-[#5B6475] dark:text-[#94A3B8]">Engagement %</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="h-64 sm:h-72 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="viewsGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#5B5BD6" stopOpacity={0.25} />
-                  <stop offset="95%" stopColor="#5B5BD6" stopOpacity={0.0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} opacity={0.6} />
-              <XAxis dataKey="date" stroke="#94A3B8" tick={{ fontSize: 11 }} />
-              <YAxis yAxisId="left" stroke="#94A3B8" tick={{ fontSize: 11 }} />
-              <YAxis yAxisId="right" orientation="right" stroke="#14B8A6" tick={{ fontSize: 11 }} unit="%" />
-              <RechartsTooltip
-                contentStyle={{
-                  backgroundColor: '#FFFFFF',
-                  borderColor: '#E8E6DF',
-                  borderRadius: '0.75rem',
-                  fontSize: '12px',
-                  boxShadow: '0 4px 20px -2px rgba(0,0,0,0.06)',
-                }}
-              />
-              <Area
-                yAxisId="left"
-                type="monotone"
-                dataKey="views"
-                stroke="#5B5BD6"
-                strokeWidth={2.5}
-                fillOpacity={1}
-                fill="url(#viewsGrad)"
-                name="Views"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </Card>
-
-      {/* Top vs Bottom Posts Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top Hit Posts */}
-        <Card className="p-5">
-          <div className="flex items-center justify-between pb-3.5 border-b border-[#EFECE6] dark:border-[#232B3E] mb-4">
-            <div className="flex items-center space-x-2">
-              <div className="w-7 h-7 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400 flex items-center justify-center">
-                <Flame className="w-4 h-4 fill-current" />
-              </div>
-              <h3 className="text-sm font-bold text-[#1F2430] dark:text-white">
-                Top Hit Posts (What Worked)
-              </h3>
-            </div>
-            <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
-              Highest engagement
-            </span>
-          </div>
-
-          <div className="space-y-3">
-            {topPosts.map((post) => (
-              <div
-                key={post.post_id}
-                onClick={() => setActivePost(post)}
-                className="p-3.5 rounded-xl bg-[#FAF9F6] dark:bg-[#131825] border border-[#E8E6DF] dark:border-[#232B3E] hover:border-brand-300 dark:hover:border-brand-700 hover:shadow-soft transition cursor-pointer"
-              >
-                <div className="flex items-center justify-between mb-1.5">
-                  <PlatformBadge platform={post.platform} />
-                  <BreakoutBadge isBreakout={post.is_breakout} />
-                </div>
-                <h4 className="text-xs font-semibold text-[#1F2430] dark:text-white line-clamp-2">
-                  {post.title}
-                </h4>
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#EFECE6] dark:border-[#1E2536] text-[11px] text-[#5B6475] dark:text-[#94A3B8]">
-                  <span>{post.views ? post.views.toLocaleString() : '0'} views</span>
-                  <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                    {post.engagement_rate ? (post.engagement_rate * 100).toFixed(1) : '0.0'}% ER
-                  </span>
-                </div>
-              </div>
-            ))}
+          <div className="h-72 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={snapshots} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stop-color="#7C3AED" stop-opacity={0.3} />
+                    <stop offset="95%" stop-color="#7C3AED" stop-opacity={0} />
+                  </linearGradient>
+                  <linearGradient id="colorEngage" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stop-color="#14B8A6" stop-opacity={0.25} />
+                    <stop offset="95%" stop-color="#14B8A6" stop-opacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(d) => d.slice(5)} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                <RechartsTooltip
+                  contentStyle={{
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    borderColor: '#334155',
+                    borderRadius: '12px',
+                    color: '#fff',
+                    fontSize: '12px',
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="views"
+                  stroke="#7C3AED"
+                  strokeWidth={2.5}
+                  fillOpacity={1}
+                  fill="url(#colorViews)"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="engagements"
+                  stroke="#14B8A6"
+                  strokeWidth={2}
+                  fillOpacity={1}
+                  fill="url(#colorEngage)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </Card>
+      </section>
 
-        {/* Lower Engagement Posts */}
-        <Card className="p-5">
-          <div className="flex items-center justify-between pb-3.5 border-b border-[#EFECE6] dark:border-[#232B3E] mb-4">
-            <div className="flex items-center space-x-2">
-              <div className="w-7 h-7 rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 flex items-center justify-center">
-                <TrendingUp className="w-4 h-4" />
-              </div>
-              <h3 className="text-sm font-bold text-[#1F2430] dark:text-white">
-                Usual Pace Posts (Room to Grow)
-              </h3>
-            </div>
-            <span className="text-[11px] text-slate-400 font-medium">Standard baseline</span>
-          </div>
+      {/* 5. HOW IT WORKS COLLAPSIBLE STRIP */}
+      <HowItWorks steps={HOW_IT_WORKS_STEPS} />
 
-          <div className="space-y-3">
-            {bottomPosts.map((post) => (
-              <div
-                key={post.post_id}
-                onClick={() => setActivePost(post)}
-                className="p-3.5 rounded-xl bg-[#FAF9F6] dark:bg-[#131825] border border-[#E8E6DF] dark:border-[#232B3E] hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-soft transition cursor-pointer"
-              >
-                <div className="flex items-center justify-between mb-1.5">
-                  <PlatformBadge platform={post.platform} />
-                  <span className="text-[10px] text-slate-400 font-mono capitalize">
-                    {post.post_type}
-                  </span>
-                </div>
-                <h4 className="text-xs font-medium text-[#5B6475] dark:text-[#94A3B8] line-clamp-2">
-                  {post.title}
-                </h4>
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#EFECE6] dark:border-[#1E2536] text-[11px] text-[#5B6475] dark:text-[#94A3B8]">
-                  <span>{post.views ? post.views.toLocaleString() : '0'} views</span>
-                  <span>{post.engagement_rate ? (post.engagement_rate * 100).toFixed(2) : '0.00'}% ER</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-
-      {/* Recent Posts Stream Table */}
-      <Card className="p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
-          <div>
-            <h2 className="text-base font-bold text-[#1F2430] dark:text-white">
-              Recent Content Stream
-            </h2>
-            <p className="text-xs text-[#5B6475] dark:text-[#94A3B8] mt-0.5">
-              Click any row to open post details and inspect engagement drivers
-            </p>
-          </div>
-
-          {/* Format Filter */}
-          <div className="flex items-center space-x-2">
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
-            <select
-              value={postTypeFilter}
-              onChange={(e) => setPostTypeFilter(e.target.value)}
-              className="bg-[#FAF9F6] dark:bg-[#131825] border border-[#E8E6DF] dark:border-[#232B3E] rounded-xl px-3 py-1.5 text-xs text-[#1F2430] dark:text-white focus:outline-none focus:border-brand-500"
-            >
-              <option value="all">All Formats</option>
-              <option value="long_video">Long Video</option>
-              <option value="short">Shorts / Reels</option>
-              <option value="thread">Threads</option>
-              <option value="story_post">Story Posts</option>
-              <option value="carousel">Carousels</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-[#EFECE6] dark:border-[#232B3E] text-[#858D9D] dark:text-[#64748B] uppercase tracking-wider text-[10px]">
-                <th className="py-3 px-3">Platform</th>
-                <th className="py-3 px-3">Post Title</th>
-                <th className="py-3 px-3">Type</th>
-                <th className="py-3 px-3 text-right">Views</th>
-                <th className="py-3 px-3 text-right">Likes</th>
-                <th className="py-3 px-3 text-right">Engagement</th>
-                <th className="py-3 px-3 text-center">Outcome</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#EFECE6] dark:divide-[#232B3E]">
-              {recentPosts.map((post) => (
-                <tr
-                  key={post.post_id}
-                  onClick={() => setActivePost(post)}
-                  className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition cursor-pointer"
-                >
-                  <td className="py-3 px-3 whitespace-nowrap">
-                    <PlatformBadge platform={post.platform} size="sm" />
-                  </td>
-                  <td className="py-3 px-3 font-medium text-[#1F2430] dark:text-white max-w-xs truncate">
-                    {post.title}
-                  </td>
-                  <td className="py-3 px-3 text-[#5B6475] dark:text-[#94A3B8] whitespace-nowrap capitalize">
-                    {post.post_type}
-                  </td>
-                  <td className="py-3 px-3 text-right text-[#1F2430] dark:text-white font-mono">
-                    {post.views ? post.views.toLocaleString() : '0'}
-                  </td>
-                  <td className="py-3 px-3 text-right text-[#5B6475] dark:text-[#94A3B8] font-mono">
-                    {post.likes ? post.likes.toLocaleString() : '0'}
-                  </td>
-                  <td className="py-3 px-3 text-right font-bold text-[#5B5BD6] dark:text-brand-300 font-mono">
-                    {post.engagement_rate ? (post.engagement_rate * 100).toFixed(2) : '0.00'}%
-                  </td>
-                  <td className="py-3 px-3 text-center whitespace-nowrap">
-                    <BreakoutBadge isBreakout={post.is_breakout} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {/* Slide-over Post Inspection Panel */}
+      {/* Post Slide-Over for inspection */}
       <SlideOver
-        isOpen={Boolean(activePost)}
+        open={Boolean(activePost)}
         onClose={() => setActivePost(null)}
-        title={activePost?.title}
-        subtitle={`${activePost?.platform?.toUpperCase()} • Published on ${activePost?.published_at?.slice(0, 10)}`}
-        footer={
-          <div className="flex justify-end space-x-2">
-            <Button variant="secondary" size="sm" onClick={() => setActivePost(null)}>
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              icon={Sparkles}
-              onClick={() => {
-                const topicParam = encodeURIComponent(activePost?.title || '');
-                const platParam = activePost?.platform || 'youtube';
-                setActivePost(null);
-                navigate(`/studio?topic=${topicParam}&platform=${platParam}`);
-              }}
-            >
-              Draft Similar in Studio
-            </Button>
-          </div>
-        }
+        title={activePost?.caption || 'Post Details'}
       >
         {activePost && (
-          <div className="space-y-6 text-sm">
-            {/* Badges */}
-            <div className="flex items-center justify-between">
-              <PlatformBadge platform={activePost.platform} />
-              <BreakoutBadge isBreakout={activePost.is_breakout} />
-            </div>
-
-            {/* Quick Metrics */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3.5 rounded-xl bg-[#FAF9F6] dark:bg-[#131825] border border-[#E8E6DF] dark:border-[#232B3E]">
-                <div className="text-xs text-[#5B6475] dark:text-[#94A3B8]">Total Views</div>
-                <div className="text-xl font-extrabold text-[#1F2430] dark:text-white mt-1">
-                  {activePost.views ? activePost.views.toLocaleString() : '0'}
-                </div>
+          <div className="space-y-6">
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <PlatformBadge platform={activePost.platform} />
+                <span className="text-xs text-slate-500 font-mono">
+                  {formatIsoDateTime(activePost.published_at)}
+                </span>
               </div>
-              <div className="p-3.5 rounded-xl bg-[#FAF9F6] dark:bg-[#131825] border border-[#E8E6DF] dark:border-[#232B3E]">
-                <div className="text-xs text-[#5B6475] dark:text-[#94A3B8]">Engagement Rate</div>
-                <div className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">
-                  {activePost.engagement_rate ? (activePost.engagement_rate * 100).toFixed(2) : '0.00'}%
-                </div>
-              </div>
-            </div>
-
-            {/* Interaction Breakdown */}
-            <div className="p-4 rounded-xl bg-white dark:bg-[#1A2333] border border-[#E8E6DF] dark:border-[#232B3E] space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-[#5B6475] dark:text-[#94A3B8]">
-                Audience Interactions
+              <h4 className="font-bold text-base text-slate-900 dark:text-white">
+                {activePost.caption}
               </h4>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div>
-                  <div className="text-xs text-slate-400">Likes</div>
-                  <div className="font-bold text-[#1F2430] dark:text-white mt-0.5">
-                    {activePost.likes ? activePost.likes.toLocaleString() : '0'}
-                  </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <div className="text-xs text-slate-400">Total Views</div>
+                <div className="text-lg font-bold text-slate-900 dark:text-white mt-1">
+                  {activePost.views?.toLocaleString()}
                 </div>
-                <div>
-                  <div className="text-xs text-slate-400">Comments</div>
-                  <div className="font-bold text-[#1F2430] dark:text-white mt-0.5">
-                    {activePost.comments ? activePost.comments.toLocaleString() : '0'}
-                  </div>
+              </div>
+              <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <div className="text-xs text-slate-400">Engagement Rate</div>
+                <div className="text-lg font-bold text-emerald-600 mt-1">
+                  {((activePost.engagement_rate || 0) * 100).toFixed(2)}%
                 </div>
-                <div>
-                  <div className="text-xs text-slate-400">Shares</div>
-                  <div className="font-bold text-[#1F2430] dark:text-white mt-0.5">
-                    {activePost.shares ? activePost.shares.toLocaleString() : '0'}
-                  </div>
+              </div>
+              <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <div className="text-xs text-slate-400">Likes</div>
+                <div className="text-lg font-bold text-slate-900 dark:text-white mt-1">
+                  {activePost.likes?.toLocaleString()}
+                </div>
+              </div>
+              <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <div className="text-xs text-slate-400">Comments</div>
+                <div className="text-lg font-bold text-slate-900 dark:text-white mt-1">
+                  {activePost.comments?.toLocaleString()}
                 </div>
               </div>
             </div>
 
-            {/* What Worked / Key Learning */}
-            <div className="p-4 rounded-xl bg-brand-50 dark:bg-brand-950/40 border border-brand-200 dark:border-brand-800 text-xs text-[#313083] dark:text-brand-300 space-y-2">
-              <div className="flex items-center space-x-1.5 font-bold">
-                <Sparkles className="w-4 h-4 text-[#5B5BD6]" />
-                <span>What worked for this post</span>
-              </div>
-              <p className="leading-relaxed">
-                {activePost.is_breakout
-                  ? 'Strong title curiosity gap paired with an optimal release time drove above-average initial retention, propelling this post into your top decile.'
-                  : 'Standard performance. Consider sharpening the first 3 seconds of the hook or testing a punchier contrarian premise next time.'}
-              </p>
+            <div className="pt-2 flex gap-3">
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setActivePost(null);
+                  navigate('/predictor');
+                }}
+                className="flex-1 rounded-xl text-xs font-semibold py-2.5"
+              >
+                Predict Again
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setActivePost(null);
+                  navigate('/studio');
+                }}
+                className="flex-1 rounded-xl text-xs font-semibold py-2.5"
+              >
+                Turn Into Idea
+              </Button>
             </div>
           </div>
         )}
