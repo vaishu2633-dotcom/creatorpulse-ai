@@ -73,6 +73,23 @@
   color-scheme: dark;
 }
 
+/* Dashboard Exact Viewport Fit Utilities */
+@media (min-width: 1100px) and (min-height: 600px) {
+  .dashboard-main-fit {
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+  }
+}
+
+@media (max-width: 1099px), (max-height: 599px) {
+  .dashboard-main-fit {
+    height: auto !important;
+    min-height: 100% !important;
+    overflow-y: auto !important;
+  }
+}
+
 body {
   margin: 0;
   background-color: var(--bg-page);

@@ -47,45 +47,45 @@ export default function PageHeader({
   const effectiveSubtitle = subtitle || description;
 
   return (
-    <div className={`space-y-4 ${className}`}>
-      {/* Top Banner Card */}
-      <div className="relative p-6 sm:p-7 rounded-3xl bg-white dark:bg-[#131927] border border-[#EAE7F5] dark:border-[#1F293D] shadow-xs overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className={`space-y-3 ${className}`}>
+      {/* Top Banner Card (Compact 85-110px height) */}
+      <div className="relative p-3.5 sm:p-4.5 rounded-2xl bg-white dark:bg-[#131927] border border-[#EAE7F5] dark:border-[#1F293D] shadow-xs overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
         {/* Left Side: Identity & Meta */}
-        <div className="space-y-3 z-10 max-w-2xl">
+        <div className="space-y-1.5 z-10 max-w-2xl">
           {/* Tag & Status Row */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             {effectiveTag && <PageTag tag={effectiveTag} />}
             {effectiveStatus && <StatusChip status={effectiveStatus} size="sm" />}
           </div>
 
           {/* Title with Feature Icon */}
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2.5">
             {Icon && (
               <div
-                className={`w-10 h-10 rounded-2xl flex items-center justify-center border shrink-0 shadow-2xs ${accentClass}`}
+                className={`w-8 h-8 rounded-xl flex items-center justify-center border shrink-0 shadow-2xs ${accentClass}`}
               >
-                <Icon className="w-5 h-5" />
+                <Icon className="w-4 h-4" />
               </div>
             )}
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#1E1B4B] dark:text-white">
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-[#1E1B4B] dark:text-white leading-tight">
               {title}
             </h1>
           </div>
 
           {/* Plain Plain-Language Sentence Subtitle */}
           {effectiveSubtitle && (
-            <p className="text-sm text-[#64748B] dark:text-[#94A3B8] leading-relaxed">
+            <p className="text-xs text-[#64748B] dark:text-[#94A3B8] leading-relaxed line-clamp-1 sm:line-clamp-2">
               {effectiveSubtitle}
             </p>
           )}
 
           {/* Optional Inline Children (Buttons, Tabs, Filters) */}
-          {children && <div className="pt-2">{children}</div>}
+          {children && <div className="pt-1">{children}</div>}
         </div>
 
         {/* Right Side: Header Illustration Banner */}
         {illustration && (
-          <div className="hidden sm:block shrink-0 w-36 h-28 md:w-48 md:h-36 z-0 opacity-90 dark:opacity-80 transition-opacity">
+          <div className="hidden sm:block shrink-0 w-28 h-20 md:w-36 md:h-24 z-0 opacity-90 dark:opacity-80 transition-opacity">
             <img
               src={illustration}
               alt={illustrationAlt}

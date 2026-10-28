@@ -161,24 +161,27 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }) {
       )}
 
       <aside
-        className={`fixed md:sticky top-0 z-40 h-screen shrink-0 transition-all duration-300 ease-in-out border-r border-[#EAE7F5] dark:border-[#1F293D] bg-[#FFFFFF] dark:bg-[#131927] text-slate-800 dark:text-slate-100 flex flex-col justify-between shadow-xs ${
+        style={{
+          width: collapsed ? '4.5rem' : 'clamp(232px, 17vw, 272px)',
+        }}
+        className={`fixed md:sticky top-0 z-40 h-screen shrink-0 transition-all duration-200 ease-in-out border-r border-[#EAE7F5] dark:border-[#1F293D] bg-[#FFFFFF] dark:bg-[#131927] text-slate-800 dark:text-slate-100 flex flex-col justify-between shadow-xs ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        } ${collapsed ? 'w-20' : 'w-[340px]'}`}
+        }`}
       >
         <div className="flex flex-col h-full min-h-0">
-          {/* Logo Block */}
-          <div className="h-20 flex items-center justify-between px-6 border-b border-[#EAE7F5] dark:border-[#1F293D] shrink-0">
-            <div className="flex items-center space-x-3.5 min-w-0">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-md text-white shrink-0">
-                <Sparkles className="w-5 h-5 fill-white" />
+          {/* Logo Block (Compact h-14 to match top bar) */}
+          <div className="h-14 flex items-center justify-between px-3.5 border-b border-[#EAE7F5] dark:border-[#1F293D] shrink-0">
+            <div className="flex items-center space-x-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-xs text-white shrink-0">
+                <Sparkles className="w-4 h-4 fill-white" />
               </div>
               {!collapsed && (
-                <div className="truncate">
-                  <div className="font-extrabold text-base tracking-tight flex items-center space-x-1.5">
-                    <span className="text-slate-900 dark:text-white">CreatorPulse</span>
+                <div className="truncate min-w-0">
+                  <div className="font-extrabold text-[13.5px] tracking-tight flex items-center space-x-1 leading-none">
+                    <span className="text-slate-900 dark:text-white truncate">CreatorPulse</span>
                     <span className="font-extrabold text-violet-600 dark:text-violet-400">AI</span>
                   </div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate mt-0.5">
                     Social Intelligence Studio
                   </div>
                 </div>
@@ -188,23 +191,23 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }) {
             {/* Collapse button on desktop */}
             <button
               onClick={() => setCollapsed(!collapsed)}
-              className="hidden md:flex p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              className="hidden md:flex p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
               aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
               {collapsed ? (
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-3.5 h-3.5" />
               ) : (
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-3.5 h-3.5" />
               )}
             </button>
           </div>
 
-          {/* Navigation Links Scrollable Area */}
-          <div className="flex-1 px-4 py-5 space-y-6 overflow-y-auto min-h-0">
+          {/* Navigation Links Scrollable Area without visible scrollbar */}
+          <div className="flex-1 px-2.5 py-2 space-y-2.5 overflow-y-auto min-h-0 scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             {navGroups.map((group) => (
-              <div key={group.group} className="space-y-1.5">
+              <div key={group.group} className="space-y-0.5">
                 {!collapsed && (
-                  <div className="px-3 pb-1 text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                  <div className="px-2 pt-1 pb-0.5 text-[9.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                     {group.group}
                   </div>
                 )}
@@ -218,25 +221,25 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }) {
                       onClick={onCloseMobile}
                       title={`${item.label} • Status: ${item.truthStatus}`}
                       className={({ isActive }) =>
-                        `group relative flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
+                        `group relative flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-medium h-[38px] transition-all ${
                           isActive
-                            ? 'bg-violet-100/80 dark:bg-violet-950/60 text-violet-900 dark:text-violet-200 font-semibold border border-violet-200/80 dark:border-violet-800/70 shadow-xs'
+                            ? 'bg-violet-100/90 dark:bg-violet-950/70 text-violet-900 dark:text-violet-200 font-semibold border border-violet-200/80 dark:border-violet-800/80 shadow-2xs'
                             : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-slate-800/60'
-                        } ${collapsed ? 'justify-center px-2' : ''}`
+                        } ${collapsed ? 'justify-center px-1' : ''}`
                       }
                     >
-                      <div className="flex items-center space-x-3 min-w-0">
+                      <div className="flex items-center space-x-2.5 min-w-0">
                         <Icon
-                          className={`w-5 h-5 shrink-0 transition-colors ${item.accent}`}
+                          className={`w-4 h-4 shrink-0 transition-colors ${item.accent}`}
                         />
                         {!collapsed && (
-                          <span className="truncate text-[13px]">{item.label}</span>
+                          <span className="truncate text-[12px]">{item.label}</span>
                         )}
                       </div>
 
                       {!collapsed && item.badge && (
                         <span
-                          className={`shrink-0 ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          className={`shrink-0 ml-1.5 text-[9px] font-bold px-1.5 py-0.2 rounded-full border leading-normal ${
                             item.badgeColor === 'green'
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
                               : item.badgeColor === 'gray'
@@ -255,36 +258,36 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }) {
           </div>
 
           {/* Bottom Profile Card */}
-          <div className="p-4 border-t border-[#EAE7F5] dark:border-[#1F293D] bg-slate-50/60 dark:bg-[#111622] shrink-0">
+          <div className="p-2 border-t border-[#EAE7F5] dark:border-[#1F293D] bg-slate-50/60 dark:bg-[#111622] shrink-0">
             <NavLink
               to="/settings"
-              className="flex items-center justify-between p-2.5 rounded-2xl hover:bg-white dark:hover:bg-slate-800/80 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
+              className="flex items-center justify-between p-1.5 rounded-xl hover:bg-white dark:hover:bg-slate-800/80 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
             >
-              <div className="flex items-center space-x-3 min-w-0">
+              <div className="flex items-center space-x-2.5 min-w-0">
                 {user.avatarUrl ? (
                   <img
                     src={user.avatarUrl}
                     alt={user.name}
-                    className="w-10 h-10 rounded-xl object-cover shrink-0 border border-violet-200 dark:border-violet-800 shadow-xs"
+                    className="w-7 h-7 rounded-lg object-cover shrink-0 border border-violet-200 dark:border-violet-800 shadow-2xs"
                   />
                 ) : (
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-violet-600 to-indigo-600 text-white flex items-center justify-center font-bold text-[10px] shadow-2xs shrink-0">
                     {user.initials || 'CP'}
                   </div>
                 )}
                 {!collapsed && (
                   <div className="min-w-0">
-                    <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                    <div className="text-[11.5px] font-bold text-slate-900 dark:text-white truncate leading-none">
                       {user.channelName || 'Creator Channel'}
                     </div>
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
                       {user.workspace || 'Prototype Workspace'}
                     </div>
                   </div>
                 )}
               </div>
               {!collapsed && (
-                <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
               )}
             </NavLink>
           </div>

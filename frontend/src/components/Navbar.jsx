@@ -21,7 +21,6 @@ import {
   Settings as SettingsIcon,
   HelpCircle,
   CheckCircle2,
-  Info,
 } from 'lucide-react';
 import { YoutubeIcon, InstagramIcon, TwitterIcon, LinkedinIcon } from './SocialIcons';
 
@@ -39,7 +38,6 @@ const SAMPLE_NOTIFICATIONS = [
     title: 'Breakout Hit Detected',
     message: 'Your video "Why 90% of Junior Devs Fail Technical Interviews" hit top 5% view velocity.',
     time: '2 hours ago',
-    type: 'breakout',
     source: 'Sample telemetry',
   },
   {
@@ -47,7 +45,6 @@ const SAMPLE_NOTIFICATIONS = [
     title: 'Emerging Topic Radar',
     message: 'Topic "AI Prompt Engineering for Production" is trending with 84% momentum across YouTube and X.',
     time: '5 hours ago',
-    type: 'trend',
     source: 'Sample telemetry',
   },
   {
@@ -55,7 +52,6 @@ const SAMPLE_NOTIFICATIONS = [
     title: 'Audience Question Surge',
     message: '14 viewers asked about setup costs in your recent comments. Ready to turn into Studio idea?',
     time: '1 day ago',
-    type: 'vibe',
     source: 'Sample telemetry',
   },
 ];
@@ -76,7 +72,6 @@ export default function Navbar({ onToggleMobileSidebar }) {
   const dataDropdownRef = useRef(null);
   const profileDropdownRef = useRef(null);
 
-  // Close dropdowns on outside click
   useEffect(() => {
     function handleClickOutside(event) {
       if (dataDropdownRef.current && !dataDropdownRef.current.contains(event.target)) {
@@ -100,19 +95,19 @@ export default function Navbar({ onToggleMobileSidebar }) {
 
   return (
     <>
-      <header className="h-20 bg-white/90 dark:bg-[#131927]/90 backdrop-blur-md border-b border-[#EAE7F5] dark:border-[#1F293D] sticky top-0 z-30 px-4 sm:px-8 flex items-center justify-between transition-colors shadow-2xs">
-        {/* Left: Mobile trigger & Platform segmented pills */}
-        <div className="flex items-center space-x-3.5">
+      <header className="h-14 bg-white/95 dark:bg-[#131927]/95 backdrop-blur-md border-b border-[#EAE7F5] dark:border-[#1F293D] sticky top-0 z-30 px-3 sm:px-5 flex items-center justify-between transition-colors shadow-2xs shrink-0">
+        {/* Left: Mobile trigger & Segmented platform pills */}
+        <div className="flex items-center space-x-2.5 min-w-0">
           <button
             onClick={onToggleMobileSidebar}
-            className="md:hidden p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+            className="md:hidden p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0"
             aria-label="Open mobile navigation"
           >
             <Menu className="w-5 h-5" />
           </button>
 
-          {/* Segmented Platform Pills */}
-          <div className="flex items-center space-x-1 bg-slate-100/90 dark:bg-[#0B0F19] p-1 rounded-2xl border border-slate-200/60 dark:border-slate-800 overflow-x-auto max-w-[260px] sm:max-w-none">
+          {/* Segmented Platform Pills - Compact without horizontal scrollbar */}
+          <div className="flex items-center space-x-0.5 bg-slate-100/90 dark:bg-[#0B0F19] p-0.5 rounded-xl border border-slate-200/60 dark:border-slate-800 shrink-0">
             {PLATFORMS.map((plat) => {
               const Icon = ICON_MAP[plat.icon] || Layers;
               const isSelected = selectedPlatform === plat.id;
@@ -121,7 +116,8 @@ export default function Navbar({ onToggleMobileSidebar }) {
                 <button
                   key={plat.id}
                   onClick={() => setSelectedPlatform(plat.id)}
-                  className={`relative flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 z-10 ${
+                  title={plat.label}
+                  className={`relative flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all shrink-0 z-10 ${
                     isSelected
                       ? 'text-slate-900 dark:text-white'
                       : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
@@ -130,53 +126,56 @@ export default function Navbar({ onToggleMobileSidebar }) {
                   {isSelected && (
                     <motion.div
                       layoutId="navbarActivePlatform"
-                      className="absolute inset-0 bg-white dark:bg-[#1E2638] rounded-xl shadow-xs border border-slate-200/80 dark:border-slate-700 -z-10"
+                      className="absolute inset-0 bg-white dark:bg-[#1E2638] rounded-lg shadow-xs border border-slate-200/80 dark:border-slate-700 -z-10"
                       transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                     />
                   )}
                   <Icon
-                    className="w-4 h-4"
+                    className="w-3.5 h-3.5 shrink-0"
                     style={{ color: plat.color || undefined }}
                   />
-                  <span className="hidden md:inline">{plat.label}</span>
+                  {/* Keep active one labeled, show other labels only on wider screens (>= 1280px) */}
+                  <span className={`text-[11.5px] ${isSelected ? 'inline' : 'hidden xl:inline'}`}>
+                    {plat.label}
+                  </span>
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* Right Controls */}
-        <div className="flex items-center space-x-3 sm:space-x-4">
+        {/* Right Controls - One Line, No Wrap, Fully Visible */}
+        <div className="flex items-center space-x-2 sm:space-x-3 shrink-0 pl-2">
           {/* Sample Data Dropdown Chip */}
           <div className="relative" ref={dataDropdownRef}>
             <button
               onClick={() => setDataDropdownOpen(!dataDropdownOpen)}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-amber-50/80 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60 text-xs font-medium hover:bg-amber-100/70 transition shadow-2xs"
+              className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-amber-50/90 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60 text-[11px] font-semibold whitespace-nowrap hover:bg-amber-100/70 transition shadow-2xs"
             >
-              <Database className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-              <span className="hidden sm:inline">Sample data</span>
-              <ChevronDown className="w-3 h-3 opacity-70" />
+              <Database className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span>Sample data</span>
+              <ChevronDown className="w-2.5 h-2.5 opacity-70 shrink-0 ml-0.5" />
             </button>
 
             <AnimatePresence>
               {dataDropdownOpen && (
                 <motion.div
-                  initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                  initial={{ opacity: 0, y: 6, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 6, scale: 0.95 }}
-                  className="absolute right-0 mt-2 w-64 rounded-2xl bg-white dark:bg-[#1E2638] border border-slate-200 dark:border-slate-700 shadow-xl py-2 z-50 text-xs"
+                  exit={{ opacity: 0, y: 4, scale: 0.95 }}
+                  className="absolute right-0 mt-1.5 w-60 rounded-2xl bg-white dark:bg-[#1E2638] border border-slate-200 dark:border-slate-700 shadow-xl py-1.5 z-50 text-xs"
                 >
-                  <div className="px-3 py-1.5 font-bold uppercase tracking-wider text-[10px] text-slate-400 border-b border-slate-100 dark:border-slate-800">
+                  <div className="px-3 py-1 font-bold uppercase tracking-wider text-[9.5px] text-slate-400 border-b border-slate-100 dark:border-slate-800">
                     Data Provenance Mode
                   </div>
                   <button
                     onClick={() => setDataDropdownOpen(false)}
-                    className="w-full text-left px-3.5 py-2.5 flex items-start gap-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition"
+                    className="w-full text-left px-3 py-2 flex items-start gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition"
                   >
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
                     <div>
                       <div className="font-bold text-slate-900 dark:text-white">Sample data</div>
-                      <div className="text-[11px] text-slate-500">1,800 simulated posts for safe testing</div>
+                      <div className="text-[10.5px] text-slate-500">1,800 simulated posts for safe testing</div>
                     </div>
                   </button>
 
@@ -185,12 +184,12 @@ export default function Navbar({ onToggleMobileSidebar }) {
                       setDataDropdownOpen(false);
                       navigate('/settings');
                     }}
-                    className="w-full text-left px-3.5 py-2.5 flex items-start gap-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition"
+                    className="w-full text-left px-3 py-2 flex items-start gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition"
                   >
-                    <Upload className="w-4 h-4 text-violet-600 shrink-0 mt-0.5" />
+                    <Upload className="w-3.5 h-3.5 text-violet-600 shrink-0 mt-0.5" />
                     <div>
                       <div className="font-bold text-slate-900 dark:text-white">Uploaded CSV</div>
-                      <div className="text-[11px] text-slate-500">Upload your own channel analytics</div>
+                      <div className="text-[10.5px] text-slate-500">Upload your own channel analytics</div>
                     </div>
                   </button>
 
@@ -199,12 +198,12 @@ export default function Navbar({ onToggleMobileSidebar }) {
                       setDataDropdownOpen(false);
                       navigate('/settings');
                     }}
-                    className="w-full text-left px-3.5 py-2.5 flex items-start gap-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition"
+                    className="w-full text-left px-3 py-2 flex items-start gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition"
                   >
-                    <Link2 className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                    <Link2 className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
                     <div>
                       <div className="font-bold text-slate-900 dark:text-white">Connected account</div>
-                      <div className="text-[11px] text-slate-500">Direct OAuth connections (in setup)</div>
+                      <div className="text-[10.5px] text-slate-500">Direct OAuth connections (in setup)</div>
                     </div>
                   </button>
                 </motion.div>
@@ -216,7 +215,7 @@ export default function Navbar({ onToggleMobileSidebar }) {
           <button
             onClick={handleRefresh}
             title="Click to refresh telemetry"
-            className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-medium hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition shadow-2xs"
+            className="hidden sm:flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-[11px] font-medium whitespace-nowrap hover:bg-slate-200/60 transition shadow-2xs"
           >
             <RefreshCw className={`w-3 h-3 ${refreshing ? 'animate-spin text-violet-600' : 'text-slate-400'}`} />
             <span>{updatedTime}</span>
@@ -225,28 +224,28 @@ export default function Navbar({ onToggleMobileSidebar }) {
           {/* Notification Bell with Red Dot */}
           <button
             onClick={() => setNotificationsOpen(true)}
-            className="relative w-9 h-9 rounded-xl flex items-center justify-center bg-white dark:bg-[#1E2638] border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-violet-600 dark:hover:text-violet-400 hover:border-violet-300 transition shadow-2xs"
+            className="relative w-8 h-8 rounded-lg flex items-center justify-center bg-white dark:bg-[#1E2638] border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-violet-600 dark:hover:text-violet-400 hover:border-violet-300 transition shadow-2xs shrink-0"
             aria-label="View notifications"
           >
-            <Bell className="w-4 h-4" />
-            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900" />
+            <Bell className="w-3.5 h-3.5" />
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900" />
           </button>
 
           {/* Profile Avatar Dropdown */}
           <div className="relative" ref={profileDropdownRef}>
             <button
               onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-              className="flex items-center space-x-2 p-1 rounded-xl hover:ring-2 hover:ring-violet-500/20 transition"
+              className="flex items-center space-x-1 p-0.5 rounded-lg hover:ring-2 hover:ring-violet-500/20 transition shrink-0"
               aria-label="User profile menu"
             >
               {user.avatarUrl ? (
                 <img
                   src={user.avatarUrl}
                   alt={user.name}
-                  className="w-9 h-9 rounded-xl object-cover border border-violet-200 dark:border-violet-800 shadow-2xs"
+                  className="w-8 h-8 rounded-lg object-cover border border-violet-200 dark:border-violet-800 shadow-2xs"
                 />
               ) : (
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-2xs">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-violet-600 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-2xs">
                   {user.initials || 'CP'}
                 </div>
               )}
@@ -255,14 +254,14 @@ export default function Navbar({ onToggleMobileSidebar }) {
             <AnimatePresence>
               {profileDropdownOpen && (
                 <motion.div
-                  initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                  initial={{ opacity: 0, y: 6, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 6, scale: 0.95 }}
-                  className="absolute right-0 mt-2 w-60 rounded-2xl bg-white dark:bg-[#1E2638] border border-slate-200 dark:border-slate-700 shadow-xl py-2 z-50 text-xs"
+                  exit={{ opacity: 0, y: 4, scale: 0.95 }}
+                  className="absolute right-0 mt-1.5 w-56 rounded-2xl bg-white dark:bg-[#1E2638] border border-slate-200 dark:border-slate-700 shadow-xl py-1.5 z-50 text-xs"
                 >
-                  <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800">
-                    <div className="font-bold text-slate-900 dark:text-white">{user.name}</div>
-                    <div className="text-[11px] text-slate-500 truncate">{user.channelName}</div>
+                  <div className="px-3.5 py-2.5 border-b border-slate-100 dark:border-slate-800">
+                    <div className="font-bold text-slate-900 dark:text-white truncate">{user.name}</div>
+                    <div className="text-[10.5px] text-slate-500 truncate">{user.channelName}</div>
                   </div>
 
                   <div className="py-1">
@@ -271,20 +270,19 @@ export default function Navbar({ onToggleMobileSidebar }) {
                         setProfileDropdownOpen(false);
                         navigate('/settings');
                       }}
-                      className="w-full text-left px-4 py-2 flex items-center space-x-2.5 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition"
+                      className="w-full text-left px-3.5 py-2 flex items-center space-x-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition"
                     >
-                      <SettingsIcon className="w-4 h-4 text-slate-400" />
-                      <span>Settings & Custom Avatar</span>
+                      <SettingsIcon className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Settings & Avatar</span>
                     </button>
 
-                    {/* Theme options inside dropdown */}
-                    <div className="px-4 py-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    <div className="px-3.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                       Theme
                     </div>
-                    <div className="px-3 flex items-center gap-1.5 pb-2">
+                    <div className="px-3 flex items-center gap-1 pb-1">
                       <button
                         onClick={() => setTheme('light')}
-                        className={`flex-1 py-1 px-2 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 border ${
+                        className={`flex-1 py-1 rounded-md text-[10.5px] font-semibold flex items-center justify-center gap-1 border ${
                           activeTheme === 'light'
                             ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950 dark:text-violet-300'
                             : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
@@ -295,7 +293,7 @@ export default function Navbar({ onToggleMobileSidebar }) {
                       </button>
                       <button
                         onClick={() => setTheme('dark')}
-                        className={`flex-1 py-1 px-2 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 border ${
+                        className={`flex-1 py-1 rounded-md text-[10.5px] font-semibold flex items-center justify-center gap-1 border ${
                           activeTheme === 'dark'
                             ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950 dark:text-violet-300'
                             : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
@@ -306,7 +304,7 @@ export default function Navbar({ onToggleMobileSidebar }) {
                       </button>
                       <button
                         onClick={() => setTheme('system')}
-                        className={`flex-1 py-1 px-2 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 border ${
+                        className={`flex-1 py-1 rounded-md text-[10.5px] font-semibold flex items-center justify-center gap-1 border ${
                           activeTheme === 'system'
                             ? 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950 dark:text-violet-300'
                             : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
@@ -324,9 +322,9 @@ export default function Navbar({ onToggleMobileSidebar }) {
                         setProfileDropdownOpen(false);
                         setTourOpen(true);
                       }}
-                      className="w-full text-left px-4 py-2 flex items-center space-x-2.5 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition"
+                      className="w-full text-left px-3.5 py-1.5 flex items-center space-x-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition"
                     >
-                      <HelpCircle className="w-4 h-4 text-slate-400" />
+                      <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
                       <span>Replay Product Tour</span>
                     </button>
                   </div>
@@ -344,23 +342,23 @@ export default function Navbar({ onToggleMobileSidebar }) {
         title="Channel Notifications & Alerts"
       >
         <div className="space-y-4">
-          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400">
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400">
             <span className="font-bold text-slate-900 dark:text-white">Note: </span>
             All notifications reflect simulated prototype activity until live social APIs are connected.
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {SAMPLE_NOTIFICATIONS.map((n) => (
               <div
                 key={n.id}
-                className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-violet-300 dark:hover:border-violet-700 transition"
+                className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-violet-300 dark:hover:border-violet-700 transition"
               >
-                <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                <div className="flex items-center justify-between text-[10.5px] text-slate-400 mb-1">
                   <span className="font-semibold text-violet-600 dark:text-violet-400">{n.source}</span>
                   <span>{n.time}</span>
                 </div>
-                <h4 className="font-bold text-sm text-slate-900 dark:text-white">{n.title}</h4>
-                <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                <h4 className="font-bold text-xs text-slate-900 dark:text-white">{n.title}</h4>
+                <p className="text-[11.5px] text-slate-600 dark:text-slate-300 mt-0.5 leading-relaxed">
                   {n.message}
                 </p>
               </div>
