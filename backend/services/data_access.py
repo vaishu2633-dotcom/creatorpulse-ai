@@ -209,6 +209,7 @@ def get_active_posts_raw() -> List[Dict[str, Any]]:
 def get_posts(
     platform: Optional[str] = None,
     post_type: Optional[str] = None,
+    days: Optional[int] = None,
     limit: Optional[int] = None,
     sort_by: str = "published_at",
     descending: bool = True
@@ -220,6 +221,32 @@ def get_posts(
         
     if post_type and post_type.lower() != "all":
         posts = [p for p in posts if p.get("post_type", "").lower() == post_type.lower()]
+
+    if days and days > 0 and posts:
+        from datetime import timedelta
+        # Parse timestamps to anchor relative to newest post
+        dates = []
+        for p in posts:
+            pub = p.get("published_at", "")
+            if pub:
+                try:
+                    dt = datetime.fromisoformat(pub.replace("Z", "+00:00"))
+                    dates.append(dt)
+                except Exception:
+                    pass
+        if dates:
+            max_dt = max(dates)
+            cutoff = max_dt - timedelta(days=days)
+            filtered = []
+            for p in posts:
+                pub = p.get("published_at", "")
+                try:
+                    dt = datetime.fromisoformat(pub.replace("Z", "+00:00"))
+                    if dt >= cutoff:
+                        filtered.append(p)
+                except Exception:
+                    filtered.append(p)
+            posts = filtered
         
     if sort_by:
         posts = sorted(posts, key=lambda x: x.get(sort_by, 0), reverse=descending)
@@ -229,11 +256,11 @@ def get_posts(
         
     return posts
 
-def get_top_posts(platform: Optional[str] = None, limit: int = 5) -> List[Dict[str, Any]]:
-    return get_posts(platform=platform, limit=limit, sort_by="engagement_rate", descending=True)
+def get_top_posts(platform: Optional[str] = None, days: Optional[int] = None, limit: int = 5) -> List[Dict[str, Any]]:
+    return get_posts(platform=platform, days=days, limit=limit, sort_by="engagement_rate", descending=True)
 
-def get_bottom_posts(platform: Optional[str] = None, limit: int = 5) -> List[Dict[str, Any]]:
-    return get_posts(platform=platform, limit=limit, sort_by="engagement_rate", descending=False)
+def get_bottom_posts(platform: Optional[str] = None, days: Optional[int] = None, limit: int = 5) -> List[Dict[str, Any]]:
+    return get_posts(platform=platform, days=days, limit=limit, sort_by="engagement_rate", descending=False)
 
 def get_metric_snapshots(platform: Optional[str] = None, days: int = 30) -> List[Dict[str, Any]]:
     active_source = get_active_data_source()
@@ -241,7 +268,7 @@ def get_metric_snapshots(platform: Optional[str] = None, days: int = 30) -> List
         snapshots = _load_json("metric_snapshots.json")
         if platform and platform.lower() != "all":
             snapshots = [s for s in snapshots if s.get("platform", "").lower() == platform.lower()]
-        return snapshots
+        return snapshots[-days:] if days and days > 0 else snapshots
 
     # Build dynamic timeline snapshots from active posts
     posts = get_posts(platform=platform)
@@ -275,11 +302,11 @@ def get_metric_snapshots(platform: Optional[str] = None, days: int = 30) -> List
             "engagement_rate": er,
             "posts_count": s["posts_count"]
         })
-    return snapshots[-days:]
+    return snapshots[-days:] if days and days > 0 else snapshots
 
-def get_dashboard_summary(platform: Optional[str] = None) -> Dict[str, Any]:
+def get_dashboard_summary(platform: Optional[str] = None, days: Optional[int] = None) -> Dict[str, Any]:
     creators = get_creators(platform)
-    posts = get_posts(platform=platform)
+    posts = get_posts(platform=platform, days=days)
     
     total_followers = sum(c.get("follower_count", 0) for c in creators)
     total_views = sum(p.get("views", 0) for p in posts)
@@ -291,6 +318,11 @@ def get_dashboard_summary(platform: Optional[str] = None) -> Dict[str, Any]:
     avg_er = total_engagements / max(1, total_views)
     breakout_count = sum(1 for p in posts if p.get("is_breakout", False))
     breakout_rate = breakout_count / max(1, len(posts))
+
+    # Sparkline series (views & engagements over the last 14 entries)
+    snaps = get_metric_snapshots(platform=platform, days=days or 30)
+    views_sparkline = [s.get("views", 0) for s in snaps[-14:]]
+    er_sparkline = [round(s.get("engagement_rate", 0) * 100, 2) for s in snaps[-14:]]
     
     return {
         "metadata": get_system_metadata(),
@@ -301,7 +333,12 @@ def get_dashboard_summary(platform: Optional[str] = None) -> Dict[str, Any]:
         "average_engagement_rate": round(avg_er, 4),
         "breakout_rate": round(breakout_rate, 4),
         "breakout_count": breakout_count,
-        "creators_monitored": len(creators)
+        "creators_monitored": len(creators),
+        "days_filtered": days,
+        "sparklines": {
+            "views": views_sparkline,
+            "engagement_rate": er_sparkline
+        }
     }
 
 # ----------------- Trends -----------------

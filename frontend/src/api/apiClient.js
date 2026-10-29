@@ -31,20 +31,38 @@ async function request(endpoint, options = {}) {
 }
 
 // ----------------- Dashboard -----------------
-export const getDashboardSummary = (platform = 'all') =>
-  request(`/api/dashboard/summary?platform=${platform}`);
+export const getDashboardSummary = (platform = 'all', days = null) => {
+  const q = new URLSearchParams({ platform });
+  if (days) q.append('days', days);
+  return request(`/api/dashboard/summary?${q.toString()}`);
+};
 
 export const getSnapshots = (platform = 'all', days = 30) =>
   request(`/api/dashboard/snapshots?platform=${platform}&days=${days}`);
 
-export const getRecentPosts = (platform = 'all', postType = 'all', limit = 20) =>
-  request(`/api/dashboard/posts?platform=${platform}&post_type=${postType}&limit=${limit}`);
+export const getRecentPosts = (platform = 'all', postType = 'all', limit = 20, sortBy = 'published_at', descending = true, days = null) => {
+  const q = new URLSearchParams({
+    platform,
+    post_type: postType,
+    limit: String(limit),
+    sort_by: sortBy,
+    descending: String(descending)
+  });
+  if (days) q.append('days', String(days));
+  return request(`/api/dashboard/posts?${q.toString()}`);
+};
 
-export const getTopPosts = (platform = 'all', limit = 5) =>
-  request(`/api/dashboard/top-posts?platform=${platform}&limit=${limit}`);
+export const getTopPosts = (platform = 'all', days = null, limit = 5) => {
+  const q = new URLSearchParams({ platform, limit: String(limit) });
+  if (days) q.append('days', String(days));
+  return request(`/api/dashboard/top-posts?${q.toString()}`);
+};
 
-export const getBottomPosts = (platform = 'all', limit = 5) =>
-  request(`/api/dashboard/bottom-posts?platform=${platform}&limit=${limit}`);
+export const getBottomPosts = (platform = 'all', days = null, limit = 5) => {
+  const q = new URLSearchParams({ platform, limit: String(limit) });
+  if (days) q.append('days', String(days));
+  return request(`/api/dashboard/bottom-posts?${q.toString()}`);
+};
 
 export const getCreators = (platform = 'all') =>
   request(`/api/dashboard/creators?platform=${platform}`);

@@ -8,6 +8,8 @@ import {
   getDashboardSummary,
   getSnapshots,
   getRecentPosts,
+  getTopPosts,
+  getBottomPosts,
 } from '../api/apiClient';
 import { getSampleThumbnail } from '../assets/sample/sampleThumbnails';
 import PlatformBadge from '../components/PlatformBadge';
@@ -77,6 +79,13 @@ function getTimeAgo(dateStr, idx = 0) {
   }
 }
 
+const formatNumber = (num) => {
+  if (!num) return '0';
+  if (num >= 1_000_000) return (num / 1_000_000).toFixed(1) + 'M';
+  if (num >= 1_000) return (num / 1_000).toFixed(1) + 'K';
+  return num.toLocaleString();
+};
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { selectedPlatform } = usePlatform();
@@ -91,6 +100,11 @@ export default function Dashboard() {
   const [recentPosts, setRecentPosts] = useState([]);
   const [activePost, setActivePost] = useState(null);
   const [showTrajectorySlideOver, setShowTrajectorySlideOver] = useState(false);
+
+  // Time range & sorting controls for dynamic reflection
+  const [timeRange, setTimeRange] = useState('all'); // 'all' | '90' | '30' | '7'
+  const [activityTab, setActivityTab] = useState('recent'); // 'recent' | 'top' | 'bottom'
+  const [sortBy, setSortBy] = useState('published_at'); // 'published_at' | 'views' | 'engagement_rate'
 
   // VibeCheck URL state
   const [vibeUrl, setVibeUrl] = useState('');
@@ -113,10 +127,21 @@ export default function Dashboard() {
   const loadData = () => {
     setLoading(true);
     setError(null);
+    const daysParam = timeRange === 'all' ? null : parseInt(timeRange, 10);
+
+    let postsPromise;
+    if (activityTab === 'top') {
+      postsPromise = getTopPosts(selectedPlatform, daysParam, 20);
+    } else if (activityTab === 'bottom') {
+      postsPromise = getBottomPosts(selectedPlatform, daysParam, 20);
+    } else {
+      postsPromise = getRecentPosts(selectedPlatform, 'all', 20, sortBy, true, daysParam);
+    }
+
     Promise.all([
-      getDashboardSummary(selectedPlatform),
-      getSnapshots(selectedPlatform, 30),
-      getRecentPosts(selectedPlatform, 'all', 15),
+      getDashboardSummary(selectedPlatform, daysParam),
+      getSnapshots(selectedPlatform, daysParam || 30),
+      postsPromise,
     ])
       .then(([sumRes, snapRes, postsRes]) => {
         setSummary(sumRes || {});
@@ -132,7 +157,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadData();
-  }, [selectedPlatform]);
+  }, [selectedPlatform, timeRange, activityTab, sortBy]);
 
   // Baseline metrics for computed status chips
   const baselineEngagement = summary?.average_engagement_rate || 0.052;
@@ -300,7 +325,7 @@ export default function Dashboard() {
               className="h-full w-full object-contain drop-shadow-2xs select-none"
             />
 
-            {/* Floating Card 1: Grow Faster */}
+            {/* Floating Card 1: Grow Faster (Dynamic Total Views & Posts) */}
             <motion.div
               animate={shouldReduceMotion ? {} : { y: [0, -4, 0] }}
               transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
@@ -311,15 +336,15 @@ export default function Dashboard() {
               </div>
               <div>
                 <div className="text-[10px] font-bold text-slate-800 dark:text-white leading-none">
-                  Grow Faster
+                  {formatNumber(summary?.total_views || 0)} views
                 </div>
                 <div className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Track your growth
+                  {summary?.total_posts || 0} posts in active data
                 </div>
               </div>
             </motion.div>
 
-            {/* Floating Card 2: Create Better */}
+            {/* Floating Card 2: Breakout Hit Rate */}
             <motion.div
               animate={shouldReduceMotion ? {} : { y: [0, 5, 0] }}
               transition={{ duration: 5.2, repeat: Infinity, ease: 'easeInOut', delay: 0.6 }}
@@ -330,15 +355,15 @@ export default function Dashboard() {
               </div>
               <div>
                 <div className="text-[10px] font-bold text-slate-800 dark:text-white leading-none">
-                  Create Better
+                  {((summary?.breakout_rate || 0) * 100).toFixed(1)}% Breakout Rate
                 </div>
                 <div className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Get content ideas
+                  {summary?.breakout_count || 0} top-tier hits
                 </div>
               </div>
             </motion.div>
 
-            {/* Floating Card 3: More Reach */}
+            {/* Floating Card 3: Community Engagement */}
             <motion.div
               animate={shouldReduceMotion ? {} : { y: [0, -4, 0] }}
               transition={{ duration: 4.8, repeat: Infinity, ease: 'easeInOut', delay: 1.2 }}
@@ -349,10 +374,10 @@ export default function Dashboard() {
               </div>
               <div>
                 <div className="text-[10px] font-bold text-slate-800 dark:text-white leading-none">
-                  More Reach
+                  {((summary?.average_engagement_rate || 0) * 100).toFixed(1)}% Avg ER
                 </div>
                 <div className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Spot rising trends
+                  {formatNumber(summary?.total_engagements || 0)} engagements
                 </div>
               </div>
             </motion.div>
@@ -462,40 +487,115 @@ export default function Dashboard() {
         {/* Left: Recent Activity (lg:col-span-7 ~ 60%) */}
         <div className="lg:col-span-7 h-full min-h-0 flex flex-col">
           <Card className="h-full flex flex-col min-h-0 p-3 sm:p-3.5 rounded-2xl border border-violet-100 dark:border-slate-800 shadow-xs bg-white dark:bg-[#131927]">
-            {/* Header */}
-            <div className="shrink-0 flex items-center justify-between pb-2 mb-1 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center space-x-2">
-                <div className="w-6 h-6 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center">
-                  <Zap className="w-3.5 h-3.5" />
+            {/* Header with Activity Tabs, Date Filter, and Sorting */}
+            <div className="shrink-0 pb-2 mb-1 border-b border-slate-100 dark:border-slate-800 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-6 h-6 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center">
+                    <Zap className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-xs text-slate-900 dark:text-white leading-none">
+                      {activityTab === 'recent' ? 'Recent Activity' : activityTab === 'top' ? 'Top Hits' : 'Needs Improvement'}
+                    </h3>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      {summary?.total_posts || 0} posts • {(summary?.total_views || 0).toLocaleString()} views • {((summary?.average_engagement_rate || 0) * 100).toFixed(1)}% ER
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-extrabold text-xs text-slate-900 dark:text-white leading-none">
-                    Recent Activity
-                  </h3>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    {summary?.metadata?.data_source === 'mock data (JSON storage)'
-                      ? 'Sample activity'
-                      : 'Latest posts from your connected accounts'}
-                  </p>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setShowTrajectorySlideOver(true)}
+                    className="text-[10.5px] font-medium text-slate-500 hover:text-violet-600 flex items-center gap-1 transition"
+                    title="View 30-day analytics area trajectory"
+                  >
+                    <LineChart className="w-3 h-3" />
+                    <span className="hidden sm:inline">30-day Trajectory</span>
+                  </button>
+                  <button
+                    onClick={() => navigate('/results')}
+                    className="text-xs font-semibold text-violet-600 dark:text-violet-400 hover:text-violet-700 flex items-center gap-0.5"
+                  >
+                    <span>View all</span>
+                    <ChevronRight className="w-3 h-3" />
+                  </button>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => setShowTrajectorySlideOver(true)}
-                  className="text-[10.5px] font-medium text-slate-500 hover:text-violet-600 flex items-center gap-1 transition"
-                  title="View 30-day analytics area trajectory"
-                >
-                  <LineChart className="w-3 h-3" />
-                  <span className="hidden sm:inline">30-day Trajectory</span>
-                </button>
-                <button
-                  onClick={() => navigate('/results')}
-                  className="text-xs font-semibold text-violet-600 dark:text-violet-400 hover:text-violet-700 flex items-center gap-0.5"
-                >
-                  <span>View all</span>
-                  <ChevronRight className="w-3 h-3" />
-                </button>
+              {/* Sub-bar: Activity View Tabs + Time Filter Pills + Sort Option */}
+              <div className="flex flex-wrap items-center justify-between gap-1.5 text-[10.5px]">
+                {/* Tabs: Recent / Top Hits / Bottom */}
+                <div className="inline-flex p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700">
+                  <button
+                    onClick={() => setActivityTab('recent')}
+                    className={`px-2 py-0.5 rounded-md font-semibold transition ${
+                      activityTab === 'recent'
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+                    }`}
+                  >
+                    Recent
+                  </button>
+                  <button
+                    onClick={() => setActivityTab('top')}
+                    className={`px-2 py-0.5 rounded-md font-semibold transition ${
+                      activityTab === 'top'
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+                    }`}
+                  >
+                    Top Hits
+                  </button>
+                  <button
+                    onClick={() => setActivityTab('bottom')}
+                    className={`px-2 py-0.5 rounded-md font-semibold transition ${
+                      activityTab === 'bottom'
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+                    }`}
+                  >
+                    Bottom
+                  </button>
+                </div>
+
+                {/* Right controls: Date Filter pills & Sort */}
+                <div className="flex items-center space-x-1.5 ml-auto">
+                  {/* Time Range Pills */}
+                  <div className="inline-flex p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700">
+                    {[
+                      { id: '7', label: '7d' },
+                      { id: '30', label: '30d' },
+                      { id: '90', label: '90d' },
+                      { id: 'all', label: 'All' },
+                    ].map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => setTimeRange(t.id)}
+                        className={`px-1.5 py-0.5 rounded font-medium transition ${
+                          timeRange === t.id
+                            ? 'bg-violet-600 text-white font-bold'
+                            : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Sort selector for Recent posts */}
+                  {activityTab === 'recent' && (
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="px-1.5 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700 text-[10.5px] text-slate-600 dark:text-slate-300 font-medium focus:ring-1 focus:ring-violet-500"
+                    >
+                      <option value="published_at">Date</option>
+                      <option value="views">Views</option>
+                      <option value="engagement_rate">ER%</option>
+                    </select>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -693,12 +793,43 @@ export default function Dashboard() {
       <SlideOver
         open={showTrajectorySlideOver}
         onClose={() => setShowTrajectorySlideOver(false)}
-        title="30-Day Channel Trajectory"
+        title="Channel Performance & Trajectory"
       >
         <div className="space-y-4">
           <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-            Aggregated cross-platform view velocity and community engagements over the past 30 days.
+            Aggregated metrics and cross-platform trajectory computed from your active dataset.
           </p>
+
+          {/* 4 Summary Metric Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+            <div className="p-3 rounded-xl bg-violet-50/70 dark:bg-violet-950/30 border border-violet-100 dark:border-violet-900/40">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase">Total Views</div>
+              <div className="text-base font-extrabold text-slate-900 dark:text-white mt-0.5">
+                {(summary?.total_views || 0).toLocaleString()}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-teal-50/70 dark:bg-teal-950/30 border border-teal-100 dark:border-teal-900/40">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase">Engagements</div>
+              <div className="text-base font-extrabold text-slate-900 dark:text-white mt-0.5">
+                {(summary?.total_engagements || 0).toLocaleString()}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase">Avg Engagement</div>
+              <div className="text-base font-extrabold text-slate-900 dark:text-white mt-0.5">
+                {((summary?.average_engagement_rate || 0) * 100).toFixed(2)}%
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/40">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase">Breakout Hits</div>
+              <div className="text-base font-extrabold text-slate-900 dark:text-white mt-0.5">
+                {summary?.breakout_count || 0} / {summary?.total_posts || 0}
+              </div>
+            </div>
+          </div>
 
           <div className="h-72 w-full pt-2">
             <ResponsiveContainer width="100%" height="100%">
