@@ -19,7 +19,7 @@ def test_root_and_health():
     data = res_root.json()
     assert data["status"] == "operational"
     assert "metadata" in data
-    assert data["metadata"]["data_source"] == "mock data (JSON storage)"
+    assert "data_source" in data["metadata"]
     assert data["metadata"]["is_synthetic"] is True
 
     res_health = client.get("/api/health")

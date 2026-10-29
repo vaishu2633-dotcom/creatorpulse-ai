@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const PlatformContext = createContext();
 
@@ -13,9 +13,55 @@ export const PLATFORMS = [
 export function PlatformProvider({ children }) {
   const [selectedPlatform, setSelectedPlatform] = useState('all');
   const [lastRefreshed, setLastRefreshed] = useState(new Date().toLocaleTimeString());
+  const [activeSource, setActiveSource] = useState('sample');
+  const [dataSourceMeta, setDataSourceMeta] = useState(null);
+  const [sourceLoading, setSourceLoading] = useState(false);
+
+  const fetchDataSourceState = useCallback(async () => {
+    try {
+      const res = await fetch('/api/settings/data-source');
+      if (res.ok) {
+        const data = await res.json();
+        setActiveSource(data.active_source || 'sample');
+        setDataSourceMeta(data.metadata || null);
+        if (data.metadata?.last_refreshed) {
+          const date = new Date(data.metadata.last_refreshed);
+          setLastRefreshed(date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        }
+      }
+    } catch {
+      // Keep defaults on connection error
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDataSourceState();
+  }, [fetchDataSourceState]);
+
+  const switchDataSource = async (newSource) => {
+    setSourceLoading(true);
+    try {
+      const res = await fetch('/api/settings/data-source', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: newSource })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setActiveSource(data.active_source);
+        setDataSourceMeta(data.metadata);
+        setLastRefreshed(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      }
+    } catch {
+      // fallback
+    } finally {
+      setSourceLoading(false);
+    }
+  };
 
   const refreshData = () => {
-    setLastRefreshed(new Date().toLocaleTimeString());
+    setLastRefreshed(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    fetchDataSourceState();
   };
 
   return (
@@ -26,6 +72,11 @@ export function PlatformProvider({ children }) {
         platforms: PLATFORMS,
         lastRefreshed,
         refreshData,
+        activeSource,
+        dataSourceMeta,
+        sourceLoading,
+        switchDataSource,
+        fetchDataSourceState
       }}
     >
       {children}

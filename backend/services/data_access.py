@@ -7,53 +7,177 @@ for PostgreSQL, Supabase, DynamoDB, or external APIs without modifying applicati
 
 Platform-neutral field schema maintained:
 - platform, post_type, external_id / post_id, published_at, views, likes, comments, shares, impressions
+
+Active Data Source Architecture:
+- 'sample': simulated 1,800 posts for safe prototype exploration
+- 'uploaded_csv': user-uploaded platform export (with column validation & bad row reporting)
+- 'youtube': live imported videos from a connected YouTube channel via YouTube Data API v3
 """
 
 import os
 import json
 import uuid
+import csv
+import io
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 ML_DIR = os.path.join(os.path.dirname(__file__), "..", "ml")
 
-# Track in-memory or file-based last refreshed timestamp
-LAST_REFRESHED = datetime.now(timezone.utc).isoformat()
+STATE_FILE = "data_source_state.json"
 
-def _load_json(filename: str) -> List[Dict[str, Any]]:
+def _load_json(filename: str) -> Any:
     path = os.path.join(DATA_DIR, filename)
     if not os.path.exists(path):
         return []
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
 
 def _save_json(filename: str, data: Any) -> None:
     path = os.path.join(DATA_DIR, filename)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
+# ----------------- Data Source State -----------------
+
+def get_data_source_state() -> Dict[str, Any]:
+    """Loads active data source configuration and provenance state."""
+    state = _load_json(STATE_FILE)
+    if not isinstance(state, dict) or "active_source" not in state:
+        state = {
+            "active_source": "sample",
+            "last_refreshed": datetime.now(timezone.utc).isoformat(),
+            "uploaded_meta": {
+                "filename": None,
+                "count": len(_load_json("uploaded_posts.json")),
+                "imported_at": None,
+                "bad_rows_count": 0
+            },
+            "youtube_meta": {
+                "channel_id": None,
+                "channel_title": None,
+                "channel_handle": None,
+                "count": len(_load_json("youtube_posts.json")),
+                "imported_at": None
+            }
+        }
+        _save_json(STATE_FILE, state)
+    return state
+
+def save_data_source_state(state: Dict[str, Any]) -> None:
+    state["last_refreshed"] = datetime.now(timezone.utc).isoformat()
+    _save_json(STATE_FILE, state)
+
+def get_active_data_source() -> str:
+    state = get_data_source_state()
+    return state.get("active_source", "sample")
+
+def set_active_data_source(source: str) -> Dict[str, Any]:
+    valid_sources = ["sample", "uploaded_csv", "youtube"]
+    if source not in valid_sources:
+        raise ValueError(f"Invalid data source '{source}'. Must be one of: {valid_sources}")
+    state = get_data_source_state()
+    state["active_source"] = source
+    save_data_source_state(state)
+    return get_system_metadata()
+
 # ----------------- System & Meta -----------------
 
 def get_system_metadata() -> Dict[str, Any]:
     """Returns provenance metadata required by CreatorPulse AI principles."""
+    state = get_data_source_state()
+    active_source = state.get("active_source", "sample")
+
+    sample_count = len(_load_json("posts.json"))
+    uploaded_posts = _load_json("uploaded_posts.json")
+    uploaded_count = len(uploaded_posts) if isinstance(uploaded_posts, list) else 0
+    yt_posts = _load_json("youtube_posts.json")
+    yt_count = len(yt_posts) if isinstance(yt_posts, list) else 0
+
+    if active_source == "uploaded_csv":
+        data_source_label = f"Uploaded CSV ({uploaded_count} posts)"
+        is_synthetic = False
+    elif active_source == "youtube":
+        ch_title = state.get("youtube_meta", {}).get("channel_title") or "Channel"
+        data_source_label = f"YouTube ({ch_title}, {yt_count} videos)"
+        is_synthetic = False
+    else:
+        data_source_label = f"Sample data (simulated {sample_count} posts)"
+        is_synthetic = True
+
     return {
-        "data_source": "mock data (JSON storage)",
-        "last_refreshed": LAST_REFRESHED,
-        "is_synthetic": True,
-        "environment": "prototype"
+        "active_source": active_source,
+        "data_source": data_source_label,
+        "last_refreshed": state.get("last_refreshed", datetime.now(timezone.utc).isoformat()),
+        "is_synthetic": is_synthetic,
+        "environment": "prototype",
+        "counts": {
+            "sample": sample_count,
+            "uploaded_csv": uploaded_count,
+            "youtube": yt_count
+        },
+        "uploaded_meta": state.get("uploaded_meta", {}),
+        "youtube_meta": state.get("youtube_meta", {})
     }
 
 # ----------------- Creators -----------------
 
 def get_creators(platform: Optional[str] = None) -> List[Dict[str, Any]]:
-    creators = _load_json("creators.json")
+    active_source = get_active_data_source()
+
+    if active_source == "youtube":
+        state = get_data_source_state()
+        yt_meta = state.get("youtube_meta", {})
+        posts = _load_json("youtube_posts.json")
+        avg_er = 0.05
+        if posts:
+            total_views = sum(p.get("views", 0) for p in posts)
+            total_eng = sum(p.get("likes", 0) + p.get("comments", 0) for p in posts)
+            avg_er = round(total_eng / max(1, total_views), 4)
+
+        creators = [{
+            "creator_id": yt_meta.get("channel_id") or "yt_connected_channel",
+            "name": yt_meta.get("channel_title") or "Connected YouTube Channel",
+            "handle": yt_meta.get("channel_handle") or "@channel",
+            "platform": "youtube",
+            "follower_count": yt_meta.get("subscriber_count", 0),
+            "baseline_engagement_rate": avg_er,
+            "category": "YouTube Creator",
+            "avatar": ""
+        }]
+    elif active_source == "uploaded_csv":
+        state = get_data_source_state()
+        fn = state.get("uploaded_meta", {}).get("filename") or "Uploaded Dataset"
+        posts = _load_json("uploaded_posts.json")
+        avg_er = 0.05
+        if posts:
+            total_views = sum(p.get("views", 0) for p in posts)
+            total_eng = sum(p.get("likes", 0) + p.get("comments", 0) + p.get("shares", 0) for p in posts)
+            avg_er = round(total_eng / max(1, total_views), 4)
+
+        creators = [{
+            "creator_id": "c_uploaded_01",
+            "name": fn.replace(".csv", "").title(),
+            "handle": "@uploaded_creator",
+            "platform": "all",
+            "follower_count": 0,
+            "baseline_engagement_rate": avg_er,
+            "category": "Creator Analytics",
+            "avatar": ""
+        }]
+    else:
+        creators = _load_json("creators.json")
+
     if platform and platform.lower() != "all":
-        return [c for c in creators if c.get("platform", "").lower() == platform.lower()]
+        return [c for c in creators if c.get("platform", "").lower() in [platform.lower(), "all"]]
     return creators
 
 def get_creator_by_id(creator_id: str) -> Optional[Dict[str, Any]]:
-    creators = _load_json("creators.json")
+    creators = get_creators()
     for c in creators:
         if c.get("creator_id") == creator_id:
             return c
@@ -68,9 +192,19 @@ def get_creator_base_rate(platform: str, creator_id: Optional[str] = None) -> fl
                 return float(c.get("baseline_engagement_rate", 0.05))
     if creators:
         return float(creators[0].get("baseline_engagement_rate", 0.05))
-    return 0.05 # fallback
+    return 0.05
 
 # ----------------- Posts & Dashboard -----------------
+
+def get_active_posts_raw() -> List[Dict[str, Any]]:
+    """Loads all raw posts for current active data source."""
+    active_source = get_active_data_source()
+    if active_source == "uploaded_csv":
+        return _load_json("uploaded_posts.json")
+    elif active_source == "youtube":
+        return _load_json("youtube_posts.json")
+    else:
+        return _load_json("posts.json")
 
 def get_posts(
     platform: Optional[str] = None,
@@ -79,7 +213,7 @@ def get_posts(
     sort_by: str = "published_at",
     descending: bool = True
 ) -> List[Dict[str, Any]]:
-    posts = _load_json("posts.json")
+    posts = get_active_posts_raw()
     
     if platform and platform.lower() != "all":
         posts = [p for p in posts if p.get("platform", "").lower() == platform.lower()]
@@ -102,10 +236,46 @@ def get_bottom_posts(platform: Optional[str] = None, limit: int = 5) -> List[Dic
     return get_posts(platform=platform, limit=limit, sort_by="engagement_rate", descending=False)
 
 def get_metric_snapshots(platform: Optional[str] = None, days: int = 30) -> List[Dict[str, Any]]:
-    snapshots = _load_json("metric_snapshots.json")
-    if platform and platform.lower() != "all":
-        snapshots = [s for s in snapshots if s.get("platform", "").lower() == platform.lower()]
-    return snapshots
+    active_source = get_active_data_source()
+    if active_source == "sample":
+        snapshots = _load_json("metric_snapshots.json")
+        if platform and platform.lower() != "all":
+            snapshots = [s for s in snapshots if s.get("platform", "").lower() == platform.lower()]
+        return snapshots
+
+    # Build dynamic timeline snapshots from active posts
+    posts = get_posts(platform=platform)
+    if not posts:
+        return []
+
+    # Group posts by date
+    daily_stats: Dict[str, Dict[str, Any]] = {}
+    for p in sorted(posts, key=lambda x: x.get("published_at", "")):
+        pub = p.get("published_at", "")[:10] or "2026-03-01"
+        if pub not in daily_stats:
+            daily_stats[pub] = {
+                "date": pub,
+                "platform": platform or "all",
+                "views": 0,
+                "engagements": 0,
+                "posts_count": 0
+            }
+        daily_stats[pub]["views"] += p.get("views", 0)
+        daily_stats[pub]["engagements"] += p.get("likes", 0) + p.get("comments", 0) + p.get("shares", 0)
+        daily_stats[pub]["posts_count"] += 1
+
+    snapshots = []
+    for d, s in sorted(daily_stats.items()):
+        er = round(s["engagements"] / max(1, s["views"]), 4)
+        snapshots.append({
+            "date": d,
+            "platform": s["platform"],
+            "views": s["views"],
+            "engagements": s["engagements"],
+            "engagement_rate": er,
+            "posts_count": s["posts_count"]
+        })
+    return snapshots[-days:]
 
 def get_dashboard_summary(platform: Optional[str] = None) -> Dict[str, Any]:
     creators = get_creators(platform)
@@ -117,7 +287,8 @@ def get_dashboard_summary(platform: Optional[str] = None) -> Dict[str, Any]:
     total_comments = sum(p.get("comments", 0) for p in posts)
     total_shares = sum(p.get("shares", 0) for p in posts)
     
-    avg_er = (total_likes + total_comments + total_shares) / max(1, total_views)
+    total_engagements = total_likes + total_comments + total_shares
+    avg_er = total_engagements / max(1, total_views)
     breakout_count = sum(1 for p in posts if p.get("is_breakout", False))
     breakout_rate = breakout_count / max(1, len(posts))
     
@@ -126,7 +297,7 @@ def get_dashboard_summary(platform: Optional[str] = None) -> Dict[str, Any]:
         "total_followers": total_followers,
         "total_posts": len(posts),
         "total_views": total_views,
-        "total_engagements": total_likes + total_comments + total_shares,
+        "total_engagements": total_engagements,
         "average_engagement_rate": round(avg_er, 4),
         "breakout_rate": round(breakout_rate, 4),
         "breakout_count": breakout_count,
@@ -141,7 +312,6 @@ def get_trends(platform: Optional[str] = None, time_window: Optional[str] = None
         trends = [t for t in trends if t.get("platform", "").lower() == platform.lower()]
     if time_window and time_window.lower() != "all":
         trends = [t for t in trends if t.get("time_window", "").lower() == time_window.lower()]
-    # sort by strength score descending
     trends.sort(key=lambda x: x.get("strength_score", 0), reverse=True)
     return trends
 
@@ -180,7 +350,6 @@ def get_comments_summary(platform: Optional[str] = None) -> Dict[str, Any]:
     neu = sum(1 for c in comments if c.get("sentiment") == "neutral")
     neg = sum(1 for c in comments if c.get("sentiment") == "negative")
     
-    # Themes aggregation
     theme_counts = {}
     for c in comments:
         th = c.get("theme", "general")
@@ -227,7 +396,6 @@ def save_prediction(prediction_data: Dict[str, Any]) -> Dict[str, Any]:
 
 def get_accuracy_scoreboard(platform: Optional[str] = None) -> Dict[str, Any]:
     preds = get_predictions(platform=platform, limit=200)
-    # Evaluate evaluated items where actual_outcome is known
     evaluated = [p for p in preds if p.get("actual_outcome") is not None]
     
     if not evaluated:
@@ -241,12 +409,10 @@ def get_accuracy_scoreboard(platform: Optional[str] = None) -> Dict[str, Any]:
             "calibration_bins": []
         }
         
-    # Compute metrics
     brier_sum = 0.0
     actual_positives = 0
     tp = fp = fn = tn = 0
     
-    # 5 Calibration Bins: 0-20%, 20-40%, 40-60%, 60-80%, 80-100%
     bins = [
         {"bin": "0-20%", "min": 0.0, "max": 0.20, "count": 0, "predicted_sum": 0.0, "actual_sum": 0},
         {"bin": "20-40%", "min": 0.20, "max": 0.40, "count": 0, "predicted_sum": 0.0, "actual_sum": 0},
@@ -262,7 +428,7 @@ def get_accuracy_scoreboard(platform: Optional[str] = None) -> Dict[str, Any]:
             actual_positives += 1
         brier_sum += (prob - actual) ** 2
         
-        pred_label = 1 if prob >= 0.15 else 0 # Breakout threshold
+        pred_label = 1 if prob >= 0.15 else 0
         if pred_label == 1 and actual == 1:
             tp += 1
         elif pred_label == 1 and actual == 0:
@@ -272,7 +438,6 @@ def get_accuracy_scoreboard(platform: Optional[str] = None) -> Dict[str, Any]:
         else:
             tn += 1
             
-        # Add to calibration bin
         for b in bins:
             if b["min"] <= prob <= b["max"] or (b["max"] == 1.0 and prob >= 1.0):
                 b["count"] += 1
@@ -297,13 +462,9 @@ def get_accuracy_scoreboard(platform: Optional[str] = None) -> Dict[str, Any]:
     precision = round(tp / max(1, tp + fp), 3)
     recall = round(tp / max(1, tp + fn), 3)
 
-    # Base rate of breakout occurrences in sample
     base_rate = actual_positives / n if n > 0 else 0.05
-    # Naive baseline forecasting Brier score: predicting constant p = base_rate
-    # E[Brier_baseline] = p * (1-p)
     baseline_brier = round(base_rate * (1.0 - base_rate), 4)
 
-    # Truthful evaluation label comparing against naive guessing
     if brier < baseline_brier - 0.015:
         brier_label = "Better than guessing"
     elif abs(brier - baseline_brier) <= 0.015:
@@ -399,7 +560,6 @@ def save_vibecheck_report(report_data: Dict[str, Any]) -> Dict[str, Any]:
     if "created_at" not in report_data:
         report_data["created_at"] = datetime.now(timezone.utc).isoformat()
     
-    # Prepend to history
     reports.insert(0, report_data)
     _save_json("vibecheck_reports.json", reports)
     return report_data
@@ -412,148 +572,320 @@ def delete_vibecheck_report(report_id: str) -> bool:
         return True
     return False
 
-# ----------------- CSV Import for Settings -----------------
+# ----------------- CSV Validation, Preview & Import -----------------
 
-def import_posts_from_csv(csv_content: str) -> Dict[str, Any]:
-    """
-    Parses user-uploaded CSV of social media posts, validates columns,
-    normalizes to CreatorPulse DAL schema, appends to posts.json, and updates metadata.
-    """
-    import csv
-    import io
+SAMPLE_CSV_TEMPLATE = (
+    "platform,post_type,caption,published_at,views,likes,comments,shares\n"
+    "youtube,long_video,Why 90% of Junior Devs Fail Technical Interviews,2026-03-01T14:00:00Z,45200,3200,410,120\n"
+    "instagram,reel,Clean Architecture in 60 Seconds,2026-03-03T18:30:00Z,89000,7400,290,1500\n"
+    "twitter,thread,10 rules for writing resilient async code in 2026,2026-03-05T09:15:00Z,31200,1950,185,420\n"
+    "linkedin,post,Lessons from scaling our first AI microservice to 1M users,2026-03-08T11:00:00Z,18500,980,112,65\n"
+    "youtube,short,Top 3 VS Code shortcuts you never knew existed,2026-03-10T16:45:00Z,124000,9800,530,2200\n"
+)
 
-    posts = _load_json("posts.json")
-    existing_ids = {p.get("post_id") for p in posts}
+def get_sample_csv_template() -> str:
+    """Returns downloadable sample CSV template string."""
+    return SAMPLE_CSV_TEMPLATE
+
+def _parse_row_to_post(row: Dict[str, str], row_idx: int) -> tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """
+    Validates a single CSV row and converts it to CreatorPulse schema.
+    Returns (post_record, None) if valid, or (None, error_reason) if bad.
+    """
+    cols = {k.lower().strip(): k for k in row.keys() if k}
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    # 1. Caption / Title check
+    caption = ""
+    for cand in ["caption", "title", "content", "text", "post_text", "video_title", "name"]:
+        if cand in cols and row[cols[cand]].strip():
+            caption = row[cols[cand]].strip()
+            break
+    if not caption:
+        return None, "Missing post title or caption"
+
+    # 2. Views check
+    views = None
+    for cand in ["views", "impressions", "reach", "view_count"]:
+        if cand in cols and row[cols[cand]].strip():
+            try:
+                val = float(row[cols[cand]].strip().replace(",", ""))
+                if val < 0:
+                    return None, f"Views cannot be negative ({val})"
+                views = int(val)
+                break
+            except ValueError:
+                return None, f"Invalid views value '{row[cols[cand]]}' (must be a number)"
+    if views is None:
+        views = 0
+
+    # 3. Likes check
+    likes = 0
+    for cand in ["likes", "like_count", "reactions"]:
+        if cand in cols and row[cols[cand]].strip():
+            try:
+                val = float(row[cols[cand]].strip().replace(",", ""))
+                if val < 0:
+                    return None, f"Likes cannot be negative ({val})"
+                likes = int(val)
+                break
+            except ValueError:
+                return None, f"Invalid likes value '{row[cols[cand]]}' (must be a number)"
+
+    # 4. Comments check
+    comments = 0
+    for cand in ["comments", "comment_count", "replies"]:
+        if cand in cols and row[cols[cand]].strip():
+            try:
+                val = float(row[cols[cand]].strip().replace(",", ""))
+                if val < 0:
+                    return None, f"Comments cannot be negative ({val})"
+                comments = int(val)
+                break
+            except ValueError:
+                return None, f"Invalid comments value '{row[cols[cand]]}' (must be a number)"
+
+    # 5. Shares check
+    shares = 0
+    for cand in ["shares", "share_count", "retweets", "reposts"]:
+        if cand in cols and row[cols[cand]].strip():
+            try:
+                val = float(row[cols[cand]].strip().replace(",", ""))
+                shares = max(0, int(val))
+                break
+            except ValueError:
+                pass
+
+    # 6. Platform normalization
+    platform = "instagram"
+    for cand in ["platform", "network", "channel"]:
+        if cand in cols and row[cols[cand]].strip():
+            p_val = row[cols[cand]].strip().lower()
+            if "you" in p_val or "yt" in p_val:
+                platform = "youtube"
+            elif "insta" in p_val or "ig" in p_val:
+                platform = "instagram"
+            elif "tweet" in p_val or "x" in p_val or "tw" in p_val:
+                platform = "twitter"
+            elif "link" in p_val:
+                platform = "linkedin"
+            else:
+                platform = p_val
+            break
+
+    # 7. Post type normalization
+    post_type = "post"
+    for cand in ["post_type", "type", "format"]:
+        if cand in cols and row[cols[cand]].strip():
+            post_type = row[cols[cand]].strip().lower()
+            break
+    if platform == "youtube" and post_type == "post":
+        post_type = "long_video"
+
+    # 8. Published date
+    published_at = now_iso
+    for cand in ["published_at", "date", "created_at", "timestamp", "time"]:
+        if cand in cols and row[cols[cand]].strip():
+            published_at = row[cols[cand]].strip()
+            break
+
+    # Computed metrics
+    total_eng = likes + comments + shares
+    engagement_rate = round(total_eng / max(1, views), 4)
+    is_breakout = engagement_rate >= 0.06 or (views >= 10000 and total_eng >= 600)
+
+    post_record = {
+        "post_id": f"csv_{row_idx}_{uuid.uuid4().hex[:6]}",
+        "platform": platform,
+        "post_type": post_type,
+        "caption": caption,
+        "published_at": published_at,
+        "views": views,
+        "likes": likes,
+        "comments": comments,
+        "shares": shares,
+        "impressions": views,
+        "engagement_rate": engagement_rate,
+        "is_breakout": is_breakout,
+        "source": "user_csv_upload"
+    }
+
+    return post_record, None
+
+def validate_and_preview_csv(csv_content: str) -> Dict[str, Any]:
+    """
+    Validates CSV headers, parses rows, separates valid posts from bad rows,
+    and returns a preview (first 5 posts) plus row statistics and bad row diagnostics.
+    """
+    if not csv_content or not csv_content.strip():
+        return {
+            "is_valid": False,
+            "error": "CSV content is empty.",
+            "total_rows": 0,
+            "valid_count": 0,
+            "bad_count": 0,
+            "bad_rows": [],
+            "preview": [],
+            "headers": []
+        }
 
     try:
-        reader = csv.DictReader(io.StringIO(csv_content))
+        # Detect delimiter (comma, semicolon, or tab)
+        sample_chunk = csv_content[:2048]
+        delimiter = ","
+        for d in [",", ";", "\t"]:
+            if d in sample_chunk:
+                delimiter = d
+                break
+
+        reader = csv.DictReader(io.StringIO(csv_content), delimiter=delimiter)
         if not reader.fieldnames:
-            return {"success": False, "error": "CSV file contains no header row."}
-        
-        # Field mapping
-        cols = {f.lower().strip(): f for f in reader.fieldnames}
-        
-        imported_count = 0
-        skipped_count = 0
-        now_iso = datetime.now(timezone.utc).isoformat()
-
-        for idx, row in enumerate(reader):
-            # Extract platform
-            platform = "instagram"
-            for p_cand in ["platform", "network", "channel"]:
-                if p_cand in cols and row[cols[p_cand]].strip():
-                    platform = row[cols[p_cand]].strip().lower()
-                    break
-
-            # Extract views
-            views = 0
-            for v_cand in ["views", "impressions", "reach"]:
-                if v_cand in cols and row[cols[v_cand]].strip():
-                    try:
-                        views = int(float(row[cols[v_cand]]))
-                        break
-                    except (ValueError, TypeError):
-                        pass
-
-            # Extract likes
-            likes = 0
-            for l_cand in ["likes", "like_count", "reactions"]:
-                if l_cand in cols and row[cols[l_cand]].strip():
-                    try:
-                        likes = int(float(row[cols[l_cand]]))
-                        break
-                    except (ValueError, TypeError):
-                        pass
-
-            # Extract comments
-            comments = 0
-            for c_cand in ["comments", "comment_count", "replies"]:
-                if c_cand in cols and row[cols[c_cand]].strip():
-                    try:
-                        comments = int(float(row[cols[c_cand]]))
-                        break
-                    except (ValueError, TypeError):
-                        pass
-
-            # Extract shares
-            shares = 0
-            for s_cand in ["shares", "retweets", "reposts"]:
-                if s_cand in cols and row[cols[s_cand]].strip():
-                    try:
-                        shares = int(float(row[cols[s_cand]]))
-                        break
-                    except (ValueError, TypeError):
-                        pass
-
-            # Extract text / title
-            caption = ""
-            for t_cand in ["caption", "content", "text", "title", "post_text"]:
-                if t_cand in cols and row[cols[t_cand]].strip():
-                    caption = row[cols[t_cand]].strip()
-                    break
-
-            # Extract post_type
-            post_type = "post"
-            for pt_cand in ["post_type", "type", "format"]:
-                if pt_cand in cols and row[cols[pt_cand]].strip():
-                    post_type = row[cols[pt_cand]].strip().lower()
-                    break
-
-            # Extract published_at
-            published_at = now_iso
-            for d_cand in ["published_at", "date", "created_at", "timestamp"]:
-                if d_cand in cols and row[cols[d_cand]].strip():
-                    published_at = row[cols[d_cand]].strip()
-                    break
-
-            # Post ID
-            post_id = f"csv_post_{uuid.uuid4().hex[:8]}"
-
-            # Calculate engagement rate
-            total_eng = likes + comments + shares
-            engagement_rate = round(total_eng / max(1, views), 4)
-
-            # Determine breakout status (relative to 6% benchmark)
-            is_breakout = engagement_rate >= 0.06 or (views > 10000 and total_eng > 600)
-
-            post_record = {
-                "post_id": post_id,
-                "platform": platform,
-                "post_type": post_type,
-                "caption": caption or f"Imported post #{idx + 1}",
-                "published_at": published_at,
-                "views": views,
-                "likes": likes,
-                "comments": comments,
-                "shares": shares,
-                "impressions": views,
-                "engagement_rate": engagement_rate,
-                "is_breakout": is_breakout,
-                "source": "user_csv_upload"
+            return {
+                "is_valid": False,
+                "error": "CSV contains no header row.",
+                "total_rows": 0,
+                "valid_count": 0,
+                "bad_count": 0,
+                "bad_rows": [],
+                "preview": [],
+                "headers": []
             }
 
-            posts.insert(0, post_record)
-            imported_count += 1
+        headers = [h.strip() for h in reader.fieldnames if h]
+        valid_posts = []
+        bad_rows = []
 
-        if imported_count > 0:
-            _save_json("posts.json", posts)
-            global LAST_REFRESHED
-            LAST_REFRESHED = now_iso
+        for idx, row in enumerate(reader):
+            post, err = _parse_row_to_post(row, idx + 1)
+            if post:
+                valid_posts.append(post)
+            else:
+                bad_rows.append({
+                    "row_number": idx + 2, # +2 accounting for header and 1-based index
+                    "reason": err,
+                    "data": {k: v for k, v in row.items() if k}
+                })
 
+        total = len(valid_posts) + len(bad_rows)
         return {
-            "success": True,
-            "imported_count": imported_count,
-            "skipped_count": skipped_count,
-            "total_posts": len(posts),
-            "message": f"Successfully parsed and imported {imported_count} posts into CreatorPulse dataset."
+            "is_valid": len(valid_posts) > 0,
+            "total_rows": total,
+            "valid_count": len(valid_posts),
+            "bad_count": len(bad_rows),
+            "bad_rows": bad_rows[:15], # cap bad rows sample
+            "preview": valid_posts[:5],
+            "headers": headers,
+            "delimiter": delimiter
         }
-
     except Exception as e:
         return {
-            "success": False,
-            "error": f"Failed to parse CSV file: {str(e)}"
+            "is_valid": False,
+            "error": f"Failed to parse CSV file: {str(e)}",
+            "total_rows": 0,
+            "valid_count": 0,
+            "bad_count": 0,
+            "bad_rows": [],
+            "preview": [],
+            "headers": []
         }
 
+def import_posts_from_csv(
+    csv_content: str,
+    filename: Optional[str] = "upload.csv",
+    set_as_active: bool = True
+) -> Dict[str, Any]:
+    """
+    Parses, validates, and imports posts from CSV into `uploaded_posts.json`.
+    Updates provenance metadata and switches active data source to 'uploaded_csv'.
+    """
+    val = validate_and_preview_csv(csv_content)
+    if not val.get("is_valid") and val.get("valid_count", 0) == 0:
+        return {
+            "success": False,
+            "error": val.get("error") or "No valid posts found in CSV file."
+        }
+
+    # Extract all valid rows
+    reader = csv.DictReader(io.StringIO(csv_content), delimiter=val.get("delimiter", ","))
+    valid_posts = []
+    bad_rows = []
+    for idx, row in enumerate(reader):
+        post, err = _parse_row_to_post(row, idx + 1)
+        if post:
+            valid_posts.append(post)
+        else:
+            bad_rows.append({"row_number": idx + 2, "reason": err})
+
+    # Save to uploaded_posts.json
+    _save_json("uploaded_posts.json", valid_posts)
+
+    # Update state
+    state = get_data_source_state()
+    state["uploaded_meta"] = {
+        "filename": filename or "upload.csv",
+        "count": len(valid_posts),
+        "imported_at": datetime.now(timezone.utc).isoformat(),
+        "bad_rows_count": len(bad_rows)
+    }
+    if set_as_active:
+        state["active_source"] = "uploaded_csv"
+
+    save_data_source_state(state)
+
+    return {
+        "success": True,
+        "imported_count": len(valid_posts),
+        "bad_rows_count": len(bad_rows),
+        "bad_rows": bad_rows[:10],
+        "active_source": state["active_source"],
+        "metadata": get_system_metadata(),
+        "message": f"Successfully imported {len(valid_posts)} posts from '{filename}' into CreatorPulse dataset."
+    }
+
+# ----------------- YouTube Channel Ingestion -----------------
+
+def import_youtube_channel_posts(
+    channel_url: str,
+    set_as_active: bool = True
+) -> Dict[str, Any]:
+    """
+    Invokes youtube_service to fetch channel videos and saves to `youtube_posts.json`.
+    Updates provenance metadata and switches active source to 'youtube'.
+    """
+    from backend.services import youtube_service
+
+    result = youtube_service.fetch_youtube_channel_data(channel_url)
+    if not result.get("success"):
+        return result
+
+    videos = result.get("videos", [])
+    channel_info = result.get("channel", {})
+
+    _save_json("youtube_posts.json", videos)
+
+    state = get_data_source_state()
+    state["youtube_meta"] = {
+        "channel_id": channel_info.get("channel_id"),
+        "channel_title": channel_info.get("title"),
+        "channel_handle": channel_info.get("custom_url"),
+        "subscriber_count": channel_info.get("subscriber_count", 0),
+        "video_count": channel_info.get("video_count", 0),
+        "count": len(videos),
+        "imported_at": datetime.now(timezone.utc).isoformat()
+    }
+    if set_as_active:
+        state["active_source"] = "youtube"
+
+    save_data_source_state(state)
+
+    return {
+        "success": True,
+        "channel": channel_info,
+        "imported_count": len(videos),
+        "active_source": state["active_source"],
+        "metadata": get_system_metadata(),
+        "message": f"Successfully connected '{channel_info.get('title')}' and imported {len(videos)} videos."
+    }
 
 # ==========================================
 # COMPETITOR ANALYSIS DATA ACCESS METHODS
@@ -582,7 +914,6 @@ def add_competitor(competitor: Dict[str, Any]) -> Dict[str, Any]:
     if len(current) >= 3:
         raise ValueError("Maximum of 3 competitor channels allowed for comparison.")
     
-    # Check duplicate handle
     handle = competitor.get("handle", "").lower().strip()
     if any(c.get("handle", "").lower().strip() == handle for c in current):
         raise ValueError(f"Competitor with handle '{handle}' is already added.")
@@ -610,7 +941,6 @@ def get_user_channel_benchmark() -> Dict[str, Any]:
         "baseline_engagement_rate": 0.052
     }
     
-    # Compute user stats from post data
     posts = get_posts(platform="youtube", limit=100)
     avg_views = int(sum(p.get("views", 0) for p in posts) / max(len(posts), 1)) if posts else 42300
     
@@ -634,6 +964,5 @@ def get_user_channel_benchmark() -> Dict[str, Any]:
                 "engagement_rate": p.get("engagement_rate", 0.05)
             } for p in sorted(posts, key=lambda x: x.get("views", 0), reverse=True)[:3]
         ] if posts else [],
-        "is_sample": True
+        "is_sample": get_active_data_source() == "sample"
     }
-

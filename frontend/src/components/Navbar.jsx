@@ -58,7 +58,15 @@ const SAMPLE_NOTIFICATIONS = [
 
 export default function Navbar({ onToggleMobileSidebar }) {
   const navigate = useNavigate();
-  const { selectedPlatform, setSelectedPlatform } = usePlatform();
+  const {
+    selectedPlatform,
+    setSelectedPlatform,
+    activeSource,
+    dataSourceMeta,
+    switchDataSource,
+    lastRefreshed,
+    refreshData
+  } = usePlatform();
   const { activeTheme, setTheme } = useTheme();
   const { user } = useUser();
 
@@ -66,7 +74,6 @@ export default function Navbar({ onToggleMobileSidebar }) {
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
-  const [updatedTime, setUpdatedTime] = useState('Updated just now');
   const [refreshing, setRefreshing] = useState(false);
 
   const dataDropdownRef = useRef(null);
@@ -87,11 +94,35 @@ export default function Navbar({ onToggleMobileSidebar }) {
 
   const handleRefresh = () => {
     setRefreshing(true);
+    refreshData();
     setTimeout(() => {
       setRefreshing(false);
-      setUpdatedTime('Updated just now');
     }, 600);
   };
+
+  const getSourceBadgeConfig = () => {
+    if (activeSource === 'uploaded_csv') {
+      return {
+        label: 'Uploaded CSV',
+        classes: 'bg-violet-50/90 dark:bg-violet-950/40 text-violet-800 dark:text-violet-300 border-violet-200/80 dark:border-violet-800/60',
+        iconClass: 'text-violet-600 dark:text-violet-400'
+      };
+    }
+    if (activeSource === 'youtube') {
+      return {
+        label: 'YouTube Channel',
+        classes: 'bg-rose-50/90 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 border-rose-200/80 dark:border-rose-800/60',
+        iconClass: 'text-rose-600 dark:text-rose-400'
+      };
+    }
+    return {
+      label: 'Sample data',
+      classes: 'bg-amber-50/90 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-200/80 dark:border-amber-800/60',
+      iconClass: 'text-amber-600 dark:text-amber-400'
+    };
+  };
+
+  const badgeConfig = getSourceBadgeConfig();
 
   return (
     <>
@@ -146,14 +177,14 @@ export default function Navbar({ onToggleMobileSidebar }) {
 
         {/* Right Controls - One Line, No Wrap, Fully Visible */}
         <div className="flex items-center space-x-2 sm:space-x-3 shrink-0 pl-2">
-          {/* Sample Data Dropdown Chip */}
+          {/* Dynamic Active Data Source Dropdown Chip */}
           <div className="relative" ref={dataDropdownRef}>
             <button
               onClick={() => setDataDropdownOpen(!dataDropdownOpen)}
-              className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-amber-50/90 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60 text-[11px] font-semibold whitespace-nowrap hover:bg-amber-100/70 transition shadow-2xs"
+              className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg border text-[11px] font-semibold whitespace-nowrap transition shadow-2xs ${badgeConfig.classes}`}
             >
-              <Database className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
-              <span>Sample data</span>
+              <Database className={`w-3 h-3 shrink-0 ${badgeConfig.iconClass}`} />
+              <span>{badgeConfig.label}</span>
               <ChevronDown className="w-2.5 h-2.5 opacity-70 shrink-0 ml-0.5" />
             </button>
 
@@ -163,47 +194,105 @@ export default function Navbar({ onToggleMobileSidebar }) {
                   initial={{ opacity: 0, y: 6, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 4, scale: 0.95 }}
-                  className="absolute right-0 mt-1.5 w-60 rounded-2xl bg-white dark:bg-[#1E2638] border border-slate-200 dark:border-slate-700 shadow-xl py-1.5 z-50 text-xs"
+                  className="absolute right-0 mt-1.5 w-64 rounded-2xl bg-white dark:bg-[#1E2638] border border-slate-200 dark:border-slate-700 shadow-xl py-1.5 z-50 text-xs"
                 >
                   <div className="px-3 py-1 font-bold uppercase tracking-wider text-[9.5px] text-slate-400 border-b border-slate-100 dark:border-slate-800">
-                    Data Provenance Mode
+                    Active Data Source Switcher
                   </div>
+
+                  {/* Option 1: Sample data */}
                   <button
-                    onClick={() => setDataDropdownOpen(false)}
-                    className="w-full text-left px-3 py-2 flex items-start gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition"
+                    onClick={() => {
+                      switchDataSource('sample');
+                      setDataDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 flex items-start gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition ${
+                      activeSource === 'sample' ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''
+                    }`}
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white">Sample data</div>
-                      <div className="text-[10.5px] text-slate-500">1,800 simulated posts for safe testing</div>
+                    {activeSource === 'sample' ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <div className="w-3.5 h-3.5 rounded-full border border-slate-300 dark:border-slate-600 shrink-0 mt-0.5" />
+                    )}
+                    <div className="flex-1">
+                      <div className="font-bold text-slate-900 dark:text-white flex items-center justify-between">
+                        <span>Sample data</span>
+                        <span className="text-[10px] text-amber-600 font-normal">
+                          {dataSourceMeta?.counts?.sample || 1800} posts
+                        </span>
+                      </div>
+                      <div className="text-[10.5px] text-slate-500">Simulated posts for safe prototype testing</div>
                     </div>
                   </button>
 
+                  {/* Option 2: Uploaded CSV */}
                   <button
                     onClick={() => {
-                      setDataDropdownOpen(false);
-                      navigate('/settings');
+                      if (dataSourceMeta?.counts?.uploaded_csv > 0) {
+                        switchDataSource('uploaded_csv');
+                        setDataDropdownOpen(false);
+                      } else {
+                        setDataDropdownOpen(false);
+                        navigate('/settings');
+                      }
                     }}
-                    className="w-full text-left px-3 py-2 flex items-start gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition"
+                    className={`w-full text-left px-3 py-2 flex items-start gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition ${
+                      activeSource === 'uploaded_csv' ? 'bg-violet-50/50 dark:bg-violet-950/20' : ''
+                    }`}
                   >
-                    <Upload className="w-3.5 h-3.5 text-violet-600 shrink-0 mt-0.5" />
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white">Uploaded CSV</div>
-                      <div className="text-[10.5px] text-slate-500">Upload your own channel analytics</div>
+                    {activeSource === 'uploaded_csv' ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-violet-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <div className="w-3.5 h-3.5 rounded-full border border-slate-300 dark:border-slate-600 shrink-0 mt-0.5" />
+                    )}
+                    <div className="flex-1">
+                      <div className="font-bold text-slate-900 dark:text-white flex items-center justify-between">
+                        <span>Uploaded CSV</span>
+                        <span className="text-[10px] text-violet-600 font-normal">
+                          {dataSourceMeta?.counts?.uploaded_csv || 0} posts
+                        </span>
+                      </div>
+                      <div className="text-[10.5px] text-slate-500">
+                        {dataSourceMeta?.uploaded_meta?.filename
+                          ? `Active: ${dataSourceMeta.uploaded_meta.filename}`
+                          : 'Click to upload your own CSV'}
+                      </div>
                     </div>
                   </button>
 
+                  {/* Option 3: YouTube Channel */}
                   <button
                     onClick={() => {
-                      setDataDropdownOpen(false);
-                      navigate('/settings');
+                      if (dataSourceMeta?.counts?.youtube > 0) {
+                        switchDataSource('youtube');
+                        setDataDropdownOpen(false);
+                      } else {
+                        setDataDropdownOpen(false);
+                        navigate('/settings');
+                      }
                     }}
-                    className="w-full text-left px-3 py-2 flex items-start gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition"
+                    className={`w-full text-left px-3 py-2 flex items-start gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition ${
+                      activeSource === 'youtube' ? 'bg-rose-50/50 dark:bg-rose-950/20' : ''
+                    }`}
                   >
-                    <Link2 className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white">Connected account</div>
-                      <div className="text-[10.5px] text-slate-500">Direct OAuth connections (in setup)</div>
+                    {activeSource === 'youtube' ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <div className="w-3.5 h-3.5 rounded-full border border-slate-300 dark:border-slate-600 shrink-0 mt-0.5" />
+                    )}
+                    <div className="flex-1">
+                      <div className="font-bold text-slate-900 dark:text-white flex items-center justify-between">
+                        <span>YouTube Channel</span>
+                        <span className="text-[10px] text-rose-600 font-normal">
+                          {dataSourceMeta?.counts?.youtube || 0} videos
+                        </span>
+                      </div>
+                      <div className="text-[10.5px] text-slate-500">
+                        {dataSourceMeta?.youtube_meta?.channel_title
+                          ? `Connected: ${dataSourceMeta.youtube_meta.channel_title}`
+                          : 'Click to connect channel via API'}
+                      </div>
                     </div>
                   </button>
                 </motion.div>
@@ -218,7 +307,7 @@ export default function Navbar({ onToggleMobileSidebar }) {
             className="hidden sm:flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-[11px] font-medium whitespace-nowrap hover:bg-slate-200/60 transition shadow-2xs"
           >
             <RefreshCw className={`w-3 h-3 ${refreshing ? 'animate-spin text-violet-600' : 'text-slate-400'}`} />
-            <span>{updatedTime}</span>
+            <span>Updated {lastRefreshed}</span>
           </button>
 
           {/* Notification Bell with Red Dot */}
