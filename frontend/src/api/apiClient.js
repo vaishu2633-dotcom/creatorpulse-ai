@@ -86,8 +86,11 @@ export const getReportsCsvExportUrl = (platform = 'all', days = null) => {
 };
 
 // ----------------- Trends -----------------
-export const getTrends = (platform = 'all', timeWindow = 'all') =>
-  request(`/api/trends?platform=${platform}&time_window=${timeWindow}`);
+export const getTrends = (platform = 'all', timeWindow = 'all', region = 'all') => {
+  let url = `/api/trends?platform=${platform}&time_window=${timeWindow}`;
+  if (region && region !== 'all') url += `&region=${region}`;
+  return request(url);
+};
 
 // ----------------- Prediction -----------------
 export const predictPost = (payload) =>

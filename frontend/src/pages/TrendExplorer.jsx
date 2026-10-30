@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePlatform } from '../context/PlatformContext';
+import { useToast } from '../context/ToastContext';
 import { getTrends } from '../api/apiClient';
 import PageHeader from '../components/ui/PageHeader';
 import HowItWorks from '../components/ui/HowItWorks';
-import StatusChip from '../components/ui/StatusChip';
 import PlatformBadge from '../components/PlatformBadge';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -21,34 +21,34 @@ import {
   ArrowRight,
   Sparkles,
   Clock,
-  Lightbulb,
   ExternalLink,
   ChevronRight,
   TrendingUp,
-  Tag,
   CircleDot,
   LayoutGrid,
   Radio,
-  Eye
+  Globe,
+  Info,
+  UserCheck,
 } from 'lucide-react';
 
 const HOW_IT_WORKS_STEPS = [
   {
-    title: 'Pick Time Range',
-    description: 'Filter between 24 hours (immediate spikes), 7 days (weekly momentum), or 30 days (macro shifts).'
+    title: 'Pick Time Window & Region',
+    description: 'Filter between 24 hours, 7 days, or 30 days, and select target country or channel data.',
   },
   {
     title: 'Explore the Bubble Radar',
-    description: 'Bubble size represents topic velocity; bubble color indicates primary platform.'
+    description: 'Bubble size represents topic velocity; bubble color indicates primary platform.',
   },
   {
     title: 'Inspect Topic Signals',
-    description: 'Click any trend to preview audience discussion angles, momentum scores, and sample hooks.'
+    description: 'Click any trend to preview audience discussion angles, momentum scores, and sample hooks.',
   },
   {
-    title: 'Use in Studio',
-    description: 'One click loads the trending angle directly into Content Studio for instant copy generation.'
-  }
+    title: 'Use This Topic in Studio',
+    description: 'One click loads the trending angle directly into Content Studio for instant copy generation.',
+  },
 ];
 
 const PLATFORM_BUBBLE_COLORS = {
@@ -65,13 +65,30 @@ const COVER_GRADIENTS = {
   linkedin: 'from-blue-600/20 via-cyan-500/10 to-transparent',
 };
 
+const REGIONS = [
+  { id: 'all', label: 'All Regions' },
+  { id: 'US', label: 'United States (US)' },
+  { id: 'IN', label: 'India (IN)' },
+  { id: 'GB', label: 'United Kingdom (GB)' },
+];
+
 export default function TrendExplorer() {
   const { selectedPlatform, lastRefreshed } = usePlatform();
   const navigate = useNavigate();
+  const { addToast } = useToast();
 
   const [timeWindow, setTimeWindow] = useState('24h');
-  const [viewMode, setViewMode] = useState('bubble'); // 'bubble' or 'grid'
+  const [region, setRegion] = useState('all');
+  const [sourceFilter, setSourceFilter] = useState('all'); // 'all', 'creator', 'platform'
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'bubble'
   const [trends, setTrends] = useState([]);
+  const [trendPackage, setTrendPackage] = useState({
+    source: 'Sample data',
+    is_sample_data: true,
+    last_updated: null,
+    has_youtube_key: false,
+    creator_rising_count: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -81,9 +98,16 @@ export default function TrendExplorer() {
   const fetchTrendingData = () => {
     setLoading(true);
     setError(null);
-    getTrends(selectedPlatform, timeWindow)
+    getTrends(selectedPlatform, timeWindow, region)
       .then((res) => {
         setTrends(res.trends || []);
+        setTrendPackage({
+          source: res.source || 'Sample data',
+          is_sample_data: Boolean(res.is_sample_data),
+          last_updated: res.last_updated,
+          has_youtube_key: Boolean(res.has_youtube_key),
+          creator_rising_count: res.creator_rising_count || 0,
+        });
         setLoading(false);
       })
       .catch((err) => {
@@ -94,16 +118,23 @@ export default function TrendExplorer() {
 
   useEffect(() => {
     fetchTrendingData();
-  }, [selectedPlatform, timeWindow, lastRefreshed]);
+  }, [selectedPlatform, timeWindow, region, lastRefreshed]);
 
   const handleUseTopic = (trend) => {
-    navigate(`/studio?topic=${encodeURIComponent(trend.topic)}&platform=${trend.platform}`);
+    if (!trend || !trend.topic) return;
+    addToast(`Loading "${trend.topic}" into Content Studio...`, 'info');
+    navigate(`/studio?topic=${encodeURIComponent(trend.topic)}&platform=${trend.platform || 'youtube'}`);
   };
+
+  // Filter trends based on sourceFilter
+  const filteredTrends = trends.filter((t) => {
+    if (sourceFilter === 'creator') return t.is_creator_data;
+    if (sourceFilter === 'platform') return !t.is_creator_data;
+    return true;
+  });
 
   // Generate coordinates for SVG Bubble Map
   const generateBubblePositions = (items) => {
-    // 2D grid/spiral placement to avoid overlaps
-    const count = items.length;
     const width = 800;
     const height = 440;
     const centerX = width / 2;
@@ -111,10 +142,9 @@ export default function TrendExplorer() {
 
     return items.map((item, idx) => {
       const strength = item.strength_score || 75;
-      const radius = 28 + (strength - 60) * 0.8; // between 32px and 62px
+      const radius = 28 + (strength - 60) * 0.8;
 
-      // Arrange in golden spiral
-      const angle = idx * 2.39996; // golden angle
+      const angle = idx * 2.39996;
       const distance = 45 + Math.sqrt(idx) * 95;
       const x = Math.max(radius + 15, Math.min(width - radius - 15, centerX + Math.cos(angle) * distance));
       const y = Math.max(radius + 15, Math.min(height - radius - 15, centerY + Math.sin(angle) * (distance * 0.75)));
@@ -128,16 +158,20 @@ export default function TrendExplorer() {
     });
   };
 
-  const bubbleItems = generateBubblePositions(trends);
+  const bubbleItems = generateBubblePositions(filteredTrends);
+
+  const formattedLastUpdated = trendPackage.last_updated
+    ? new Date(trendPackage.last_updated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : 'Just now';
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-16">
       {/* Page Header */}
       <PageHeader
         title="Trend Explorer"
-        subtitle="Detect high-growth conversation angles across platforms before they become saturated"
+        subtitle="Detect high-growth conversation angles across platforms and within your own creator posts"
         tag="Trend Radar"
-        status="Uses sample data"
+        status={trendPackage.is_sample_data ? 'Uses sample data' : 'Working now'}
         icon={Compass}
         illustration={TrendRadarIllustration}
         actions={
@@ -145,26 +179,26 @@ export default function TrendExplorer() {
             {/* View Switcher */}
             <div className="flex items-center bg-white dark:bg-[#171D2B] p-1 rounded-xl border border-[#E8E6DF] dark:border-[#232B3E]">
               <button
-                onClick={() => setViewMode('bubble')}
-                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                  viewMode === 'bubble'
-                    ? 'bg-[#5B5BD6] text-white'
-                    : 'text-[#5B6475] dark:text-[#94A3B8] hover:text-[#1F2430]'
-                }`}
-              >
-                <Radio className="w-3.5 h-3.5" />
-                <span>Bubble Radar</span>
-              </button>
-              <button
                 onClick={() => setViewMode('grid')}
                 className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
                   viewMode === 'grid'
-                    ? 'bg-[#5B5BD6] text-white'
+                    ? 'bg-[#5B5BD6] text-white shadow-2xs'
                     : 'text-[#5B6475] dark:text-[#94A3B8] hover:text-[#1F2430]'
                 }`}
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
                 <span>Cards Grid</span>
+              </button>
+              <button
+                onClick={() => setViewMode('bubble')}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  viewMode === 'bubble'
+                    ? 'bg-[#5B5BD6] text-white shadow-2xs'
+                    : 'text-[#5B6475] dark:text-[#94A3B8] hover:text-[#1F2430]'
+                }`}
+              >
+                <Radio className="w-3.5 h-3.5" />
+                <span>Bubble Radar</span>
               </button>
             </div>
           </div>
@@ -174,22 +208,104 @@ export default function TrendExplorer() {
       {/* How it Works Strip */}
       <HowItWorks steps={HOW_IT_WORKS_STEPS} />
 
-      {/* Filter and Time Window Strip */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] shadow-xs">
-        <div className="flex items-center space-x-2 text-xs text-[#5B6475] dark:text-[#94A3B8]">
-          <Clock className="w-4 h-4 text-[#5B5BD6]" />
-          <span>Velocity Window:</span>
+      {/* Provenance & Source Metadata Banner */}
+      <div
+        className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+          trendPackage.is_sample_data
+            ? 'bg-amber-50/70 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/50 text-amber-900 dark:text-amber-300'
+            : 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-300'
+        }`}
+      >
+        <div className="flex items-start sm:items-center space-x-3">
+          <Info className={`w-4 h-4 shrink-0 mt-0.5 sm:mt-0 ${trendPackage.is_sample_data ? 'text-amber-600' : 'text-emerald-600'}`} />
+          <div>
+            <div className="font-semibold">
+              <span>Source: </span>
+              <strong className="underline underline-offset-2">{trendPackage.source}</strong>
+              <span className="mx-2 opacity-50">•</span>
+              <span>Last update: {formattedLastUpdated}</span>
+            </div>
+            <p className="text-[11px] opacity-80 mt-0.5">
+              {trendPackage.has_youtube_key
+                ? 'Active YouTube Data API integration with real video velocity & creator data signals.'
+                : 'Sample trends active. Add YOUTUBE_API_KEY in .env for live regional YouTube trends.'}
+            </p>
+          </div>
         </div>
-        <Tabs
-          size="sm"
-          tabs={[
-            { id: '24h', label: '24 Hours (Fast Spikes)' },
-            { id: '7d', label: '7 Days (Weekly Momentum)' },
-            { id: '30d', label: '30 Days (Macro Themes)' },
-          ]}
-          activeTab={timeWindow}
-          onChange={(tab) => setTimeWindow(tab)}
-        />
+
+        <div className="flex items-center space-x-2 shrink-0">
+          <span
+            className={`px-2.5 py-1 rounded-full font-mono text-[11px] font-bold border ${
+              trendPackage.is_sample_data
+                ? 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-900/40 dark:text-amber-300'
+                : 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300'
+            }`}
+          >
+            {trendPackage.is_sample_data ? 'Sample data' : 'Live data'}
+          </span>
+        </div>
+      </div>
+
+      {/* Filter and Time Window Strip */}
+      <div className="p-4 rounded-2xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] shadow-2xs space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          {/* Source Tabs */}
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setSourceFilter('all')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition border ${
+                sourceFilter === 'all'
+                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-transparent shadow-xs'
+                  : 'bg-[#FAF9F6] dark:bg-[#131825] text-[#5B6475] dark:text-[#94A3B8] border-[#E8E6DF] dark:border-[#232B3E]'
+              }`}
+            >
+              All Signals ({trends.length})
+            </button>
+            <button
+              onClick={() => setSourceFilter('creator')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition border flex items-center space-x-1.5 ${
+                sourceFilter === 'creator'
+                  ? 'bg-indigo-600 text-white border-transparent shadow-xs'
+                  : 'bg-[#FAF9F6] dark:bg-[#131825] text-[#5B6475] dark:text-[#94A3B8] border-[#E8E6DF] dark:border-[#232B3E]'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Rising in Your Content ({trends.filter((t) => t.is_creator_data).length})</span>
+            </button>
+          </div>
+
+          {/* Region Selector */}
+          <div className="flex items-center space-x-2">
+            <Globe className="w-4 h-4 text-[#5B5BD6]" />
+            <span className="text-xs text-[#5B6475] dark:text-[#94A3B8]">Region:</span>
+            <select
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              className="bg-[#FAF9F6] dark:bg-[#131825] border border-[#E8E6DF] dark:border-[#232B3E] rounded-xl px-2.5 py-1 text-xs text-[#1F2430] dark:text-white focus:outline-none focus:border-[#5B5BD6]"
+            >
+              {REGIONS.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Velocity Window */}
+          <div className="flex items-center space-x-2">
+            <Clock className="w-4 h-4 text-[#5B5BD6]" />
+            <Tabs
+              size="sm"
+              tabs={[
+                { id: '24h', label: '24 Hours' },
+                { id: '7d', label: '7 Days' },
+                { id: '30d', label: '30 Days' },
+              ]}
+              activeTab={timeWindow}
+              onChange={(tab) => setTimeWindow(tab)}
+            />
+          </div>
+        </div>
       </div>
 
       {loading ? (
@@ -204,13 +320,17 @@ export default function TrendExplorer() {
           description={error}
           onRetry={fetchTrendingData}
         />
-      ) : trends.length === 0 ? (
+      ) : filteredTrends.length === 0 ? (
         <EmptyState
           illustration={EmptyDraftsIllustration}
-          title="No trends found"
-          description="Try switching the platform selector or time window to uncover more trending topics."
-          actionText="View all platforms"
-          onAction={() => navigate('/trends')}
+          title="No trends found for this filter"
+          description="Try switching the platform selector, region, or source filter to uncover more trending topics."
+          actionText="Reset filters"
+          onAction={() => {
+            setSourceFilter('all');
+            setRegion('all');
+            setTimeWindow('24h');
+          }}
         />
       ) : viewMode === 'bubble' ? (
         /* Interactive SVG Bubble Map */
@@ -222,7 +342,7 @@ export default function TrendExplorer() {
                 <span>Interactive Bubble Radar</span>
               </h3>
               <p className="text-xs text-[#5B6475] dark:text-[#94A3B8]">
-                Bubble size corresponds to momentum score. Click any bubble to inspect discussion angles.
+                Bubble size corresponds to momentum score. Click any bubble to inspect signals or use topic.
               </p>
             </div>
             <div className="flex items-center space-x-3 text-xs">
@@ -236,7 +356,7 @@ export default function TrendExplorer() {
               </span>
               <span className="flex items-center space-x-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-sky-500" />
-                <span className="text-[11px] text-slate-400">X (Twitter)</span>
+                <span className="text-[11px] text-slate-400">X</span>
               </span>
               <span className="flex items-center space-x-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
@@ -250,12 +370,10 @@ export default function TrendExplorer() {
               viewBox="0 0 800 440"
               className="w-full h-auto max-h-[480px] select-none"
             >
-              {/* Radar concentric target circles */}
               <circle cx="400" cy="220" r="190" fill="none" stroke="#E2E8F0" strokeDasharray="4 4" opacity="0.6" />
               <circle cx="400" cy="220" r="130" fill="none" stroke="#E2E8F0" strokeDasharray="4 4" opacity="0.6" />
               <circle cx="400" cy="220" r="70" fill="none" stroke="#E2E8F0" strokeDasharray="4 4" opacity="0.6" />
 
-              {/* Render Bubbles */}
               {bubbleItems.map((b) => {
                 const colors = PLATFORM_BUBBLE_COLORS[b.platform] || PLATFORM_BUBBLE_COLORS.youtube;
                 const isSelected = activeTrend?.trend_id === b.trend_id;
@@ -267,7 +385,6 @@ export default function TrendExplorer() {
                     onClick={() => setActiveTrend(b)}
                     className="cursor-pointer transition-transform duration-200 hover:scale-105"
                   >
-                    {/* Glow outline if selected */}
                     {isSelected && (
                       <circle
                         r={b.radius + 6}
@@ -275,11 +392,9 @@ export default function TrendExplorer() {
                         stroke="#5B5BD6"
                         strokeWidth="3"
                         strokeDasharray="4 2"
-                        className="animate-spin"
                       />
                     )}
 
-                    {/* Bubble background */}
                     <circle
                       r={b.radius}
                       fill={colors.bg}
@@ -288,7 +403,6 @@ export default function TrendExplorer() {
                       className="filter drop-shadow-sm"
                     />
 
-                    {/* Platform accent dot on top */}
                     <circle
                       cx="0"
                       cy={-b.radius + 12}
@@ -296,7 +410,6 @@ export default function TrendExplorer() {
                       fill={colors.fill}
                     />
 
-                    {/* Topic text truncated */}
                     <text
                       textAnchor="middle"
                       y={-2}
@@ -310,7 +423,6 @@ export default function TrendExplorer() {
                         : b.topic}
                     </text>
 
-                    {/* Strength badge pill */}
                     <text
                       textAnchor="middle"
                       y={14}
@@ -330,7 +442,7 @@ export default function TrendExplorer() {
       ) : (
         /* Card Grid View */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {trends.map((item) => {
+          {filteredTrends.map((item) => {
             const strength = item.strength_score || 70;
             const grad = COVER_GRADIENTS[item.platform] || 'from-indigo-500/20 to-transparent';
 
@@ -342,7 +454,15 @@ export default function TrendExplorer() {
                 className="flex flex-col justify-between cursor-pointer"
                 cover={
                   <div className={`h-16 bg-gradient-to-r ${grad} p-4 flex items-center justify-between border-b border-[#E8E6DF] dark:border-[#232B3E]`}>
-                    <PlatformBadge platform={item.platform} />
+                    <div className="flex items-center space-x-2">
+                      <PlatformBadge platform={item.platform} />
+                      {item.is_creator_data && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-[#5B5BD6] dark:text-brand-300 flex items-center space-x-1 border border-indigo-200 dark:border-indigo-800">
+                          <Sparkles className="w-2.5 h-2.5" />
+                          <span>Your Content</span>
+                        </span>
+                      )}
+                    </div>
                     <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-white/80 dark:bg-[#1A2333] text-[#5B6475] dark:text-[#94A3B8] border border-slate-200 dark:border-slate-700">
                       {item.category}
                     </span>
@@ -393,7 +513,7 @@ export default function TrendExplorer() {
                     </div>
                   )}
 
-                  <div className="pt-2">
+                  <div className="pt-2 flex items-center space-x-2">
                     <Button
                       variant="primary"
                       size="sm"
@@ -404,7 +524,7 @@ export default function TrendExplorer() {
                         handleUseTopic(item);
                       }}
                     >
-                      Use in Studio
+                      Use this topic
                     </Button>
                   </div>
                 </div>
@@ -428,10 +548,18 @@ export default function TrendExplorer() {
                 <span className="text-xs px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium">
                   {activeTrend.category}
                 </span>
+                {activeTrend.is_creator_data && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-[#5B5BD6] dark:text-brand-300 font-bold">
+                    From Your Content
+                  </span>
+                )}
               </div>
               <h3 className="text-base font-bold text-[#1F2430] dark:text-white leading-relaxed">
                 {activeTrend.topic}
               </h3>
+              <div className="text-[11px] text-[#5B6475] dark:text-[#94A3B8]">
+                Source: <strong className="font-semibold">{activeTrend.source || 'Sample data'}</strong>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-center">
@@ -479,7 +607,7 @@ export default function TrendExplorer() {
               icon={Sparkles}
               onClick={() => handleUseTopic(activeTrend)}
             >
-              Load into Content Studio
+              Use this topic in Studio
             </Button>
           </div>
         )}

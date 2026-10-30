@@ -316,3 +316,123 @@ def fetch_youtube_channel_data(channel_input: str, max_videos: int = 50) -> Dict
             "error_type": "unknown_error",
             "error": f"An unexpected error occurred: {str(exc)}"
         }
+
+
+YOUTUBE_CATEGORIES = {
+    "1": "Film & Animation",
+    "2": "Autos & Vehicles",
+    "10": "Music",
+    "15": "Pets & Animals",
+    "17": "Sports",
+    "20": "Gaming",
+    "22": "People & Blogs",
+    "23": "Comedy",
+    "24": "Entertainment",
+    "25": "News & Politics",
+    "26": "Howto & Style",
+    "27": "Education",
+    "28": "Science & Technology"
+}
+
+def fetch_youtube_trending_topics(region_code: str = "US", max_results: int = 15) -> Dict[str, Any]:
+    """
+    Fetches real trending videos for a specified region from YouTube Data API v3.
+    Extracts high-velocity topics, view counts, and engagement strength.
+    """
+    api_key = get_youtube_api_key()
+    if not api_key or api_key.startswith("your_"):
+        return {
+            "success": False,
+            "error_type": "missing_key",
+            "error": "YouTube Data API key is not configured in .env."
+        }
+
+    valid_region = region_code.upper() if region_code and len(region_code) == 2 else "US"
+
+    try:
+        with httpx.Client(timeout=12.0) as client:
+            resp = client.get(
+                "https://www.googleapis.com/youtube/v3/videos",
+                params={
+                    "part": "snippet,statistics",
+                    "chart": "mostPopular",
+                    "regionCode": valid_region,
+                    "maxResults": min(max_results, 50),
+                    "key": api_key
+                }
+            )
+
+            if resp.status_code == 403:
+                err_data = resp.json().get("error", {})
+                reasons = [e.get("reason") for e in err_data.get("errors", [])]
+                if "quotaExceeded" in reasons or "dailyLimitExceeded" in reasons:
+                    return {
+                        "success": False,
+                        "error_type": "quota_exceeded",
+                        "error": "YouTube API daily quota exceeded."
+                    }
+                return {
+                    "success": False,
+                    "error_type": "permission_denied",
+                    "error": f"YouTube API access denied: {err_data.get('message', '')}"
+                }
+
+            if resp.status_code != 200:
+                return {
+                    "success": False,
+                    "error_type": "api_error",
+                    "error": f"YouTube API returned HTTP {resp.status_code}"
+                }
+
+            data = resp.json()
+            items = data.get("items", [])
+            trends = []
+
+            for idx, item in enumerate(items):
+                snip = item.get("snippet", {})
+                stats = item.get("statistics", {})
+                title = snip.get("title", "")
+                views = int(stats.get("viewCount", 0))
+                likes = int(stats.get("likeCount", 0))
+                comments = int(stats.get("commentCount", 0))
+                cat_id = str(snip.get("categoryId", "28"))
+                category = YOUTUBE_CATEGORIES.get(cat_id, "Trending")
+
+                er = round(((likes + comments) / views * 100), 2) if views > 0 else 3.5
+                strength = min(99, max(60, int(75 + (views / 1_500_000) * 5 + er * 2)))
+                growth_rate = f"+{min(240, max(25, int(er * 18)))}%"
+
+                trends.append({
+                    "trend_id": f"yt_live_{item.get('id', idx)}",
+                    "platform": "youtube",
+                    "topic": title,
+                    "category": category,
+                    "time_window": "24h",
+                    "volume": views,
+                    "growth_rate": growth_rate,
+                    "strength_score": strength,
+                    "sentiment": "bullish" if er > 4.0 else "neutral",
+                    "region": valid_region,
+                    "source": f"YouTube Data API ({valid_region})",
+                    "is_creator_data": False,
+                    "channel_title": snip.get("channelTitle", ""),
+                    "published_at": snip.get("publishedAt", ""),
+                    "sample_hooks": [
+                        f"Why '{title[:55]}' is exploding in reach right now",
+                        f"The storytelling hook behind {snip.get('channelTitle', 'this video')}'s momentum"
+                    ]
+                })
+
+            return {
+                "success": True,
+                "region": valid_region,
+                "count": len(trends),
+                "trends": trends
+            }
+    except Exception as exc:
+        return {
+            "success": False,
+            "error_type": "exception",
+            "error": str(exc)
+        }
+

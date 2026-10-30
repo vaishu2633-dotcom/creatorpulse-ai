@@ -1,7 +1,8 @@
 """
 CreatorPulse AI - Trend Explorer Router
 -----------------------------------------
-Delivers platform-specific trending topics with time-window filters (24h, 7d, 30d).
+Delivers platform-specific trending topics with time-window filters (24h, 7d, 30d),
+regional YouTube trends (US, IN, GB), and rising topics from the creator's own active dataset.
 """
 
 from fastapi import APIRouter, Query
@@ -13,11 +14,19 @@ router = APIRouter(prefix="/api/trends", tags=["Trends"])
 @router.get("")
 def get_trends(
     platform: Optional[str] = Query("all"),
-    time_window: Optional[str] = Query("all")
+    time_window: Optional[str] = Query("all"),
+    region: Optional[str] = Query("all"),
+    include_creator_topics: bool = Query(True)
 ):
-    trends = data_access.get_trends(platform=platform, time_window=time_window)
-    return {
-        "metadata": data_access.get_system_metadata(),
-        "total": len(trends),
-        "trends": trends
-    }
+    """
+    Returns platform-tailored trending topics with provenance:
+    - Real YouTube Data API trends when YOUTUBE_API_KEY is configured
+    - Topics rising in the user's active creator dataset
+    - Truthful fallback to sample trends with 'Sample data' label when no key is present
+    """
+    return data_access.get_trends_package(
+        platform=platform,
+        time_window=time_window,
+        region=region,
+        include_creator_topics=include_creator_topics
+    )
