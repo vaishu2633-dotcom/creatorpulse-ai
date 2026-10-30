@@ -81,11 +81,17 @@ const assert = require('assert');
     await page.goto(`${BASE_URL}/`, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(1000);
 
-    // In Dashboard Recent Activity, verify the imported CSV post title and views render
     const bodyContent = await page.textContent('body');
-    assert(bodyContent.includes('Playwright Automated Test Post'), 'Dashboard did not show imported post title');
-    assert(bodyContent.includes('35,000') || bodyContent.includes('72,000'), 'Dashboard did not show imported post views');
-    console.log('Dashboard reflects dynamic CSV post: Playwright Automated Test Post with views');
+    assert(bodyContent.includes('107.0K') || bodyContent.includes('107,000'), 'Dashboard did not show imported total views');
+    console.log('Dashboard reflects dynamic CSV metrics (107.0K Total Views)');
+
+    // Also verify post title in /reports
+    await page.goto(`${BASE_URL}/reports`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('text=Playwright Automated Test Post', { timeout: 10000 });
+    const reportsBody = await page.textContent('body');
+    assert(reportsBody.includes('Playwright Automated Test Post'), 'Reports did not show imported post title');
+    assert(reportsBody.includes('35.0K') || reportsBody.includes('72.0K') || reportsBody.includes('35,000'), 'Reports did not show imported post views');
+    console.log('Reports page reflects dynamic CSV post: Playwright Automated Test Post with views');
 
     // 8. Switch back to Sample data via Settings
     console.log('[Step 7] Switching back to Sample data');

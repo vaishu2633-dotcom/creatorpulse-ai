@@ -45,6 +45,16 @@ def get_channel_analytics(
         days=days
     )
     
+    # Enrich summary with likes and comments totals if not present
+    if "total_likes" not in summary:
+        summary["total_likes"] = sum(int(p.get("likes", 0)) for p in all_posts)
+    if "total_comments" not in summary:
+        summary["total_comments"] = sum(int(p.get("comments", 0)) for p in all_posts)
+    if "avg_engagement_rate_percent" not in summary:
+        summary["avg_engagement_rate_percent"] = round(float(summary.get("average_engagement_rate", 0)) * 100, 2)
+    if "breakout_hit_rate_percent" not in summary:
+        summary["breakout_hit_rate_percent"] = round(float(summary.get("breakout_rate", 0)) * 100, 1)
+    
     return {
         "summary": summary,
         "snapshots": snapshots if isinstance(snapshots, list) else snapshots.get("snapshots", []),

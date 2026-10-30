@@ -371,7 +371,7 @@ export default function Reports() {
 
                       <div className="min-w-0">
                         <div className="text-xs font-bold text-slate-900 dark:text-white truncate group-hover:text-violet-600 dark:group-hover:text-violet-400 transition">
-                          {post.title}
+                          {post.title || post.caption || 'Untitled Post'}
                         </div>
                         <div className="text-[10px] text-slate-400 flex items-center space-x-2 mt-0.5">
                           <PlatformBadge platform={post.platform} size="xs" showName={true} />
@@ -411,7 +411,7 @@ export default function Reports() {
       <SlideOver
         isOpen={Boolean(activePost)}
         onClose={() => setActivePost(null)}
-        title={activePost?.title || 'Post Performance Breakdown'}
+        title={activePost?.title || activePost?.caption || 'Post Performance Breakdown'}
         subtitle="Full metrics, engagement velocity, and viewer actions"
       >
         {activePost && (
