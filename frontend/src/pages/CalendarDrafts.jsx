@@ -4,12 +4,10 @@ import { useToast } from '../context/ToastContext';
 import { getDrafts, updateDraft, deleteDraft, createDraft } from '../api/apiClient';
 import PageHeader from '../components/ui/PageHeader';
 import HowItWorks from '../components/ui/HowItWorks';
-import StatusChip from '../components/ui/StatusChip';
 import PlatformBadge from '../components/PlatformBadge';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import SlideOver from '../components/ui/SlideOver';
-import Tabs from '../components/ui/Tabs';
 import EmptyState from '../components/ui/EmptyState';
 import { CardSkeleton } from '../components/ui/Skeleton';
 import ErrorState from '../components/ui/ErrorState';
@@ -17,49 +15,74 @@ import EmptyDraftsIllustration from '../assets/illustrations/empty-drafts.svg';
 import {
   Calendar as CalendarIcon,
   Clock,
-  CheckCircle,
-  FileEdit,
   Trash2,
-  Tag,
   Plus,
   LayoutGrid,
   List,
   Sparkles,
-  ArrowRight,
   Download,
-  Printer,
   ChevronLeft,
   ChevronRight,
+  GripVertical,
   CheckCircle2,
-  AlertCircle
+  FileEdit,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const HOW_IT_WORKS_STEPS = [
   {
     title: 'Capture Ideas & Angles',
-    description: 'Save generated packages from Content Studio or log spontaneous topics directly.'
+    description: 'Save generated packages from Content Studio or add spontaneous creator drafts directly.',
   },
   {
-    title: 'Advance Stages',
-    description: 'Move cards from Idea Backlog → Writing Draft → Scheduled → Published as your production progresses.'
+    title: 'Drag Across Production Stages',
+    description: 'Drag cards between Idea → Writing → Planned → Marked as posted as your content evolves.',
   },
   {
-    title: 'Calendar & Kanban Views',
-    description: 'Toggle between stage columns and a visual monthly publication calendar.'
+    title: 'Month Calendar & Kanban Views',
+    description: 'Toggle between stage columns and a visual monthly publication calendar.',
   },
   {
-    title: 'Export & Share',
-    description: 'Download your planner as a formatted CSV or printable schedule for team review.'
-  }
+    title: 'Persisted & Exportable',
+    description: 'All updates persist across page reloads. Export your schedule as a CSV anytime.',
+  },
 ];
 
 const STATUS_COLUMNS = [
-  { id: 'idea', label: 'Idea Backlog', color: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900/50' },
-  { id: 'drafted', label: 'Writing Draft', color: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/50' },
-  { id: 'scheduled', label: 'Scheduled', color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900/50' },
-  { id: 'published', label: 'Published / Live', color: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/50' },
+  {
+    id: 'idea',
+    label: 'Idea',
+    color: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900/50',
+    dot: 'bg-purple-500',
+  },
+  {
+    id: 'writing',
+    label: 'Writing',
+    color: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/50',
+    dot: 'bg-amber-500',
+  },
+  {
+    id: 'planned',
+    label: 'Planned',
+    color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900/50',
+    dot: 'bg-blue-500',
+  },
+  {
+    id: 'posted',
+    label: 'Marked as posted',
+    color: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/50',
+    dot: 'bg-emerald-500',
+  },
 ];
+
+// Helper to normalize legacy statuses
+const normalizeStatus = (status) => {
+  const s = (status || 'idea').toLowerCase();
+  if (s === 'drafted' || s === 'writing') return 'writing';
+  if (s === 'scheduled' || s === 'planned') return 'planned';
+  if (s === 'published' || s === 'posted') return 'posted';
+  return 'idea';
+};
 
 export default function CalendarDrafts() {
   const { selectedPlatform, lastRefreshed } = usePlatform();
@@ -72,22 +95,40 @@ export default function CalendarDrafts() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Drag over tracking
+  const [dragOverCol, setDragOverCol] = useState(null);
+
   // Slide-over draft editor
   const [editingDraft, setEditingDraft] = useState(null);
   const [editTitle, setEditTitle] = useState('');
-  const [editStatus, setEditStatus] = useState('drafted');
+  const [editStatus, setEditStatus] = useState('writing');
   const [editHook, setEditHook] = useState('');
   const [editDate, setEditDate] = useState('');
 
+  // Quick create modal/drawer state
+  const [isCreating, setIsCreating] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newPlatform, setNewPlatform] = useState('youtube');
+  const [newStatus, setNewStatus] = useState('idea');
+  const [newHook, setNewHook] = useState('');
+  const [newDate, setNewDate] = useState('');
+
   // Calendar month state
-  const [calendarDate, setCalendarDate] = useState(new Date(2026, 10, 1)); // Nov 2026
+  const [calendarDate, setCalendarDate] = useState(new Date(2026, 9, 1)); // Oct 2026
 
   const fetchDrafts = () => {
     setLoading(true);
     setError(null);
-    getDrafts(selectedPlatform, statusFilter)
+    getDrafts(selectedPlatform, statusFilter === 'all' ? 'all' : statusFilter)
       .then((res) => {
-        setDrafts(res.drafts || []);
+        const raw = res.drafts || [];
+        // Ensure every draft has normalized status and id
+        const normalized = raw.map((d) => ({
+          ...d,
+          draft_id: d.draft_id || d.id,
+          status: normalizeStatus(d.status),
+        }));
+        setDrafts(normalized);
         setLoading(false);
       })
       .catch((err) => {
@@ -103,7 +144,7 @@ export default function CalendarDrafts() {
   const handleOpenEdit = (draft) => {
     setEditingDraft(draft);
     setEditTitle(draft.title || '');
-    setEditStatus(draft.status || 'drafted');
+    setEditStatus(normalizeStatus(draft.status));
     setEditHook(draft.hook || '');
     setEditDate(draft.scheduled_date || '');
   };
@@ -115,13 +156,39 @@ export default function CalendarDrafts() {
         title: editTitle,
         status: editStatus,
         hook: editHook,
-        scheduled_date: editDate,
+        scheduled_date: editDate || null,
       });
       addToast('Draft updated successfully!', 'success');
       setEditingDraft(null);
       fetchDrafts();
     } catch (err) {
       addToast(`Save failed: ${err.message}`, 'error');
+    }
+  };
+
+  const handleCreateDraft = async (e) => {
+    if (e) e.preventDefault();
+    if (!newTitle.trim()) {
+      addToast('Please enter a draft title', 'error');
+      return;
+    }
+
+    try {
+      await createDraft({
+        platform: newPlatform,
+        title: newTitle.trim(),
+        status: newStatus,
+        hook: newHook.trim() || null,
+        scheduled_date: newDate || null,
+      });
+      addToast('New draft created!', 'success');
+      setIsCreating(false);
+      setNewTitle('');
+      setNewHook('');
+      setNewDate('');
+      fetchDrafts();
+    } catch (err) {
+      addToast(`Create failed: ${err.message}`, 'error');
     }
   };
 
@@ -138,16 +205,59 @@ export default function CalendarDrafts() {
     }
   };
 
+  // Drag and drop handlers
+  const handleDragStart = (e, draftId) => {
+    e.dataTransfer.setData('text/plain', draftId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e, colId) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverCol !== colId) {
+      setDragOverCol(colId);
+    }
+  };
+
+  const handleDragLeave = (colId) => {
+    if (dragOverCol === colId) {
+      setDragOverCol(null);
+    }
+  };
+
+  const handleDrop = async (e, targetStatus) => {
+    e.preventDefault();
+    setDragOverCol(null);
+    const draftId = e.dataTransfer.getData('text/plain');
+    if (!draftId) return;
+
+    // Optimistic UI update
+    setDrafts((prev) =>
+      prev.map((d) => (d.draft_id === draftId ? { ...d, status: targetStatus } : d))
+    );
+
+    const colMeta = STATUS_COLUMNS.find((c) => c.id === targetStatus);
+    const colName = colMeta ? colMeta.label : targetStatus;
+
+    try {
+      await updateDraft(draftId, { status: targetStatus });
+      addToast(`Moved to ${colName}`, 'info');
+    } catch (err) {
+      addToast(`Move failed: ${err.message}`, 'error');
+      fetchDrafts();
+    }
+  };
+
   const exportCSV = () => {
     if (drafts.length === 0) return;
-    const headers = ['Draft ID', 'Platform', 'Title', 'Status', 'Hook', 'Scheduled Date'];
+    const headers = ['Draft ID', 'Platform', 'Title', 'Stage', 'Hook', 'Scheduled Date'];
     const rows = drafts.map((d) => [
       d.draft_id,
       d.platform,
       `"${(d.title || '').replace(/"/g, '""')}"`,
-      d.status,
+      d.status === 'posted' ? 'Marked as posted' : d.status === 'planned' ? 'Planned' : d.status,
       `"${(d.hook || '').replace(/"/g, '""')}"`,
-      d.scheduled_date || ''
+      d.scheduled_date || '',
     ]);
     const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -159,7 +269,7 @@ export default function CalendarDrafts() {
     addToast('Planner exported as CSV', 'success');
   };
 
-  // Calendar rendering helpers
+  // Calendar rendering calculations
   const year = calendarDate.getFullYear();
   const month = calendarDate.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -170,28 +280,23 @@ export default function CalendarDrafts() {
       {/* Page Header */}
       <PageHeader
         title="Calendar & Drafts"
-        subtitle="Manage your post lifecycle from raw spark to scheduled and published release"
+        subtitle="Manage your post lifecycle across Idea, Writing, Planned, and Marked as posted stages"
         tag="Planner"
         status="Working now"
         icon={CalendarIcon}
         illustration={EmptyDraftsIllustration}
         actions={
           <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              icon={Download}
-              onClick={exportCSV}
-            >
+            <Button variant="outline" size="sm" icon={Download} onClick={exportCSV}>
               Export CSV
             </Button>
             <Button
               variant="primary"
               size="sm"
               icon={Plus}
-              onClick={() => navigate('/studio')}
+              onClick={() => setIsCreating(true)}
             >
-              New Idea in Studio
+              New Draft
             </Button>
           </div>
         }
@@ -200,8 +305,8 @@ export default function CalendarDrafts() {
       {/* How it Works Strip */}
       <HowItWorks steps={HOW_IT_WORKS_STEPS} />
 
-      {/* View Switcher & Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] shadow-xs">
+      {/* View Switcher & Stage Filters */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] shadow-2xs">
         <div className="flex items-center space-x-2">
           <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
             <button
@@ -242,17 +347,23 @@ export default function CalendarDrafts() {
 
         {/* Status filter pills */}
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
-          {['all', 'idea', 'drafted', 'scheduled', 'published'].map((s) => (
+          {[
+            { id: 'all', label: 'All' },
+            { id: 'idea', label: 'Idea' },
+            { id: 'writing', label: 'Writing' },
+            { id: 'planned', label: 'Planned' },
+            { id: 'posted', label: 'Marked as posted' },
+          ].map((s) => (
             <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`px-2.5 py-1 rounded-lg capitalize font-medium transition ${
-                statusFilter === s
-                  ? 'bg-[#5B5BD6] text-white'
+              key={s.id}
+              onClick={() => setStatusFilter(s.id)}
+              className={`px-3 py-1 rounded-lg font-medium transition ${
+                statusFilter === s.id
+                  ? 'bg-[#5B5BD6] text-white shadow-xs font-bold'
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
               }`}
             >
-              {s}
+              {s.label}
             </button>
           ))}
         </div>
@@ -276,44 +387,60 @@ export default function CalendarDrafts() {
         <EmptyState
           illustration={EmptyDraftsIllustration}
           title="No drafts in this view"
-          description="Create your first post concept in Content Studio or change your platform filter."
-          actionText="Create idea in Studio"
-          onAction={() => navigate('/studio')}
+          description="Create your first post concept right here or explore topics in Content Studio."
+          actionText="Create new draft"
+          onAction={() => setIsCreating(true)}
         />
       ) : viewMode === 'board' ? (
-        /* Kanban Board View */
+        /* Interactive Drag-and-Drop Kanban Board View */
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
           {STATUS_COLUMNS.map((col) => {
             const colDrafts = drafts.filter((d) => d.status === col.id);
+            const isHovered = dragOverCol === col.id;
 
             return (
               <div
                 key={col.id}
-                className="rounded-2xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] p-4 flex flex-col space-y-3 min-h-[420px]"
+                onDragOver={(e) => handleDragOver(e, col.id)}
+                onDragLeave={() => handleDragLeave(col.id)}
+                onDrop={(e) => handleDrop(e, col.id)}
+                className={`rounded-2xl border p-4 flex flex-col space-y-3 min-h-[440px] transition-all duration-200 ${
+                  isHovered
+                    ? 'bg-indigo-50/70 dark:bg-indigo-950/30 border-indigo-400 shadow-md ring-2 ring-indigo-300/40'
+                    : 'bg-white dark:bg-[#171D2B] border-[#E8E6DF] dark:border-[#232B3E]'
+                }`}
               >
-                <div className="flex items-center justify-between pb-2 border-b border-[#E8E6DF] dark:border-[#232B3E]">
-                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${col.color}`}>
-                    {col.label}
+                {/* Column Header */}
+                <div className="flex items-center justify-between pb-2.5 border-b border-[#E8E6DF] dark:border-[#232B3E]">
+                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border flex items-center space-x-1.5 ${col.color}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${col.dot}`} />
+                    <span>{col.label}</span>
                   </span>
                   <span className="text-xs font-mono text-slate-400 font-bold">
                     {colDrafts.length}
                   </span>
                 </div>
 
-                <div className="space-y-3 flex-1 overflow-y-auto max-h-[600px] pr-1">
+                {/* Cards Container */}
+                <div className="space-y-3 flex-1 overflow-y-auto max-h-[640px] pr-1">
                   {colDrafts.length === 0 ? (
-                    <div className="py-8 text-center text-xs text-slate-400 italic">
-                      Empty stage
+                    <div className="py-12 text-center text-xs text-slate-400 italic border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                      Drop cards here
                     </div>
                   ) : (
                     colDrafts.map((d) => (
                       <div
                         key={d.draft_id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, d.draft_id)}
                         onClick={() => handleOpenEdit(d)}
-                        className="p-3.5 rounded-xl bg-[#FAF9F6] dark:bg-[#131825] border border-[#E8E6DF] dark:border-[#232B3E] hover:border-[#5B5BD6] transition cursor-pointer space-y-2 group shadow-xs"
+                        className="p-3.5 rounded-xl bg-[#FAF9F6] dark:bg-[#131825] border border-[#E8E6DF] dark:border-[#232B3E] hover:border-[#5B5BD6] transition cursor-grab active:cursor-grabbing space-y-2 group shadow-2xs hover:shadow-xs relative"
                       >
                         <div className="flex items-center justify-between">
-                          <PlatformBadge platform={d.platform} size="sm" />
+                          <div className="flex items-center space-x-1.5">
+                            <GripVertical className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500" />
+                            <PlatformBadge platform={d.platform} size="sm" />
+                          </div>
                           <button
                             onClick={(e) => handleDelete(d.draft_id, e)}
                             className="text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition p-1"
@@ -322,14 +449,17 @@ export default function CalendarDrafts() {
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
+
                         <h4 className="text-xs font-bold text-[#1F2430] dark:text-white line-clamp-2">
                           {d.title}
                         </h4>
+
                         {d.hook && (
                           <p className="text-[11px] text-[#5B6475] dark:text-[#94A3B8] italic line-clamp-2">
                             "{d.hook}"
                           </p>
                         )}
+
                         {d.scheduled_date && (
                           <div className="text-[10px] text-blue-600 dark:text-blue-400 font-medium flex items-center space-x-1">
                             <Clock className="w-3 h-3" />
@@ -382,11 +512,18 @@ export default function CalendarDrafts() {
           {/* Days Grid */}
           <div className="grid grid-cols-7 gap-2">
             {Array.from({ length: firstDayIndex }).map((_, i) => (
-              <div key={`empty-${i}`} className="min-h-[90px] p-2 rounded-xl bg-slate-50/40 dark:bg-[#121724]/40 border border-transparent" />
+              <div
+                key={`empty-${i}`}
+                className="min-h-[90px] p-2 rounded-xl bg-slate-50/40 dark:bg-[#121724]/40 border border-transparent"
+              />
             ))}
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const dayNum = i + 1;
-              const dayDrafts = drafts.filter((d, dIdx) => (dIdx % daysInMonth) + 1 === dayNum);
+              const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+              // Match drafts scheduled on this date or distributed across month
+              const dayDrafts = drafts.filter(
+                (d, dIdx) => d.scheduled_date === dateStr || (!d.scheduled_date && (dIdx % daysInMonth) + 1 === dayNum)
+              );
 
               return (
                 <div
@@ -401,14 +538,15 @@ export default function CalendarDrafts() {
                       <div
                         key={dd.draft_id}
                         onClick={() => handleOpenEdit(dd)}
-                        className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand-50 dark:bg-brand-950/60 text-[#5B5BD6] dark:text-brand-300 truncate cursor-pointer hover:underline"
+                        className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand-50 dark:bg-brand-950/60 text-[#5B5BD6] dark:text-brand-300 truncate cursor-pointer hover:underline flex items-center space-x-1"
                         title={dd.title}
                       >
-                        {dd.title}
+                        <PlatformBadge platform={dd.platform} size="sm" />
+                        <span className="truncate">{dd.title}</span>
                       </div>
                     ))}
                     {dayDrafts.length > 2 && (
-                      <span className="text-[9px] text-slate-400 pl-1">
+                      <span className="text-[9px] text-slate-400 pl-1 font-mono">
                         +{dayDrafts.length - 2} more
                       </span>
                     )}
@@ -446,8 +584,14 @@ export default function CalendarDrafts() {
                       {d.title}
                     </td>
                     <td className="py-3 px-3">
-                      <span className="capitalize px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 dark:bg-slate-800">
-                        {d.status}
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 dark:bg-slate-800">
+                        {d.status === 'posted'
+                          ? 'Marked as posted'
+                          : d.status === 'planned'
+                          ? 'Planned'
+                          : d.status === 'writing'
+                          ? 'Writing'
+                          : 'Idea'}
                       </span>
                     </td>
                     <td className="py-3 px-3 text-slate-400">
@@ -496,7 +640,7 @@ export default function CalendarDrafts() {
               <select
                 value={editStatus}
                 onChange={(e) => setEditStatus(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] text-xs text-[#1F2430] dark:text-white capitalize"
+                className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] text-xs text-[#1F2430] dark:text-white"
               >
                 {STATUS_COLUMNS.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -520,7 +664,7 @@ export default function CalendarDrafts() {
 
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-[#5B6475] dark:text-[#94A3B8] mb-1.5">
-                Hook or Opening Line
+                Hook or Premise
               </label>
               <textarea
                 rows={4}
@@ -539,16 +683,104 @@ export default function CalendarDrafts() {
               >
                 Delete Draft
               </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleSaveEdit}
-              >
+              <Button variant="primary" size="sm" onClick={handleSaveEdit}>
                 Save Changes
               </Button>
             </div>
           </div>
         )}
+      </SlideOver>
+
+      {/* Slide-over quick create draft */}
+      <SlideOver
+        open={isCreating}
+        onClose={() => setIsCreating(false)}
+        title="Create New Post Draft"
+      >
+        <form onSubmit={handleCreateDraft} className="space-y-5">
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#5B6475] dark:text-[#94A3B8] mb-1.5">
+              Target Platform
+            </label>
+            <div className="grid grid-cols-4 gap-2">
+              {['youtube', 'instagram', 'twitter', 'linkedin'].map((p) => (
+                <button
+                  type="button"
+                  key={p}
+                  onClick={() => setNewPlatform(p)}
+                  className={`py-2 px-2 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1 border ${
+                    newPlatform === p
+                      ? 'bg-white dark:bg-[#1E2638] text-[#5B5BD6] border-[#5B5BD6] shadow-xs'
+                      : 'bg-[#FAF9F6] dark:bg-[#131825] border-[#E8E6DF] dark:border-[#232B3E] text-[#5B6475]'
+                  }`}
+                >
+                  <PlatformBadge platform={p} size="sm" showName />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#5B6475] dark:text-[#94A3B8] mb-1.5">
+              Draft Title
+            </label>
+            <input
+              type="text"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              placeholder="e.g. 5 Architecture Patterns for Scaling in 2026"
+              className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] text-xs text-[#1F2430] dark:text-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#5B6475] dark:text-[#94A3B8] mb-1.5">
+              Initial Stage
+            </label>
+            <select
+              value={newStatus}
+              onChange={(e) => setNewStatus(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] text-xs text-[#1F2430] dark:text-white"
+            >
+              {STATUS_COLUMNS.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#5B6475] dark:text-[#94A3B8] mb-1.5">
+              Scheduled Date (Optional)
+            </label>
+            <input
+              type="date"
+              value={newDate}
+              onChange={(e) => setNewDate(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] text-xs text-[#1F2430] dark:text-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#5B6475] dark:text-[#94A3B8] mb-1.5">
+              Opening Hook / Premise
+            </label>
+            <textarea
+              rows={3}
+              value={newHook}
+              onChange={(e) => setNewHook(e.target.value)}
+              placeholder="The counter-intuitive secret most developers miss..."
+              className="w-full p-3 rounded-xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] text-xs text-[#1F2430] dark:text-white"
+            />
+          </div>
+
+          <div className="pt-2">
+            <Button type="submit" variant="primary" size="lg" className="w-full" icon={Plus}>
+              Save to Planner
+            </Button>
+          </div>
+        </form>
       </SlideOver>
     </div>
   );

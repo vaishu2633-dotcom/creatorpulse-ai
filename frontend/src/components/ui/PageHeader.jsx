@@ -37,6 +37,7 @@ export default function PageHeader({
   illustration,
   illustrationAlt = 'Page illustration',
   children,
+  actions,
   howItWorksSteps = [],
   howItWorksDefaultOpen = false,
   className = '',
@@ -79,8 +80,8 @@ export default function PageHeader({
             </p>
           )}
 
-          {/* Optional Inline Children (Buttons, Tabs, Filters) */}
-          {children && <div className="pt-1">{children}</div>}
+          {/* Optional Inline Actions / Children (Buttons, Tabs, Filters) */}
+          {(actions || children) && <div className="pt-1 flex items-center space-x-2">{actions || children}</div>}
         </div>
 
         {/* Right Side: Header Illustration Banner */}
