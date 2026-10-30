@@ -116,6 +116,17 @@ export const getPredictionHistory = (platform = 'all', limit = 50) =>
 export const getAccuracyScoreboard = (platform = 'all') =>
   request(`/api/prediction/scoreboard?platform=${platform}`);
 
+export const recordPredictionOutcome = (predictionId, payload) =>
+  request(`/api/prediction/actual/${predictionId}`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const syncYouTubePredictionOutcomes = () =>
+  request('/api/prediction/sync-youtube-outcomes', {
+    method: 'POST',
+  });
+
 // ----------------- Content Studio -----------------
 export const generateContent = (payload) =>
   request('/api/content/generate', {

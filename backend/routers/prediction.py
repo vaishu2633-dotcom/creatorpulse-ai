@@ -84,3 +84,32 @@ def get_prediction_history(platform: Optional[str] = Query("all"), limit: int = 
 @router.get("/scoreboard")
 def get_accuracy_scoreboard(platform: Optional[str] = Query("all")):
     return data_access.get_accuracy_scoreboard(platform=platform)
+
+class RecordOutcomeRequest(BaseModel):
+    actual_outcome: bool
+    actual_views: Optional[int] = None
+    actual_engagement_rate: Optional[float] = None
+
+@router.post("/actual/{prediction_id}")
+def record_prediction_outcome(prediction_id: str, req: RecordOutcomeRequest):
+    """Records the real published outcome for a prediction."""
+    updated = data_access.update_prediction_actual(
+        prediction_id=prediction_id,
+        actual_outcome=req.actual_outcome,
+        actual_views=req.actual_views,
+        actual_engagement_rate=req.actual_engagement_rate
+    )
+    if not updated:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Prediction ID not found")
+    return {
+        "status": "success",
+        "message": "Actual outcome recorded successfully",
+        "prediction": updated,
+        "scoreboard": data_access.get_accuracy_scoreboard()
+    }
+
+@router.post("/sync-youtube-outcomes")
+def sync_youtube_outcomes():
+    """Automatically matches recent YouTube predictions with published videos to update outcomes."""
+    return data_access.sync_youtube_prediction_outcomes()

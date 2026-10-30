@@ -431,6 +431,54 @@ def save_prediction(prediction_data: Dict[str, Any]) -> Dict[str, Any]:
     _save_json("predictions.json", predictions)
     return prediction_data
 
+def update_prediction_actual(
+    prediction_id: str,
+    actual_outcome: bool,
+    actual_views: Optional[int] = None,
+    actual_engagement_rate: Optional[float] = None
+) -> Optional[Dict[str, Any]]:
+    """Records real published post outcome for a prediction to close the learning loop."""
+    predictions = _load_json("predictions.json")
+    for p in predictions:
+        if p.get("prediction_id") == prediction_id:
+            p["actual_outcome"] = bool(actual_outcome)
+            if actual_views is not None:
+                p["actual_views"] = int(actual_views)
+            if actual_engagement_rate is not None:
+                p["actual_engagement_rate"] = float(actual_engagement_rate)
+            p["evaluated_at"] = datetime.now(timezone.utc).isoformat()
+            _save_json("predictions.json", predictions)
+            return p
+    return None
+
+def sync_youtube_prediction_outcomes() -> Dict[str, Any]:
+    """Matches recent predictions against published YouTube videos to record real performance."""
+    predictions = _load_json("predictions.json")
+    youtube_posts = get_posts(platform="youtube", limit=200)
+    
+    updated_count = 0
+    for pred in predictions:
+        if pred.get("actual_outcome") is None and pred.get("platform") == "youtube":
+            pred_title = pred.get("title", "").lower().strip()
+            # Match by title similarity or exact title
+            for vid in youtube_posts:
+                vid_title = (vid.get("title") or vid.get("caption") or "").lower().strip()
+                if pred_title and (pred_title in vid_title or vid_title in pred_title):
+                    pred["actual_outcome"] = bool(vid.get("is_breakout", False))
+                    pred["actual_views"] = int(vid.get("views", 0))
+                    pred["actual_engagement_rate"] = float(vid.get("engagement_rate", 0))
+                    pred["evaluated_at"] = datetime.now(timezone.utc).isoformat()
+                    updated_count += 1
+                    break
+                    
+    if updated_count > 0:
+        _save_json("predictions.json", predictions)
+        
+    return {
+        "updated_count": updated_count,
+        "message": f"Successfully matched and updated {updated_count} prediction outcomes from published YouTube posts."
+    }
+
 def get_accuracy_scoreboard(platform: Optional[str] = None) -> Dict[str, Any]:
     preds = get_predictions(platform=platform, limit=200)
     evaluated = [p for p in preds if p.get("actual_outcome") is not None]

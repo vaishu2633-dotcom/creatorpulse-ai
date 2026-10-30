@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { usePlatform } from '../context/PlatformContext';
-import { getAccuracyScoreboard } from '../api/apiClient';
+import { useToast } from '../context/ToastContext';
+import {
+  getAccuracyScoreboard,
+  recordPredictionOutcome,
+  syncYouTubePredictionOutcomes
+} from '../api/apiClient';
 import PageHeader from '../components/ui/PageHeader';
 import HowItWorks from '../components/ui/HowItWorks';
 import StatusChip from '../components/ui/StatusChip';
@@ -25,8 +30,10 @@ import {
   CheckCircle2,
   AlertTriangle,
   ChevronRight,
-  ExternalLink,
-  ThumbsUp
+  RefreshCw,
+  Save,
+  Check,
+  Zap
 } from 'lucide-react';
 import {
   BarChart,
@@ -55,14 +62,22 @@ const HOW_IT_WORKS_STEPS = [
 ];
 
 export default function PredictionHistory() {
-  const { selectedPlatform, lastRefreshed } = usePlatform();
+  const { selectedPlatform, lastRefreshed, activeDataSource } = usePlatform();
+  const { addToast } = useToast();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [scoreboard, setScoreboard] = useState(null);
 
-  // Slide-over inspection
+  // Slide-over inspection & manual outcome recording state
   const [activeItem, setActiveItem] = useState(null);
+  const [outcomeForm, setOutcomeForm] = useState({
+    actualOutcome: true,
+    actualViews: '',
+    actualER: ''
+  });
+  const [savingOutcome, setSavingOutcome] = useState(false);
+  const [syncingYt, setSyncingYt] = useState(false);
 
   const fetchData = () => {
     setLoading(true);
@@ -81,6 +96,53 @@ export default function PredictionHistory() {
   useEffect(() => {
     fetchData();
   }, [selectedPlatform, lastRefreshed]);
+
+  const handleSelectPrediction = (item) => {
+    setActiveItem(item);
+    setOutcomeForm({
+      actualOutcome: item.actual_outcome !== null ? Boolean(item.actual_outcome) : true,
+      actualViews: item.actual_views ? String(item.actual_views) : '',
+      actualER: item.actual_engagement_rate ? String((item.actual_engagement_rate * 100).toFixed(2)) : ''
+    });
+  };
+
+  const handleSaveOutcome = async (e) => {
+    e.preventDefault();
+    if (!activeItem) return;
+
+    setSavingOutcome(true);
+    try {
+      const viewsNum = outcomeForm.actualViews ? parseInt(outcomeForm.actualViews, 10) : null;
+      const erNum = outcomeForm.actualER ? parseFloat(outcomeForm.actualER) / 100 : null;
+
+      const res = await recordPredictionOutcome(activeItem.prediction_id, {
+        actual_outcome: outcomeForm.actualOutcome,
+        actual_views: viewsNum,
+        actual_engagement_rate: erNum
+      });
+
+      addToast('Real outcome recorded! Scoreboard recalculated.', 'success');
+      setActiveItem(res.prediction);
+      setScoreboard(res.scoreboard);
+    } catch (err) {
+      addToast(err.message || 'Failed to record outcome', 'error');
+    } finally {
+      setSavingOutcome(false);
+    }
+  };
+
+  const handleSyncYouTube = async () => {
+    setSyncingYt(true);
+    try {
+      const res = await syncYouTubePredictionOutcomes();
+      addToast(res.message, res.updated_count > 0 ? 'success' : 'info');
+      fetchData();
+    } catch (err) {
+      addToast(err.message || 'YouTube sync failed', 'error');
+    } finally {
+      setSyncingYt(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -112,7 +174,6 @@ export default function PredictionHistory() {
   const sampleSize = scoreboard?.sample_size || scoreboard?.evaluated_count || 0;
   const isLowSample = scoreboard?.low_sample_warning || sampleSize < 30;
 
-  // Format evaluation chip style
   const evalLabel = scoreboard?.brier_evaluation_label || 'Evaluating';
   const getBrierChipStyle = () => {
     if (evalLabel.includes('Better')) {
@@ -127,14 +188,27 @@ export default function PredictionHistory() {
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-16">
       {/* Page Header */}
-      <PageHeader
-        title="Prediction Results"
-        subtitle="Tracking our post predictions against actual performance after publication"
-        tag="Tracker"
-        status="Uses sample data"
-        icon={Target}
-        illustration={TrackerIllustration}
-      />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <PageHeader
+          title="Prediction Results"
+          subtitle="Tracking our post predictions against actual performance after publication"
+          tag="Tracker"
+          status="Working now"
+          icon={Target}
+          illustration={TrackerIllustration}
+        />
+        <div className="shrink-0 flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSyncYouTube}
+            loading={syncingYt}
+            icon={RefreshCw}
+          >
+            Sync YouTube Outcomes
+          </Button>
+        </div>
+      </div>
 
       {/* How it Works Strip */}
       <HowItWorks steps={HOW_IT_WORKS_STEPS} />
@@ -149,13 +223,13 @@ export default function PredictionHistory() {
             </span>
             <p className="leading-relaxed">
               Accuracy and Brier calibration scores stabilize as more published post outcomes are logged.
-              Evaluations become statistically robust at N ≥ 30 evaluated posts.
+              Evaluations become statistically robust at N &ge; 30 evaluated posts.
             </p>
           </div>
         </div>
       )}
 
-      {/* Summary KPI Cards with Math Sound Labels */}
+      {/* Summary KPI Cards with Sample Size next to every number */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Forecasts */}
         <Card className="p-5" hoverEffect>
@@ -171,7 +245,7 @@ export default function PredictionHistory() {
             {scoreboard?.total_predictions || 0}
           </div>
           <div className="text-xs text-[#5B6475] dark:text-[#94A3B8] mt-1">
-            {scoreboard?.evaluated_count} evaluated • {scoreboard?.pending_count} pending
+            {scoreboard?.evaluated_count} evaluated &bull; {scoreboard?.pending_count} pending
           </div>
         </Card>
 
@@ -242,60 +316,67 @@ export default function PredictionHistory() {
         </Card>
       </div>
 
-      {/* Easy Calibration Chart: "How accurate were we?" */}
+      {/* Calibration Chart: "How accurate were we?" */}
       <Card className="p-6 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h2 className="text-base font-bold text-[#1F2430] dark:text-white flex items-center space-x-2">
               <BarChart2 className="w-4 h-4 text-[#5B5BD6]" />
-              <span>How accurate were we? (Predicted vs Actual Outcomes)</span>
-              <Tooltip text="Comparing our predicted probability tiers with the actual percentage of posts that became hits." showIcon />
+              <span>How accurate were our predictions? (Calibration Audit)</span>
             </h2>
             <p className="text-xs text-[#5B6475] dark:text-[#94A3B8] mt-0.5">
-              A well-calibrated tool ensures a predicted 30% hit chance matches ~30% in real life. Sample size: N = {sampleSize}.
+              Comparing estimated hit probabilities with actual breakout rates across {sampleSize} published posts
             </p>
+          </div>
+          <div className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+            Sample: N = {sampleSize}
           </div>
         </div>
 
-        <div className="h-64 sm:h-72 w-full pt-2">
+        <div className="h-64 w-full pt-4">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={calibrationData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} opacity={0.6} />
-              <XAxis dataKey="bin" stroke="#94A3B8" tick={{ fontSize: 11 }} />
-              <YAxis stroke="#94A3B8" tick={{ fontSize: 11 }} unit="%" />
+            <BarChart data={calibrationData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" opacity={0.6} />
+              <XAxis dataKey="bin" tick={{ fontSize: 11 }} stroke="#94A3B8" />
+              <YAxis unit="%" tick={{ fontSize: 11 }} stroke="#94A3B8" domain={[0, 100]} />
               <RechartsTooltip
+                formatter={(val) => [`${val}%`, '']}
                 contentStyle={{
-                  backgroundColor: '#FFFFFF',
-                  borderColor: '#E8E6DF',
-                  borderRadius: '0.75rem',
-                  fontSize: '12px',
+                  backgroundColor: '#1E293B',
+                  borderRadius: '8px',
+                  border: 'none',
+                  color: '#F8FAFC',
+                  fontSize: '11px',
                 }}
               />
-              <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-              <Bar dataKey="mean_predicted_prob" name="Our Prediction %" fill="#5B5BD6" radius={[6, 6, 0, 0]} />
-              <Bar dataKey="actual_breakout_rate" name="Actual Hit Rate %" fill="#14B8A6" radius={[6, 6, 0, 0]} />
+              <Legend wrapperStyle={{ fontSize: '11px' }} />
+              <Bar dataKey="mean_predicted_prob" name="Predicted Hit Chance" fill="#818CF8" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="actual_breakout_rate" name="Actual Breakout Rate" fill="#10B981" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </Card>
 
-      {/* Predictions Table (Clickable for Slide-Over) */}
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
+      {/* Predictions Timeline Table */}
+      <Card className="overflow-hidden">
+        <div className="p-5 border-b border-[#EFECE6] dark:border-[#232B3E] flex items-center justify-between">
           <div>
-            <h2 className="text-base font-bold text-[#1F2430] dark:text-white">
-              All Past Predictions ({scoreboard?.recent_history?.length || 0})
-            </h2>
-            <div className="text-xs text-[#5B6475] dark:text-[#94A3B8]">
-              Click any row to open slide-over inspection with prediction factors
-            </div>
+            <h3 className="text-sm font-bold text-[#1F2430] dark:text-white">
+              Prediction Log & Audit
+            </h3>
+            <p className="text-xs text-[#5B6475] dark:text-[#94A3B8] mt-0.5">
+              Click any row to inspect model factors or record real published outcomes
+            </p>
           </div>
+          <span className="text-xs font-semibold text-slate-400">
+            Showing latest {scoreboard?.recent_history?.length || 0}
+          </span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-[#EFECE6] dark:border-[#232B3E] text-[#858D9D] dark:text-[#64748B] uppercase tracking-wider text-[10px]">
+              <tr className="bg-[#FAF9F6] dark:bg-[#131825] border-b border-[#EFECE6] dark:border-[#232B3E] text-[#5B6475] dark:text-[#94A3B8] font-bold uppercase tracking-wider text-[10px]">
                 <th className="py-3 px-3">Date</th>
                 <th className="py-3 px-3">Platform</th>
                 <th className="py-3 px-3">Post Title</th>
@@ -310,12 +391,12 @@ export default function PredictionHistory() {
                 const isEvaluated = item.actual_outcome !== null && item.actual_outcome !== undefined;
                 const isHit = Boolean(item.actual_outcome);
                 const probPct = Math.round((item.predicted_prob || 0) * 100);
-                const basePct = Math.round((item.creator_base_rate || 0.05) * 100);
+                const basePct = Math.round((item.base_rate || item.creator_base_rate || 0.05) * 100);
 
                 return (
                   <tr
                     key={item.prediction_id}
-                    onClick={() => setActiveItem(item)}
+                    onClick={() => handleSelectPrediction(item)}
                     className="hover:bg-slate-50 dark:hover:bg-[#1A2333] transition cursor-pointer group"
                   >
                     <td className="py-3.5 px-3 text-[#5B6475] dark:text-[#94A3B8] whitespace-nowrap font-mono text-[11px]">
@@ -324,7 +405,7 @@ export default function PredictionHistory() {
                     <td className="py-3.5 px-3 whitespace-nowrap">
                       <PlatformBadge platform={item.platform} size="sm" showName />
                     </td>
-                    <td className="py-3.5 px-3 font-semibold text-[#1F2430] dark:text-white max-w-xs truncate">
+                    <td className="py-3.5 px-3 font-semibold text-[#1F2430] dark:text-white max-w-xs truncate group-hover:text-violet-600 transition">
                       {item.title}
                     </td>
                     <td className="py-3.5 px-3 text-right font-mono font-bold text-[#5B5BD6] dark:text-brand-300">
@@ -354,7 +435,7 @@ export default function PredictionHistory() {
                       )}
                     </td>
                     <td className="py-3.5 px-3 text-right font-mono text-[#5B6475] dark:text-[#94A3B8]">
-                      {item.actual_views ? item.actual_views.toLocaleString() : '—'}
+                      {item.actual_views ? Number(item.actual_views).toLocaleString() : '—'}
                     </td>
                   </tr>
                 );
@@ -364,14 +445,15 @@ export default function PredictionHistory() {
         </div>
       </Card>
 
-      {/* Slide-Over Inspection Panel */}
+      {/* Slide-Over Inspection & Recording Panel */}
       <SlideOver
-        open={Boolean(activeItem)}
+        isOpen={Boolean(activeItem)}
         onClose={() => setActiveItem(null)}
-        title="Prediction Audit"
+        title="Prediction Audit & Learning Loop"
+        subtitle="Review forecasted probabilities and record real published performance"
       >
         {activeItem && (
-          <div className="space-y-6">
+          <div className="space-y-6 p-2">
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#141A28] border border-[#E8E6DF] dark:border-[#232B3E] space-y-2">
               <div className="flex items-center space-x-2">
                 <PlatformBadge platform={activeItem.platform} size="sm" showName />
@@ -400,7 +482,7 @@ export default function PredictionHistory() {
                 </div>
                 <div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-800">
                   <div className="text-2xl font-extrabold text-[#1F2430] dark:text-white font-mono">
-                    {Math.round((activeItem.creator_base_rate || 0.05) * 100)}%
+                    {Math.round((activeItem.base_rate || activeItem.creator_base_rate || 0.05) * 100)}%
                   </div>
                   <div className="text-[11px] text-[#5B6475] dark:text-[#94A3B8]">
                     Usual Channel Rate
@@ -409,30 +491,95 @@ export default function PredictionHistory() {
               </div>
             </div>
 
-            {/* Actual Result */}
-            <div className="p-4 rounded-xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] space-y-2">
-              <div className="text-xs font-bold text-[#5B6475] dark:text-[#94A3B8] uppercase tracking-wider">
-                Actual Published Outcome
-              </div>
-              <div className="flex items-center justify-between text-xs pt-1">
-                <span className="text-[#5B6475] dark:text-[#94A3B8]">Status:</span>
-                <span className="font-bold">
-                  {activeItem.actual_outcome === true
-                    ? 'Breakout Hit (Exceeded target threshold)'
-                    : activeItem.actual_outcome === false
-                    ? 'Standard Post (Within expected range)'
-                    : 'Pending evaluation window'}
-                </span>
-              </div>
-              {activeItem.actual_views && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-[#5B6475] dark:text-[#94A3B8]">Recorded Views:</span>
-                  <span className="font-mono font-bold">{activeItem.actual_views.toLocaleString()}</span>
+            {/* Manual Learning Loop Form: Record Real Outcome */}
+            <form onSubmit={handleSaveOutcome} className="p-4 rounded-xl bg-white dark:bg-[#171D2B] border border-violet-200 dark:border-violet-800/60 space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                <div className="text-xs font-bold text-violet-900 dark:text-violet-200 uppercase tracking-wider flex items-center space-x-1.5">
+                  <CheckCircle className="w-3.5 h-3.5 text-violet-600" />
+                  <span>Record Real Outcome</span>
                 </div>
-              )}
-            </div>
+                <span className="text-[10px] text-slate-400">Closes learning loop</span>
+              </div>
 
-            {/* Top factors */}
+              {/* Outcome Toggle */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1.5">
+                  Did this post break out as a Hit?
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setOutcomeForm({ ...outcomeForm, actualOutcome: true })}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition cursor-pointer border ${
+                      outcomeForm.actualOutcome
+                        ? 'bg-emerald-500 text-white border-emerald-600 shadow-xs'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-transparent'
+                    }`}
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Breakout Hit</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setOutcomeForm({ ...outcomeForm, actualOutcome: false })}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition cursor-pointer border ${
+                      !outcomeForm.actualOutcome
+                        ? 'bg-slate-700 text-white border-slate-800 shadow-xs'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-transparent'
+                    }`}
+                  >
+                    <XCircle className="w-3.5 h-3.5" />
+                    <span>Standard / Normal</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Numbers */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                    Actual Views
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="e.g. 45000"
+                    value={outcomeForm.actualViews}
+                    onChange={(e) => setOutcomeForm({ ...outcomeForm, actualViews: e.target.value })}
+                    className="w-full bg-[#FAF9F6] dark:bg-[#111622] border border-[#E8E6DF] dark:border-[#232B3E] rounded-xl px-3 py-1.5 text-xs text-[#1F2430] dark:text-white focus:outline-none focus:border-violet-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                    Actual ER (%)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="e.g. 6.5"
+                    value={outcomeForm.actualER}
+                    onChange={(e) => setOutcomeForm({ ...outcomeForm, actualER: e.target.value })}
+                    className="w-full bg-[#FAF9F6] dark:bg-[#111622] border border-[#E8E6DF] dark:border-[#232B3E] rounded-xl px-3 py-1.5 text-xs text-[#1F2430] dark:text-white focus:outline-none focus:border-violet-600"
+                  />
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                loading={savingOutcome}
+                className="w-full"
+                icon={Save}
+              >
+                Save Real Outcome
+              </Button>
+            </form>
+
+            {/* Model Factors */}
             {activeItem.top_reasons && activeItem.top_reasons.length > 0 && (
               <div className="space-y-2">
                 <div className="text-xs font-bold text-[#5B6475] dark:text-[#94A3B8] uppercase tracking-wider">
