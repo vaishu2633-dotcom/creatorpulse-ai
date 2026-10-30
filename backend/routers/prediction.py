@@ -2,7 +2,9 @@
 CreatorPulse AI - ViralScope Prediction Router
 ------------------------------------------------
 Accepts post attributes and returns calibrated breakout probability,
-base rate, low/high range, confidence rating, explanations, and similar posts.
+base rate, low/high range, predicted ER range, confidence rating,
+explanations (positive and negative factors), and similar posts.
+Supports dynamic retraining on active creator dataset with time-based split.
 """
 
 from fastapi import APIRouter, Query
@@ -22,6 +24,7 @@ class PredictRequest(BaseModel):
     post_weekday: int = Field(2, ge=0, le=6)
     strictness: str = Field("top_10%", example="top_10%")
     creator_id: Optional[str] = None
+    save_history: Optional[bool] = True
 
 @router.post("/predict")
 def predict_post(req: PredictRequest):
@@ -34,9 +37,40 @@ def predict_post(req: PredictRequest):
         post_hour=req.post_hour,
         post_weekday=req.post_weekday,
         strictness=req.strictness,
-        creator_id=req.creator_id
+        creator_id=req.creator_id,
+        save_history=req.save_history if req.save_history is not None else True
     )
     return result
+
+@router.post("/what-if")
+def what_if_predict(req: PredictRequest):
+    """Instant live What-If scoring that does not persist to prediction history."""
+    result = prediction.predict_breakout(
+        platform=req.platform,
+        post_type=req.post_type,
+        title=req.title,
+        hashtag_count=req.hashtag_count,
+        duration_sec=req.duration_sec,
+        post_hour=req.post_hour,
+        post_weekday=req.post_weekday,
+        strictness=req.strictness,
+        creator_id=req.creator_id,
+        save_history=False
+    )
+    return result
+
+@router.post("/retrain")
+def retrain_model():
+    """
+    Retrains a calibrated model on the currently active data source.
+    Returns honest baseline fallback if active dataset < 50 posts.
+    """
+    return prediction.retrain_model_on_active_data()
+
+@router.get("/model-info")
+def get_model_info():
+    """Returns active model metadata, accuracy/brier metrics, and training provenance."""
+    return prediction.get_active_model_info()
 
 @router.get("/history")
 def get_prediction_history(platform: Optional[str] = Query("all"), limit: int = Query(50)):

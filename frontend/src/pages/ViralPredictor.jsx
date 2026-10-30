@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { usePlatform } from '../context/PlatformContext';
 import { useToast } from '../context/ToastContext';
-import { predictPost } from '../api/apiClient';
+import { predictPost, predictWhatIf, retrainModel, getModelInfo } from '../api/apiClient';
 import PageHeader from '../components/ui/PageHeader';
 import HowItWorks from '../components/ui/HowItWorks';
 import StatusChip from '../components/ui/StatusChip';
@@ -27,7 +27,10 @@ import {
   Target,
   RefreshCw,
   Lightbulb,
-  Check
+  Check,
+  Cpu,
+  Database,
+  AlertTriangle
 } from 'lucide-react';
 
 const HOW_IT_WORKS_STEPS = [
@@ -108,9 +111,25 @@ export default function ViralPredictor() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
 
+  // Model provenance & retraining state
+  const [modelInfo, setModelInfo] = useState(null);
+  const [retraining, setRetraining] = useState(false);
+  const [retrainNotice, setRetrainNotice] = useState(null);
+
   // Live "What-If" preview state
-  const [whatIfProb, setWhatIfProb] = useState(null);
+  const [whatIfResult, setWhatIfResult] = useState(null);
   const debounceTimer = useRef(null);
+
+  // Load active model info on mount
+  useEffect(() => {
+    let mounted = true;
+    getModelInfo()
+      .then((info) => {
+        if (mounted) setModelInfo(info);
+      })
+      .catch((err) => console.error('Failed to load model info:', err));
+    return () => { mounted = false; };
+  }, []);
 
   const handlePlatformChange = (p) => {
     setPlatform(p);
@@ -120,6 +139,40 @@ export default function ViralPredictor() {
       if (p === 'instagram') setDurationSec(30);
       else if (p === 'youtube') setDurationSec(600);
       else setDurationSec(0);
+    }
+  };
+
+  const handleRetrain = async () => {
+    setRetraining(true);
+    setRetrainNotice(null);
+    try {
+      const res = await retrainModel();
+      if (res.status === 'insufficient_data') {
+        setRetrainNotice({
+          type: 'warning',
+          message: res.message,
+          count: res.posts_count,
+          min: res.min_required
+        });
+        addToast(res.message, 'warning');
+      } else if (res.status === 'success') {
+        setRetrainNotice({
+          type: 'success',
+          message: res.message,
+          brier: res.metrics?.brier_score,
+          pr_auc: res.metrics?.pr_auc
+        });
+        addToast(`Model retrained on ${res.posts_count} posts (Brier: ${res.metrics?.brier_score})`, 'success');
+        // Refresh model info
+        const updated = await getModelInfo();
+        setModelInfo(updated);
+      } else {
+        addToast(res.message || 'Model training completed', 'info');
+      }
+    } catch (err) {
+      addToast(err.message || 'Failed to retrain model', 'error');
+    } finally {
+      setRetraining(false);
     }
   };
 
@@ -140,9 +193,10 @@ export default function ViralPredictor() {
         post_hour: Number(postHour),
         post_weekday: Number(postWeekday),
         strictness,
+        save_history: true
       });
       setResult(res);
-      setWhatIfProb(res.predicted_prob_percent);
+      setWhatIfResult(res);
       setActiveStep(3); // advance wizard to results
       addToast('Prediction estimated and saved to results!', 'success');
     } catch (err) {
@@ -153,14 +207,14 @@ export default function ViralPredictor() {
     }
   };
 
-  // Live Debounced What-If Estimator
+  // Live Debounced What-If Estimator (does not save to history)
   useEffect(() => {
     if (!title.trim()) return;
     clearTimeout(debounceTimer.current);
 
     debounceTimer.current = setTimeout(async () => {
       try {
-        const res = await predictPost({
+        const res = await predictWhatIf({
           platform,
           post_type: postType,
           title,
@@ -169,15 +223,26 @@ export default function ViralPredictor() {
           post_hour: Number(postHour),
           post_weekday: Number(postWeekday),
           strictness,
+          save_history: false
         });
-        setWhatIfProb(res.predicted_prob_percent);
+        setWhatIfResult(res);
       } catch {
         // silent fallback for what-if
       }
-    }, 450);
+    }, 300);
 
     return () => clearTimeout(debounceTimer.current);
-  }, [platform, postType, hashtagCount, durationSec, postHour, postWeekday, strictness]);
+  }, [platform, postType, title, hashtagCount, durationSec, postHour, postWeekday, strictness]);
+
+  const toggleCuriosityHook = () => {
+    if (title.startsWith('Why ') || title.includes('?')) {
+      // Remove question
+      setTitle(title.replace(/^Why\s+/i, '').replace(/\s*\(And How to Fix It\)/i, '').replace(/\?+$/, ''));
+    } else {
+      // Add curiosity hook
+      setTitle(`Why ${title.charAt(0).toLowerCase() + title.slice(1)}?`);
+    }
+  };
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-16">
@@ -186,13 +251,84 @@ export default function ViralPredictor() {
         title="Post Predictor"
         subtitle="Write your post, pick your timing, and see your hit chance before publishing"
         tag="Prediction Tool"
-        status="Uses sample data"
+        status={modelInfo?.working_status || 'Working now'}
         icon={Sparkles}
         illustration={PredictorReadyIllustration}
       />
 
       {/* How it Works Strip */}
       <HowItWorks steps={HOW_IT_WORKS_STEPS} />
+
+      {/* Model Provenance & Retrain Control Card */}
+      <div className="p-4 rounded-2xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3.5">
+          <div className="w-10 h-10 rounded-xl bg-brand-50 dark:bg-brand-950/60 text-[#5B5BD6] dark:text-brand-300 flex items-center justify-center shrink-0">
+            <Cpu className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-bold text-[#1F2430] dark:text-white">
+                {modelInfo?.model_label || 'Calibrated Machine Learning Model'}
+              </span>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                {modelInfo?.model_type === 'retrained_personal' ? 'Personalized' : 'Calibrated Baseline'}
+              </span>
+            </div>
+            <div className="text-[11px] text-[#5B6475] dark:text-[#94A3B8] mt-0.5">
+              Time-based 80/20 train/test split &bull; Brier Loss: {modelInfo?.brier_score ?? '0.182'} &bull; PR-AUC: {modelInfo?.pr_auc ?? '0.218'}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2 shrink-0">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleRetrain}
+            loading={retraining}
+            icon={RefreshCw}
+          >
+            Retrain on My Data
+          </Button>
+        </div>
+      </div>
+
+      {/* Retraining Notification Banner */}
+      {retrainNotice && (
+        <div
+          className={`p-4 rounded-2xl border text-xs flex items-start space-x-3 ${
+            retrainNotice.type === 'warning'
+              ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200'
+              : 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
+          }`}
+        >
+          {retrainNotice.type === 'warning' ? (
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          ) : (
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+          )}
+          <div className="flex-1">
+            <div className="font-bold">{retrainNotice.message}</div>
+            {retrainNotice.type === 'warning' && (
+              <div className="text-[11px] mt-1 opacity-90">
+                Current dataset has {retrainNotice.count} posts. Upload a larger CSV or connect your YouTube channel in Settings to train a custom model.
+              </div>
+            )}
+            {retrainNotice.type === 'success' && (
+              <div className="text-[11px] mt-1 opacity-90">
+                Holdout test metrics: Brier Loss = {retrainNotice.brier}, PR-AUC = {retrainNotice.pr_auc}. All predictions now use this personalized model.
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => setRetrainNotice(null)}
+            className="text-slate-400 hover:text-slate-600 font-bold ml-2 text-sm"
+          >
+            &times;
+          </button>
+        </div>
+      )}
 
       {/* Wizard Step Progression Bar */}
       <div className="p-3.5 rounded-2xl bg-white/80 dark:bg-[#171D2B]/80 border border-[#E8E6DF] dark:border-[#232B3E] shadow-xs">
@@ -311,7 +447,17 @@ export default function ViralPredictor() {
                   <label className="text-xs font-bold uppercase tracking-wider text-[#5B6475] dark:text-[#94A3B8]">
                     Your Title or Opening Hook
                   </label>
-                  <span className="text-[11px] text-slate-400 font-mono">{title.length} chars</span>
+                  <div className="flex items-center space-x-3">
+                    <button
+                      type="button"
+                      onClick={toggleCuriosityHook}
+                      className="text-[11px] text-[#5B5BD6] dark:text-brand-300 hover:underline flex items-center space-x-1"
+                    >
+                      <Lightbulb className="w-3 h-3" />
+                      <span>{title.includes('?') ? 'Remove Hook' : '+ Add Curiosity Hook'}</span>
+                    </button>
+                    <span className="text-[11px] text-slate-400 font-mono">{title.length} chars</span>
+                  </div>
                 </div>
                 <textarea
                   rows={3}
@@ -338,7 +484,7 @@ export default function ViralPredictor() {
                 <div>
                   <label className="block text-xs font-medium text-[#5B6475] dark:text-[#94A3B8] mb-1.5 flex items-center space-x-1">
                     <Hash className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Hashtags</span>
+                    <span>Hashtags ({hashtagCount})</span>
                   </label>
                   <input
                     type="number"
@@ -373,7 +519,7 @@ export default function ViralPredictor() {
                   </label>
                   <select
                     value={postHour}
-                    onChange={(e) => setPostHour(e.target.value)}
+                    onChange={(e) => setPostHour(Number(e.target.value))}
                     className="w-full bg-[#FAF9F6] dark:bg-[#131825] border border-[#E8E6DF] dark:border-[#232B3E] rounded-xl px-3 py-2 text-xs text-[#1F2430] dark:text-white focus:outline-none focus:border-[#5B5BD6]"
                   >
                     {getHourOptions().map((opt) => (
@@ -440,6 +586,7 @@ export default function ViralPredictor() {
             {/* Submit button */}
             <Button
               type="submit"
+              onClick={handlePredict}
               loading={loading}
               variant="primary"
               size="lg"
@@ -453,30 +600,106 @@ export default function ViralPredictor() {
 
         {/* Right Column: Your Hit Chance & What-If Panel (5 cols) */}
         <div className="lg:col-span-5 space-y-6">
-          {/* Live What-If Quick Gauge Banner */}
-          {whatIfProb !== null && (
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] flex items-center justify-between shadow-xs">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-[#5B5BD6] dark:text-brand-300 flex items-center justify-center shrink-0">
-                  <Flame className="w-5 h-5" />
+          {/* Interactive What-If Sliders Card */}
+          <div className="p-5 rounded-2xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] shadow-xs space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#E8E6DF] dark:border-[#232B3E]">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-[#5B5BD6] dark:text-brand-300 flex items-center justify-center shrink-0">
+                  <Sliders className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-[#1F2430] dark:text-white">
-                    Live What-If Preview
-                  </div>
-                  <div className="text-[11px] text-[#5B6475] dark:text-[#94A3B8]">
-                    Adjust hour or day above to see instant odds
+                  <h4 className="text-xs font-bold text-[#1F2430] dark:text-white">
+                    Live What-If Simulator
+                  </h4>
+                  <div className="text-[10px] text-[#5B6475] dark:text-[#94A3B8]">
+                    Move sliders to see instant probability shifts
                   </div>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="text-xl font-extrabold text-[#5B5BD6] dark:text-brand-300">
-                  {whatIfProb}%
+
+              {whatIfResult && (
+                <div className="text-right">
+                  <div className="text-xl font-extrabold text-[#5B5BD6] dark:text-brand-300">
+                    {whatIfResult.predicted_prob_percent}%
+                  </div>
+                  <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                    {whatIfResult.predicted_er_range} ER
+                  </div>
                 </div>
-                <div className="text-[10px] text-slate-400">hit chance</div>
+              )}
+            </div>
+
+            {/* Slider 1: Release Hour */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-[#5B6475] dark:text-[#94A3B8] font-medium flex items-center space-x-1">
+                  <Clock className="w-3 h-3" />
+                  <span>Release Hour</span>
+                </span>
+                <span className="font-bold text-[#1F2430] dark:text-white">
+                  {formatTime12h(postHour)}
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="23"
+                value={postHour}
+                onChange={(e) => setPostHour(Number(e.target.value))}
+                className="w-full accent-[#5B5BD6] cursor-pointer h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg"
+              />
+              <div className="flex justify-between text-[10px] text-slate-400">
+                <span>12 AM</span>
+                <span>12 PM</span>
+                <span>11 PM</span>
               </div>
             </div>
-          )}
+
+            {/* Slider 2: Hashtag Density */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-[#5B6475] dark:text-[#94A3B8] font-medium flex items-center space-x-1">
+                  <Hash className="w-3 h-3" />
+                  <span>Hashtags Count</span>
+                </span>
+                <span className="font-bold text-[#1F2430] dark:text-white">
+                  {hashtagCount} tags
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="20"
+                value={hashtagCount}
+                onChange={(e) => setHashtagCount(Number(e.target.value))}
+                className="w-full accent-[#5B5BD6] cursor-pointer h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg"
+              />
+            </div>
+
+            {/* Slider 3: Video Duration (if video) */}
+            {(postType === 'long_video' || postType === 'short' || postType === 'reel') && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-[#5B6475] dark:text-[#94A3B8] font-medium flex items-center space-x-1">
+                    <Video className="w-3 h-3" />
+                    <span>Duration</span>
+                  </span>
+                  <span className="font-bold text-[#1F2430] dark:text-white">
+                    {durationSec < 60 ? `${durationSec}s` : `${Math.floor(durationSec / 60)}m ${durationSec % 60}s`}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={postType === 'short' || postType === 'reel' ? 10 : 60}
+                  max={postType === 'short' || postType === 'reel' ? 90 : 1800}
+                  step={postType === 'short' || postType === 'reel' ? 5 : 30}
+                  value={durationSec}
+                  onChange={(e) => setDurationSec(Number(e.target.value))}
+                  className="w-full accent-[#5B5BD6] cursor-pointer h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg"
+                />
+              </div>
+            )}
+          </div>
 
           {/* Results Card */}
           {result ? (
@@ -511,8 +734,14 @@ export default function ViralPredictor() {
                   <span className="font-bold text-emerald-600 dark:text-emerald-400">({result.ratio_display})</span>
                 </div>
 
-                <div className="mt-3 inline-block px-3 py-1 rounded-full bg-[#FAF9F6] dark:bg-[#1A2333] border border-[#E8E6DF] dark:border-[#232B3E] text-xs text-[#5B6475] dark:text-[#94A3B8]">
-                  Realistic range: <strong className="text-[#1F2430] dark:text-white">{result.range_display}</strong>
+                {/* Predicted Engagement Rate Range */}
+                <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
+                  <div className="inline-block px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/60 border border-brand-200 dark:border-brand-800 text-xs text-[#5B5BD6] dark:text-brand-300 font-semibold">
+                    Predicted ER: <strong>{result.predicted_er_range || '4.2% – 6.8%'}</strong>
+                  </div>
+                  <div className="inline-block px-3 py-1 rounded-full bg-[#FAF9F6] dark:bg-[#1A2333] border border-[#E8E6DF] dark:border-[#232B3E] text-xs text-[#5B6475] dark:text-[#94A3B8]">
+                    Realistic range: <strong className="text-[#1F2430] dark:text-white">{result.range_display}</strong>
+                  </div>
                 </div>
 
                 {/* Plain-Language Truth Guarantee */}
@@ -521,21 +750,33 @@ export default function ViralPredictor() {
                 </div>
               </div>
 
-              {/* Why this score? Top Factors */}
+              {/* Why this score? Top Model-Derived Factors */}
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-[#5B6475] dark:text-brand-300 mb-2.5">
                   Top Factors Influencing This Score
                 </h4>
                 <div className="space-y-2">
-                  {result.top_reasons?.map((reason, i) => (
-                    <div
-                      key={i}
-                      className="p-3 rounded-xl bg-white dark:bg-[#151B28] border border-brand-200/60 dark:border-brand-800/40 text-xs text-[#1F2430] dark:text-slate-200 flex items-start space-x-2.5"
-                    >
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                      <span className="leading-relaxed">{reason}</span>
-                    </div>
-                  ))}
+                  {result.top_reasons?.map((reason, i) => {
+                    const isPositive = reason.startsWith('+');
+                    const cleanText = reason.replace(/^[+-]\s*/, '');
+                    return (
+                      <div
+                        key={i}
+                        className={`p-3 rounded-xl border text-xs flex items-start space-x-2.5 ${
+                          isPositive
+                            ? 'bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-200/60 dark:border-emerald-800/40 text-emerald-900 dark:text-emerald-200'
+                            : 'bg-amber-50/50 dark:bg-amber-950/30 border-amber-200/60 dark:border-amber-800/40 text-amber-900 dark:text-amber-200'
+                        }`}
+                      >
+                        {isPositive ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                        )}
+                        <span className="leading-relaxed font-medium">{cleanText}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -583,7 +824,7 @@ export default function ViralPredictor() {
               </h3>
 
               <p className="text-xs text-[#5B6475] dark:text-[#94A3B8] leading-relaxed max-w-sm mx-auto">
-                Fill in your title and release time on the left, then click{' '}
+                Fill in your title and release time on the left, or use the What-If sliders above, then click{' '}
                 <strong className="text-[#5B5BD6] dark:text-brand-300">See Your Hit Chance</strong>.
                 We'll compare it against your past baseline to see how likely it is to stand out.
               </p>
