@@ -128,6 +128,8 @@ export const syncYouTubePredictionOutcomes = () =>
   });
 
 // ----------------- Content Studio -----------------
+export const getContentStudioStatus = () => request('/api/content/status');
+
 export const generateContent = (payload) =>
   request('/api/content/generate', {
     method: 'POST',

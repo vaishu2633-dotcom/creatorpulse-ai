@@ -23,6 +23,12 @@ class TournamentRequest(BaseModel):
     platform: str = Field(..., example="youtube")
     topic: str = Field(..., example="Fullstack AI Development")
     count: int = Field(10, ge=3, le=20)
+    language: str = Field("English", example="English")
+
+@router.get("/status")
+def get_status():
+    """Returns LLM configuration status and active generation mode."""
+    return content_generator.get_llm_status()
 
 @router.post("/generate")
 def generate_content(req: GenerateContentRequest):
@@ -35,6 +41,9 @@ def generate_content(req: GenerateContentRequest):
     )
     return {
         "metadata": data_access.get_system_metadata(),
+        "generation_mode": content.get("generation_mode", "template"),
+        "provider": content.get("provider", "template"),
+        "model_label": content.get("model_label", "Curated Templates"),
         "content": content
     }
 
@@ -43,12 +52,14 @@ def run_tournament(req: TournamentRequest):
     results = content_generator.run_idea_tournament(
         platform=req.platform,
         topic=req.topic,
-        count=req.count
+        count=req.count,
+        language=req.language
     )
     return {
         "metadata": data_access.get_system_metadata(),
         "platform": req.platform,
         "topic": req.topic,
+        "language": req.language,
         "total_ideas_evaluated": len(results),
         "tournament_rankings": results
     }

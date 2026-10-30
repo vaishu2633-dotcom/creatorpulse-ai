@@ -578,6 +578,11 @@ def get_accuracy_scoreboard(platform: Optional[str] = None) -> Dict[str, Any]:
 
 def get_drafts(platform: Optional[str] = None, status: Optional[str] = None) -> List[Dict[str, Any]]:
     drafts = _load_json("drafts.json")
+    for d in drafts:
+        if "id" not in d and "draft_id" in d:
+            d["id"] = d["draft_id"]
+        elif "draft_id" not in d and "id" in d:
+            d["draft_id"] = d["id"]
     if platform and platform.lower() != "all":
         drafts = [d for d in drafts if d.get("platform", "").lower() == platform.lower()]
     if status and status.lower() != "all":
@@ -589,6 +594,8 @@ def save_draft(draft: Dict[str, Any]) -> Dict[str, Any]:
     drafts = _load_json("drafts.json")
     if "draft_id" not in draft:
         draft["draft_id"] = f"draft_{uuid.uuid4().hex[:8]}"
+    if "id" not in draft:
+        draft["id"] = draft["draft_id"]
     if "created_at" not in draft:
         draft["created_at"] = datetime.now(timezone.utc).isoformat()
     if "status" not in draft:
@@ -601,7 +608,7 @@ def save_draft(draft: Dict[str, Any]) -> Dict[str, Any]:
 def update_draft(draft_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     drafts = _load_json("drafts.json")
     for idx, d in enumerate(drafts):
-        if d.get("draft_id") == draft_id:
+        if d.get("draft_id") == draft_id or d.get("id") == draft_id:
             drafts[idx].update(updates)
             _save_json("drafts.json", drafts)
             return drafts[idx]
@@ -609,7 +616,7 @@ def update_draft(draft_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, A
 
 def delete_draft(draft_id: str) -> bool:
     drafts = _load_json("drafts.json")
-    new_drafts = [d for d in drafts if d.get("draft_id") != draft_id]
+    new_drafts = [d for d in drafts if d.get("draft_id") != draft_id and d.get("id") != draft_id]
     if len(new_drafts) < len(drafts):
         _save_json("drafts.json", new_drafts)
         return True
