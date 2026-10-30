@@ -24,7 +24,8 @@ from backend.routers import (
     ml_lab,
     settings,
     vibecheck,
-    competitors
+    competitors,
+    reports
 )
 
 app = FastAPI(
@@ -53,6 +54,7 @@ app.include_router(ml_lab.router)
 app.include_router(settings.router)
 app.include_router(vibecheck.router)
 app.include_router(competitors.router)
+app.include_router(reports.router)
 
 @app.get("/")
 def root():

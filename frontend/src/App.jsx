@@ -18,6 +18,7 @@ import CommentInsights from './pages/CommentInsights';
 import Settings from './pages/Settings';
 import VibeCheck from './pages/VibeCheck';
 import CompetitorAnalysis from './pages/CompetitorAnalysis';
+import Reports from './pages/Reports';
 
 export default function App() {
   return (
@@ -34,11 +35,16 @@ export default function App() {
                   <Route path="trends" element={<TrendExplorer />} />
                   <Route path="predictor" element={<ViralPredictor />} />
                   <Route path="studio" element={<ContentStudio />} />
+                  <Route path="content-studio" element={<Navigate to="/studio" replace />} />
                   <Route path="history" element={<Navigate to="/results" replace />} />
                   <Route path="ml-lab" element={<ImbalanceLab />} />
+                  <Route path="model-tests" element={<Navigate to="/ml-lab" replace />} />
                   <Route path="competitors" element={<CompetitorAnalysis />} />
                   <Route path="drafts" element={<CalendarDrafts />} />
+                  <Route path="calendar" element={<Navigate to="/drafts" replace />} />
                   <Route path="comments" element={<CommentInsights />} />
+                  <Route path="audience" element={<Navigate to="/comments" replace />} />
+                  <Route path="reports" element={<Reports />} />
                   <Route path="settings" element={<Settings />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Route>

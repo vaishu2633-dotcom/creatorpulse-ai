@@ -67,6 +67,24 @@ export const getBottomPosts = (platform = 'all', days = null, limit = 5) => {
 export const getCreators = (platform = 'all') =>
   request(`/api/dashboard/creators?platform=${platform}`);
 
+// ----------------- Reports -----------------
+export const getReportsAnalytics = (platform = 'all', days = null, sortBy = 'published_at', descending = true, limit = 50) => {
+  const q = new URLSearchParams({
+    platform,
+    sort_by: sortBy,
+    descending: String(descending),
+    limit: String(limit)
+  });
+  if (days) q.append('days', String(days));
+  return request(`/api/reports/analytics?${q.toString()}`);
+};
+
+export const getReportsCsvExportUrl = (platform = 'all', days = null) => {
+  const q = new URLSearchParams({ platform });
+  if (days) q.append('days', String(days));
+  return `/api/reports/export/csv?${q.toString()}`;
+};
+
 // ----------------- Trends -----------------
 export const getTrends = (platform = 'all', timeWindow = 'all') =>
   request(`/api/trends?platform=${platform}&time_window=${timeWindow}`);
@@ -77,6 +95,20 @@ export const predictPost = (payload) =>
     method: 'POST',
     body: JSON.stringify(payload),
   });
+
+export const predictWhatIf = (payload) =>
+  request('/api/prediction/what-if', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const retrainModel = () =>
+  request('/api/prediction/retrain', {
+    method: 'POST',
+  });
+
+export const getModelInfo = () =>
+  request('/api/prediction/model-info');
 
 export const getPredictionHistory = (platform = 'all', limit = 50) =>
   request(`/api/prediction/history?platform=${platform}&limit=${limit}`);
