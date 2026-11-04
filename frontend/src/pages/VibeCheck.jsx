@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import PageHeader from '../components/ui/PageHeader';
 import HowItWorks from '../components/ui/HowItWorks';
 import StatusChip from '../components/ui/StatusChip';
@@ -69,6 +69,13 @@ Chris B.: Great breakdown, but is this applicable for small channels under 1,000
 
 export default function VibeCheck() {
   const { addToast } = useToast();
+  const navigate = useNavigate();
+
+  const handleTurnIntoStudioIdea = (topicCandidate) => {
+    const topic = topicCandidate || analysis?.metadata?.title || 'Audience Feedback Concept';
+    addToast(`Loading "${topic.slice(0, 35)}..." into Content Studio`, 'info');
+    navigate(`/studio?topic=${encodeURIComponent(topic)}&platform=${analysis?.metadata?.platform || 'youtube'}`);
+  };
 
   // Input states
   const [activeTab, setActiveTab] = useState('url'); // 'url', 'pasted', 'transcript', 'csv', 'whisper'
@@ -717,7 +724,15 @@ export default function VibeCheck() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center space-x-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={Sparkles}
+                  onClick={() => handleTurnIntoStudioIdea(analysis.metadata.title)}
+                >
+                  Turn into Studio idea
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -771,8 +786,21 @@ export default function VibeCheck() {
                   <span>Dominant: {analysis.sentiment.dominant_vibe}</span>
                 </div>
               </div>
-              <div className="mt-4 pt-3 border-t border-[#E8E6DF] dark:border-[#232B3E] text-xs text-[#5B6475] dark:text-[#94A3B8]">
-                Compound polarity average: {analysis.sentiment.average_compound}
+              <div className="mt-4 pt-3 border-t border-[#E8E6DF] dark:border-[#232B3E] space-y-1.5 text-xs text-[#5B6475] dark:text-[#94A3B8]">
+                <div className="flex justify-between items-center">
+                  <span>Sentiment Model:</span>
+                  <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                    {analysis.sentiment.model_used || 'VADER (Rule-based)'}
+                  </span>
+                </div>
+                {analysis.sentiment.model_notice && (
+                  <div className="text-[11px] text-amber-700 dark:text-amber-400 font-medium italic">
+                    {analysis.sentiment.model_notice}
+                  </div>
+                )}
+                <div className="text-[10px] text-slate-400">
+                  Compound polarity average: {analysis.sentiment.average_compound}
+                </div>
               </div>
             </Card>
 
@@ -911,6 +939,15 @@ export default function VibeCheck() {
                   <p className="text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-[#171D2B] p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-800">
                     <strong>Recommended Next Step:</strong> {rec.action}
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => handleTurnIntoStudioIdea(rec.title)}
+                    className="text-[11px] font-bold text-[#5B5BD6] hover:underline flex items-center space-x-1 pt-1"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    <span>Turn into Studio idea</span>
+                    <ChevronRight className="w-3 h-3" />
+                  </button>
                 </div>
               ))}
             </div>

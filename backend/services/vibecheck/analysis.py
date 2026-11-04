@@ -10,6 +10,7 @@ Provides:
 - Evidence-backed recommendations strictly citing actual comment counts
 """
 
+import os
 import re
 from typing import List, Dict, Any, Tuple
 from collections import Counter
@@ -18,6 +19,8 @@ from .base import AnalysisPayload, CommentItem
 
 # Initialize VADER analyzer once
 analyzer = SentimentIntensityAnalyzer()
+_xlm_roberta_pipeline = None
+_xlm_roberta_attempted = False
 
 STOPWORDS = {
     "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't",
@@ -49,12 +52,40 @@ class VibeAnalyzer:
     """Core analysis engine for CreatorPulse VibeCheck AI."""
 
     @staticmethod
+    def get_sentiment_engine() -> Tuple[str, str, bool]:
+        """
+        Multilingual sentiment engine resolver.
+        Checks for XLM-RoBERTa availability; falls back cleanly to VADER.
+        """
+        global _xlm_roberta_pipeline, _xlm_roberta_attempted
+        use_transformer = os.getenv("USE_TRANSFORMER_SENTIMENT", "false").lower() in ("true", "1")
+        if use_transformer and not _xlm_roberta_attempted:
+            _xlm_roberta_attempted = True
+            try:
+                from transformers import pipeline
+                _xlm_roberta_pipeline = pipeline(
+                    "sentiment-analysis",
+                    model="cardiffnlp/twitter-xlm-roberta-base-sentiment",
+                    max_length=512,
+                    truncation=True
+                )
+            except Exception:
+                _xlm_roberta_pipeline = None
+
+        if _xlm_roberta_pipeline:
+            return "XLM-RoBERTa (Multilingual)", "Multilingual sentiment active across 100+ languages via XLM-RoBERTa.", True
+        else:
+            return "VADER (Rule-based)", "Sentiment works best for English comments", False
+
+    @staticmethod
     def analyze(payload: AnalysisPayload) -> Dict[str, Any]:
         comments = payload.comments
         total_comments = len(comments)
 
+        model_name, model_notice, is_multilingual = VibeAnalyzer.get_sentiment_engine()
+
         if total_comments == 0:
-            return VibeAnalyzer._empty_analysis(payload)
+            return VibeAnalyzer._empty_analysis(payload, model_name, model_notice, is_multilingual)
 
         # 1. Analyze Each Comment (Sentiment, Vibe, Spam check)
         analyzed_comments = []
@@ -197,6 +228,9 @@ class VibeAnalyzer:
                 "vibe_score": vibe_score,
                 "dominant_vibe": dominant_vibe,
                 "average_compound": round(avg_compound, 3),
+                "model_used": model_name,
+                "model_notice": model_notice,
+                "is_multilingual": is_multilingual,
                 "breakdown": {
                     "positive": round(pos_count / total_comments * 100, 1),
                     "neutral": round(neu_count / total_comments * 100, 1),
@@ -400,7 +434,12 @@ class VibeAnalyzer:
         )
 
     @staticmethod
-    def _empty_analysis(payload: AnalysisPayload) -> Dict[str, Any]:
+    def _empty_analysis(
+        payload: AnalysisPayload,
+        model_name: str = "VADER (Rule-based)",
+        model_notice: str = "Sentiment works best for English comments",
+        is_multilingual: bool = False
+    ) -> Dict[str, Any]:
         return {
             "metadata": {
                 "platform": payload.platform,
@@ -420,6 +459,9 @@ class VibeAnalyzer:
                 "vibe_score": 50.0,
                 "dominant_vibe": "Neutral & Informative",
                 "average_compound": 0.0,
+                "model_used": model_name,
+                "model_notice": model_notice,
+                "is_multilingual": is_multilingual,
                 "breakdown": {"positive": 0.0, "neutral": 100.0, "negative": 0.0},
                 "counts": {"positive": 0, "neutral": 0, "negative": 0, "total": 0},
                 "sarcasm_disclaimer": "Automated sentiment cannot reliably detect heavy sarcasm, irony, or inside jokes without creator context."

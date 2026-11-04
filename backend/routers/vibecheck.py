@@ -119,32 +119,37 @@ def analyze_content(req: AnalyzeRequest):
     target = (req.target or "").strip()
     input_type = req.input_type.strip().lower()
 
-    # Route to matching adapter
-    if input_type == "url" and target:
-        if yt_adapter.can_handle(target):
-            payload = yt_adapter.fetch_data({"url": target})
-        elif ig_adapter.can_handle(target):
-            payload = ig_adapter.fetch_data({"url": target, "comments_text": req.raw_text})
-        elif tt_adapter.can_handle(target):
-            payload = tt_adapter.fetch_data({"url": target, "comments_text": req.raw_text})
+    # Route to matching adapter with explicit error propagation (never faking sample data)
+    try:
+        if input_type == "url" and target:
+            if yt_adapter.can_handle(target):
+                payload = yt_adapter.fetch_data({"url": target})
+            elif ig_adapter.can_handle(target):
+                payload = ig_adapter.fetch_data({"url": target, "comments_text": req.raw_text})
+            elif tt_adapter.can_handle(target):
+                payload = tt_adapter.fetch_data({"url": target, "comments_text": req.raw_text})
+            else:
+                # Fallback to manual parser
+                payload = manual_adapter.fetch_data({
+                    "input_type": "pasted_comments",
+                    "raw_text": req.raw_text or target,
+                    "platform": req.platform or "general",
+                    "title": req.title,
+                    "author": req.author
+                })
         else:
-            # Fallback to manual parser
+            # Manual input (pasted comments, transcript, or CSV)
             payload = manual_adapter.fetch_data({
-                "input_type": "pasted_comments",
-                "raw_text": req.raw_text or target,
+                "input_type": input_type,
+                "raw_text": req.raw_text or "",
                 "platform": req.platform or "general",
                 "title": req.title,
                 "author": req.author
             })
-    else:
-        # Manual input (pasted comments, transcript, or CSV)
-        payload = manual_adapter.fetch_data({
-            "input_type": input_type,
-            "raw_text": req.raw_text or "",
-            "platform": req.platform or "general",
-            "title": req.title,
-            "author": req.author
-        })
+    except ValueError as val_err:
+        raise HTTPException(status_code=400, detail=str(val_err))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(exc)}")
 
     # Run analysis pipeline
     analysis = VibeAnalyzer.analyze(payload)

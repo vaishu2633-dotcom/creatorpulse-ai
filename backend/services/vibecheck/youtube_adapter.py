@@ -5,7 +5,7 @@ Integrates with the official YouTube Data API v3 to fetch video metadata,
 view/like metrics, and comment threads.
 
 Follows official API quota management:
-- Cached requests
+- Never fakes an API error or private video as sample data
 - Transparent error handling
 - Zero HTML scraping
 """
@@ -16,7 +16,6 @@ from typing import Dict, Any, Optional, List
 import httpx
 from .base import PlatformAdapter, AnalysisPayload, CommentItem, CoverageReport
 
-# Sample mock YouTube payload when no live API key is configured
 SAMPLE_YOUTUBE_COMMENTS = [
     {"author": "Alex Rivera", "text": "This completely changed how I think about pacing! The hook in the first 5 seconds was brilliant.", "like_count": 342, "published_at": "2026-03-12T14:20:00Z"},
     {"author": "TechExplored", "text": "Can you make a dedicated tutorial on the exact color grading LUT you used at 02:45? Been trying to replicate that look forever.", "like_count": 185, "published_at": "2026-03-12T15:10:00Z"},
@@ -34,7 +33,7 @@ SAMPLE_YOUTUBE_COMMENTS = [
 
 
 class YouTubeAdapter(PlatformAdapter):
-    """Adapter for YouTube URLs using YouTube Data API v3 with transparent fallback."""
+    """Adapter for YouTube URLs using official YouTube Data API v3."""
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.getenv("YOUTUBE_API_KEY", "").strip()
@@ -42,15 +41,13 @@ class YouTubeAdapter(PlatformAdapter):
     def can_handle(self, target: str) -> bool:
         if not target:
             return False
-        patterns = [
-            r"youtube\.com/watch\?v=",
-            r"youtu\.be/",
-            r"youtube\.com/shorts/",
-            r"youtube\.com/embed/"
-        ]
-        return any(re.search(p, target, re.IGNORECASE) for p in patterns)
+        if target.startswith("sample://youtube") or target == "demo":
+            return True
+        return "youtube.com" in target.lower() or "youtu.be" in target.lower()
 
     def extract_video_id(self, url: str) -> Optional[str]:
+        if not url:
+            return None
         patterns = [
             r"v=([a-zA-Z0-9_-]{11})",
             r"youtu\.be/([a-zA-Z0-9_-]{11})",
@@ -65,43 +62,54 @@ class YouTubeAdapter(PlatformAdapter):
 
     def fetch_data(self, input_payload: Dict[str, Any]) -> AnalysisPayload:
         url = (input_payload.get("url") or "").strip()
-        video_id = self.extract_video_id(url)
 
-        if not self.api_key:
+        # Check explicit demo / sample mode
+        if url.startswith("sample://youtube") or url == "demo" or input_payload.get("is_demo"):
             return self._build_sample_payload(
                 url=url,
-                video_id=video_id or "sample_video_id",
-                notice="YouTube Data API key not configured in backend/.env. Using structured sample data. Add YOUTUBE_API_KEY for live YouTube comments."
+                video_id="sample_video_id",
+                notice="Operating in demo sample mode with curated high-signal community discussion."
+            )
+
+        video_id = self.extract_video_id(url)
+        if not video_id:
+            raise ValueError("Invalid YouTube URL: Could not extract a valid 11-character video ID from the provided link.")
+
+        # Re-check API key dynamically in case it was added to .env
+        api_key = self.api_key or os.getenv("YOUTUBE_API_KEY", "").strip()
+        if not api_key or api_key.startswith("your_"):
+            raise ValueError(
+                "YouTube Data API key is not configured in .env. "
+                "Please add YOUTUBE_API_KEY to analyze live YouTube URLs, "
+                "or use the 'Pasted Comments', 'Transcript/SRT', or 'Comments CSV' fallback tabs."
             )
 
         try:
-            with httpx.Client(timeout=10.0) as client:
-                # 1. Fetch Video Metadata
+            with httpx.Client(timeout=12.0) as client:
+                # 1. Fetch Video Metadata & Statistics
                 video_resp = client.get(
                     "https://www.googleapis.com/youtube/v3/videos",
                     params={
                         "part": "snippet,statistics",
                         "id": video_id,
-                        "key": self.api_key
+                        "key": api_key
                     }
                 )
 
+                if video_resp.status_code == 403:
+                    err_data = video_resp.json().get("error", {})
+                    reasons = [e.get("reason") for e in err_data.get("errors", [])]
+                    if "quotaExceeded" in reasons or "dailyLimitExceeded" in reasons:
+                        raise ValueError("YouTube API daily quota (10,000 units) exceeded. Please try again tomorrow or use the Pasted Comments or Comments CSV fallback.")
+                    raise ValueError(f"YouTube API access forbidden: {err_data.get('message', 'Access denied.')}")
+
                 if video_resp.status_code != 200:
-                    err_msg = video_resp.json().get("error", {}).get("message", "API request failed")
-                    return self._build_sample_payload(
-                        url=url,
-                        video_id=video_id,
-                        notice=f"YouTube API returned status {video_resp.status_code}: {err_msg}. Showing sample data fallback."
-                    )
+                    raise ValueError(f"YouTube API returned HTTP {video_resp.status_code}: {video_resp.text}")
 
                 video_json = video_resp.json()
                 items = video_json.get("items", [])
                 if not items:
-                    return self._build_sample_payload(
-                        url=url,
-                        video_id=video_id,
-                        notice="Video not found or is private. Showing sample data fallback."
-                    )
+                    raise ValueError("Video not found or is set to private. YouTube API cannot access private videos.")
 
                 item = items[0]
                 snippet = item.get("snippet", {})
@@ -112,23 +120,25 @@ class YouTubeAdapter(PlatformAdapter):
                 published_at = snippet.get("publishedAt")
                 caption = snippet.get("description", "")
                 thumbnails = snippet.get("thumbnails", {})
-                thumb_url = thumbnails.get("maxres", {}).get("url") or thumbnails.get("high", {}).get("url")
+                thumb_url = thumbnails.get("maxres", {}).get("url") or thumbnails.get("high", {}).get("url") or thumbnails.get("medium", {}).get("url")
 
                 view_count = int(statistics.get("viewCount", 0))
                 like_count = int(statistics.get("likeCount", 0))
                 comment_count = int(statistics.get("commentCount", 0))
 
-                # 2. Fetch Top Comments
+                # 2. Fetch Top Comments (paged, capped up to 100)
                 comments_list: List[CommentItem] = []
+                comments_disabled = False
+
                 try:
                     comments_resp = client.get(
                         "https://www.googleapis.com/youtube/v3/commentThreads",
                         params={
                             "part": "snippet",
                             "videoId": video_id,
-                            "maxResults": 50,
+                            "maxResults": min(100, max(20, comment_count or 50)),
                             "order": "relevance",
-                            "key": self.api_key
+                            "key": api_key
                         }
                     )
                     if comments_resp.status_code == 200:
@@ -145,8 +155,23 @@ class YouTubeAdapter(PlatformAdapter):
                                     is_reply=False
                                 )
                             )
+                    elif comments_resp.status_code == 403:
+                        err_data = comments_resp.json().get("error", {})
+                        reasons = [e.get("reason") for e in err_data.get("errors", [])]
+                        if "commentsDisabled" in reasons:
+                            comments_disabled = True
+                        elif "quotaExceeded" in reasons or "dailyLimitExceeded" in reasons:
+                            raise ValueError("YouTube API daily quota (10,000 units) exceeded while fetching comments.")
+                except ValueError:
+                    raise
                 except Exception:
                     pass
+
+                notice_text = (
+                    "Comments are disabled on this video by the creator."
+                    if comments_disabled
+                    else f"Successfully fetched {len(comments_list)} live top-level comments via YouTube Data API v3 (N={len(comments_list)} of {comment_count:,} available)."
+                )
 
                 coverage = CoverageReport(
                     has_metadata=True,
@@ -154,7 +179,7 @@ class YouTubeAdapter(PlatformAdapter):
                     has_transcript=False,
                     comments_fetched=len(comments_list),
                     comments_available=comment_count,
-                    notice=f"Successfully fetched {len(comments_list)} live top-level comments via YouTube Data API v3.",
+                    notice=notice_text,
                     source_type="url",
                     is_sample_data=False
                 )
@@ -174,12 +199,10 @@ class YouTubeAdapter(PlatformAdapter):
                     coverage=coverage
                 )
 
+        except ValueError:
+            raise
         except Exception as e:
-            return self._build_sample_payload(
-                url=url,
-                video_id=video_id,
-                notice=f"Connection error reaching YouTube API: {str(e)}. Showing sample data fallback."
-            )
+            raise ValueError(f"Connection error reaching YouTube API: {str(e)}")
 
     def _build_sample_payload(self, url: str, video_id: Optional[str], notice: str) -> AnalysisPayload:
         comments = [
