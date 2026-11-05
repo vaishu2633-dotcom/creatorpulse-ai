@@ -840,6 +840,21 @@ def get_imbalance_lab_results() -> Dict[str, Any]:
     with open(results_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
+def get_creator_benchmark_results() -> Optional[Dict[str, Any]]:
+    results_path = os.path.join(ML_DIR, "creator_benchmark_results.json")
+    if not os.path.exists(results_path):
+        return None
+    try:
+        with open(results_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+def save_creator_benchmark_results(results: Dict[str, Any]) -> None:
+    results_path = os.path.join(ML_DIR, "creator_benchmark_results.json")
+    with open(results_path, "w", encoding="utf-8") as f:
+        json.dump(results, f, indent=2)
+
 # ----------------- VibeCheck Reports Storage -----------------
 
 def get_vibecheck_reports(limit: int = 50) -> List[Dict[str, Any]]:

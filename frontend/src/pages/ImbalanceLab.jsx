@@ -122,7 +122,7 @@ export default function ImbalanceLab() {
     setError(null);
     getMlResults()
       .then((res) => {
-        setData(res);
+        setData(res?.data || res);
         setLoading(false);
       })
       .catch((err) => {
