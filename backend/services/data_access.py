@@ -21,7 +21,7 @@ import csv
 import io
 import re
 from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 ML_DIR = os.path.join(os.path.dirname(__file__), "..", "ml")
@@ -501,13 +501,60 @@ def get_trends(platform: Optional[str] = None, time_window: Optional[str] = None
 
 # ----------------- Comments -----------------
 
+def _resolve_raw_comments() -> Tuple[List[Dict[str, Any]], str, bool]:
+    """
+    Returns (comments, source_label, is_sample_data).
+    Priority:
+    1. If VibeCheck reports exist, extract comments across analyzed reports (real data).
+    2. If active_source is 'sample', return sample comments from comments.json (sample data).
+    3. If active_source is 'uploaded_csv' or 'youtube' and no VibeCheck reports exist, return empty list (empty state).
+    """
+    reports = _load_json("vibecheck_reports.json")
+    vibecheck_comments = []
+    for rep in reports:
+        fa = rep.get("full_analysis") or {}
+        raw = fa.get("comments") or []
+        rep_platform = rep.get("platform", "youtube")
+        rep_title = rep.get("title", "Analyzed Content")
+        for c in raw:
+            vibecheck_comments.append({
+                "comment_id": c.get("comment_id") or f"vc_{uuid.uuid4().hex[:6]}",
+                "platform": rep_platform,
+                "author": c.get("author", "Viewer"),
+                "text": c.get("text", ""),
+                "sentiment": c.get("sentiment", "neutral"),
+                "compound_score": c.get("compound_score", 0.0),
+                "theme": c.get("vibe") or "General Feedback",
+                "is_question": bool(c.get("is_question")),
+                "like_count": c.get("like_count", 0),
+                "published_at": c.get("published_at"),
+                "source": f"VibeCheck: {rep_title[:32]}",
+                "is_sample_data": False
+            })
+
+    if vibecheck_comments:
+        return vibecheck_comments, f"VibeCheck AI ({len(reports)} reports)", False
+
+    # Check active data source
+    state = get_data_source_state()
+    active_source = state.get("active_source", "sample")
+
+    if active_source == "sample":
+        sample_comments = _load_json("comments.json")
+        for c in sample_comments:
+            c["is_sample_data"] = True
+            c["source"] = "Sample data"
+        return sample_comments, "Sample data", True
+
+    return [], "No analyzed comments", False
+
 def get_comments(
     platform: Optional[str] = None,
     sentiment: Optional[str] = None,
     theme: Optional[str] = None,
     is_question: Optional[bool] = None
 ) -> List[Dict[str, Any]]:
-    comments = _load_json("comments.json")
+    comments, _, _ = _resolve_raw_comments()
     if platform and platform.lower() != "all":
         comments = [c for c in comments if c.get("platform", "").lower() == platform.lower()]
     if sentiment and sentiment.lower() != "all":
@@ -519,13 +566,21 @@ def get_comments(
     return comments
 
 def get_comments_summary(platform: Optional[str] = None) -> Dict[str, Any]:
-    comments = get_comments(platform=platform)
+    raw_comments, source_label, is_sample = _resolve_raw_comments()
+    
+    comments = raw_comments
+    if platform and platform.lower() != "all":
+        comments = [c for c in comments if c.get("platform", "").lower() == platform.lower()]
+        
     total = len(comments)
     if total == 0:
         return {
             "metadata": get_system_metadata(),
             "total_comments": 0,
-            "sentiment_breakdown": {"positive": 0, "neutral": 0, "negative": 0},
+            "is_sample_data": is_sample,
+            "data_source": source_label,
+            "sentiment_breakdown": {"positive": 0.0, "neutral": 0.0, "negative": 0.0},
+            "sentiment_counts": {"positive": 0, "neutral": 0, "negative": 0},
             "top_themes": [],
             "repeated_questions": []
         }
@@ -534,9 +589,9 @@ def get_comments_summary(platform: Optional[str] = None) -> Dict[str, Any]:
     neu = sum(1 for c in comments if c.get("sentiment") == "neutral")
     neg = sum(1 for c in comments if c.get("sentiment") == "negative")
     
-    theme_counts = {}
+    theme_counts: Dict[str, int] = {}
     for c in comments:
-        th = c.get("theme", "general")
+        th = c.get("theme", "General")
         theme_counts[th] = theme_counts.get(th, 0) + 1
     
     top_themes = [
@@ -549,10 +604,17 @@ def get_comments_summary(platform: Optional[str] = None) -> Dict[str, Any]:
     return {
         "metadata": get_system_metadata(),
         "total_comments": total,
+        "is_sample_data": is_sample,
+        "data_source": source_label,
         "sentiment_breakdown": {
             "positive": round(pos / total * 100, 1),
             "neutral": round(neu / total * 100, 1),
             "negative": round(neg / total * 100, 1)
+        },
+        "sentiment_counts": {
+            "positive": pos,
+            "neutral": neu,
+            "negative": neg
         },
         "top_themes": top_themes,
         "repeated_questions": questions
