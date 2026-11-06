@@ -13,6 +13,8 @@ import HowItWorks from '../components/ui/HowItWorks';
 import PlatformBadge from '../components/PlatformBadge';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import TrendExplorer from './TrendExplorer';
+import CalendarDrafts from './CalendarDrafts';
 import StudioCreativeIllustration from '../assets/illustrations/studio-creative.svg';
 import {
   PenTool,
@@ -23,6 +25,8 @@ import {
   Copy,
   Info,
   Calendar,
+  Compass,
+  FileText,
   RotateCw,
   Edit3,
   ExternalLink,
@@ -66,7 +70,24 @@ const LANGUAGES = [
 ];
 
 export default function ContentStudio() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const [studioTab, setStudioTab] = useState(
+    tabParam === 'trends'
+      ? 'trends'
+      : tabParam === 'calendar'
+      ? 'calendar'
+      : tabParam === 'drafts'
+      ? 'drafts'
+      : 'generator'
+  );
+
+  useEffect(() => {
+    if (tabParam === 'trends' || tabParam === 'calendar' || tabParam === 'drafts' || tabParam === 'generator') {
+      setStudioTab(tabParam);
+    }
+  }, [tabParam]);
+
   const navigate = useNavigate();
   const { selectedPlatform } = usePlatform();
   const { addToast } = useToast();
@@ -256,8 +277,73 @@ export default function ContentStudio() {
         illustration={StudioCreativeIllustration}
       />
 
-      {/* How it Works Strip */}
-      <HowItWorks steps={HOW_IT_WORKS_STEPS} />
+      {/* 4 Primary Tabs in Content Studio */}
+      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-1 sm:gap-2">
+        <button
+          onClick={() => { setStudioTab('generator'); setSearchParams({ tab: 'generator' }); }}
+          className={`flex items-center space-x-2 py-3 px-4 font-semibold text-xs sm:text-sm border-b-2 transition ${
+            studioTab === 'generator'
+              ? 'border-violet-600 text-violet-600 dark:text-violet-400 bg-violet-50/50 dark:bg-violet-950/20 rounded-t-lg'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <PenTool className="w-4 h-4" />
+          <span>Content Generator</span>
+        </button>
+
+        <button
+          onClick={() => { setStudioTab('trends'); setSearchParams({ tab: 'trends' }); }}
+          className={`flex items-center space-x-2 py-3 px-4 font-semibold text-xs sm:text-sm border-b-2 transition ${
+            studioTab === 'trends'
+              ? 'border-violet-600 text-violet-600 dark:text-violet-400 bg-violet-50/50 dark:bg-violet-950/20 rounded-t-lg'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <Compass className="w-4 h-4" />
+          <span>Trend Explorer</span>
+        </button>
+
+        <button
+          onClick={() => { setStudioTab('calendar'); setSearchParams({ tab: 'calendar' }); }}
+          className={`flex items-center space-x-2 py-3 px-4 font-semibold text-xs sm:text-sm border-b-2 transition ${
+            studioTab === 'calendar'
+              ? 'border-violet-600 text-violet-600 dark:text-violet-400 bg-violet-50/50 dark:bg-violet-950/20 rounded-t-lg'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <Calendar className="w-4 h-4" />
+          <span>Calendar</span>
+        </button>
+
+        <button
+          onClick={() => { setStudioTab('drafts'); setSearchParams({ tab: 'drafts' }); }}
+          className={`flex items-center space-x-2 py-3 px-4 font-semibold text-xs sm:text-sm border-b-2 transition ${
+            studioTab === 'drafts'
+              ? 'border-violet-600 text-violet-600 dark:text-violet-400 bg-violet-50/50 dark:bg-violet-950/20 rounded-t-lg'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          <span>Drafts</span>
+        </button>
+      </div>
+
+      {studioTab === 'trends' ? (
+        <div className="pt-2">
+          <TrendExplorer />
+        </div>
+      ) : studioTab === 'calendar' ? (
+        <div className="pt-2">
+          <CalendarDrafts initialView="calendar" />
+        </div>
+      ) : studioTab === 'drafts' ? (
+        <div className="pt-2">
+          <CalendarDrafts initialView="board" />
+        </div>
+      ) : (
+        <>
+          {/* How it Works Strip */}
+          <HowItWorks steps={HOW_IT_WORKS_STEPS} />
 
       {/* Mode Notification Banner */}
       <div
@@ -925,6 +1011,8 @@ export default function ContentStudio() {
           )}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

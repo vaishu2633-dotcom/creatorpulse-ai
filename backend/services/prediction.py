@@ -309,14 +309,14 @@ def _derive_model_reasons(
     candidates = []
     
     # 1. Timing dynamic (post_hour)
-    hour_imp = importances.get("post_hour", 0.20)
+    hour_imp = max(0.18, float(importances.get("post_hour", 0.20)))
     weekday_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     day_name = weekday_names[post_weekday % 7]
     
     if (17 <= post_hour <= 21) or (11 <= post_hour <= 13):
         candidates.append({
             "type": "positive",
-            "weight": hour_imp,
+            "weight": hour_imp * 1.5,
             "text": f"+ Peak window: Scheduling for {day_name} at {post_hour:02d}:00 aligns with high audience activity (model timing weight: {round(hour_imp*100, 1)}%)."
         })
     elif post_hour < 6 or post_hour > 22:

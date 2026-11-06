@@ -351,9 +351,24 @@ export default function Navbar({ onToggleMobileSidebar }) {
                   <div className="px-3.5 py-2.5 border-b border-slate-100 dark:border-slate-800">
                     <div className="font-bold text-slate-900 dark:text-white truncate">{user.name}</div>
                     <div className="text-[10.5px] text-slate-500 truncate">{user.channelName}</div>
+                    <div className="mt-1 flex items-center space-x-1.5 text-[10px] text-violet-600 dark:text-violet-400 font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span>{activeSource === 'sample' ? 'Sample Data Mode' : activeSource === 'uploaded' ? 'Uploaded CSV Dataset' : 'YouTube Live Connected'}</span>
+                    </div>
                   </div>
 
                   <div className="py-1">
+                    <button
+                      onClick={() => {
+                        setProfileDropdownOpen(false);
+                        navigate('/settings#accounts');
+                      }}
+                      className="w-full text-left px-3.5 py-2 flex items-center space-x-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition"
+                    >
+                      <Link2 className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Connect Accounts</span>
+                    </button>
+
                     <button
                       onClick={() => {
                         setProfileDropdownOpen(false);
@@ -362,8 +377,23 @@ export default function Navbar({ onToggleMobileSidebar }) {
                       className="w-full text-left px-3.5 py-2 flex items-center space-x-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition"
                     >
                       <SettingsIcon className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Settings & Avatar</span>
+                      <span>Settings & API Keys</span>
                     </button>
+
+                    <div className="border-t border-slate-100 dark:border-slate-800 my-1" />
+
+                    <div className="px-3.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                      <span>Data Source</span>
+                      <span className="text-[9px] text-violet-600 dark:text-violet-400 font-semibold cursor-pointer" onClick={() => switchDataSource(activeSource === 'sample' ? 'uploaded' : 'sample')}>
+                        Switch
+                      </span>
+                    </div>
+                    <div className="px-3.5 py-1 text-[11px] text-slate-600 dark:text-slate-400 flex items-center space-x-1.5">
+                      <Database className="w-3 h-3 text-violet-500" />
+                      <span className="truncate">{activeSource === 'sample' ? 'Synthetic 1,800 posts' : 'Custom user dataset'}</span>
+                    </div>
+
+                    <div className="border-t border-slate-100 dark:border-slate-800 my-1" />
 
                     <div className="px-3.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                       Theme

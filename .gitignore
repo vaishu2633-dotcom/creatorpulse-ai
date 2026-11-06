@@ -52,13 +52,18 @@ Thumbs.db
 *.sln
 *.sw?
 
+# Screenshots & local test media
+screenshots/
+*.png
+*.jpg
+*.jpeg
+*.zip
+
 # Vite & Jupyter caches
 .vite/
 .ipynb_checkpoints/
 
 # Generated ML Models & Synthetic Data (can be recreated via generate_data.py and train.py)
-backend/ml/model.pkl
-backend/ml/results.json
 backend/data/*.json
 !backend/data/.gitkeep
 !backend/ml/.gitkeep

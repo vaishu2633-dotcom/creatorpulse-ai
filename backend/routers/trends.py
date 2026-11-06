@@ -6,12 +6,13 @@ regional YouTube trends (US, IN, GB), and rising topics from the creator's own a
 """
 
 from fastapi import APIRouter, Query
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from backend.services import data_access
 
 router = APIRouter(prefix="/api/trends", tags=["Trends"])
 
 @router.get("")
+@router.get("/")
 def get_trends(
     platform: Optional[str] = Query("all"),
     time_window: Optional[str] = Query("all"),
@@ -30,3 +31,31 @@ def get_trends(
         region=region,
         include_creator_topics=include_creator_topics
     )
+
+@router.get("/regions")
+def get_trending_regions() -> Dict[str, Any]:
+    """Returns supported regional markets for trend analysis."""
+    return {
+        "metadata": data_access.get_system_metadata(),
+        "regions": [
+            {"code": "all", "label": "Global (All Regions)"},
+            {"code": "US", "label": "United States (US)"},
+            {"code": "IN", "label": "India (IN)"},
+            {"code": "GB", "label": "United Kingdom (GB)"}
+        ]
+    }
+
+@router.get("/categories")
+def get_trending_categories() -> Dict[str, Any]:
+    """Returns available topic categories."""
+    return {
+        "metadata": data_access.get_system_metadata(),
+        "categories": [
+            "All Categories",
+            "Tech & Engineering",
+            "Design & UI/UX",
+            "AI & Future Tech",
+            "Creator Economy",
+            "Channel High-Growth"
+        ]
+    }

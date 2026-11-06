@@ -19,6 +19,7 @@ import Settings from './pages/Settings';
 import VibeCheck from './pages/VibeCheck';
 import CompetitorAnalysis from './pages/CompetitorAnalysis';
 import Reports from './pages/Reports';
+import MoreTools from './pages/MoreTools';
 
 export default function App() {
   return (
@@ -30,21 +31,23 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<Layout />}>
                   <Route index element={<Dashboard />} />
-                  <Route path="results" element={<PredictionHistory />} />
                   <Route path="vibecheck" element={<VibeCheck />} />
-                  <Route path="trends" element={<TrendExplorer />} />
                   <Route path="predictor" element={<ViralPredictor />} />
                   <Route path="studio" element={<ContentStudio />} />
+                  <Route path="reports" element={<Reports />} />
+                  <Route path="tools" element={<MoreTools />} />
+                  <Route path="more-tools" element={<Navigate to="/tools" replace />} />
+                  <Route path="results" element={<PredictionHistory />} />
+                  <Route path="trends" element={<TrendExplorer />} />
                   <Route path="content-studio" element={<Navigate to="/studio" replace />} />
-                  <Route path="history" element={<Navigate to="/results" replace />} />
+                  <Route path="history" element={<Navigate to="/predictor?tab=tracker" replace />} />
                   <Route path="ml-lab" element={<ImbalanceLab />} />
-                  <Route path="model-tests" element={<Navigate to="/ml-lab" replace />} />
+                  <Route path="model-tests" element={<Navigate to="/tools?tab=lab" replace />} />
                   <Route path="competitors" element={<CompetitorAnalysis />} />
                   <Route path="drafts" element={<CalendarDrafts />} />
-                  <Route path="calendar" element={<Navigate to="/drafts" replace />} />
+                  <Route path="calendar" element={<CalendarDrafts />} />
                   <Route path="comments" element={<CommentInsights />} />
-                  <Route path="audience" element={<Navigate to="/comments" replace />} />
-                  <Route path="reports" element={<Reports />} />
+                  <Route path="audience" element={<Navigate to="/vibecheck?tab=audience" replace />} />
                   <Route path="settings" element={<Settings />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Route>

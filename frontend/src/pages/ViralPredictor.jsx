@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { usePlatform } from '../context/PlatformContext';
 import { useToast } from '../context/ToastContext';
 import { predictPost, predictWhatIf, retrainModel, getModelInfo } from '../api/apiClient';
@@ -9,6 +10,7 @@ import PlatformBadge from '../components/PlatformBadge';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Tooltip from '../components/ui/Tooltip';
+import PredictionHistory from './PredictionHistory';
 import PredictorReadyIllustration from '../assets/illustrations/predictor-ready.svg';
 import { formatTime12h, getHourOptions } from '../utils/timeFormat';
 import {
@@ -90,6 +92,19 @@ const WEEKDAYS = [
 export default function ViralPredictor() {
   const { selectedPlatform } = usePlatform();
   const { addToast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const [pageTab, setPageTab] = useState(
+    tabParam === 'tracker' || tabParam === 'history' || tabParam === 'results' ? 'tracker' : 'predictor'
+  );
+
+  useEffect(() => {
+    if (tabParam === 'tracker' || tabParam === 'history' || tabParam === 'results') {
+      setPageTab('tracker');
+    } else if (tabParam === 'tool' || tabParam === 'predictor') {
+      setPageTab('predictor');
+    }
+  }, [tabParam]);
 
   const [platform, setPlatform] = useState(
     selectedPlatform !== 'all' ? selectedPlatform : 'youtube'
@@ -256,8 +271,40 @@ export default function ViralPredictor() {
         illustration={PredictorReadyIllustration}
       />
 
-      {/* How it Works Strip */}
-      <HowItWorks steps={HOW_IT_WORKS_STEPS} />
+      {/* 2 Primary Tabs: Prediction Tool vs Prediction Tracker & Results */}
+      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-1 sm:gap-2">
+        <button
+          onClick={() => { setPageTab('predictor'); setSearchParams({ tab: 'tool' }); }}
+          className={`flex items-center space-x-2 py-3 px-4 font-semibold text-xs sm:text-sm border-b-2 transition ${
+            pageTab === 'predictor'
+              ? 'border-violet-600 text-violet-600 dark:text-violet-400 bg-violet-50/50 dark:bg-violet-950/20 rounded-t-lg'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <Sparkles className="w-4 h-4" />
+          <span>Prediction Tool</span>
+        </button>
+        <button
+          onClick={() => { setPageTab('tracker'); setSearchParams({ tab: 'tracker' }); }}
+          className={`flex items-center space-x-2 py-3 px-4 font-semibold text-xs sm:text-sm border-b-2 transition ${
+            pageTab === 'tracker'
+              ? 'border-violet-600 text-violet-600 dark:text-violet-400 bg-violet-50/50 dark:bg-violet-950/20 rounded-t-lg'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <Target className="w-4 h-4" />
+          <span>Prediction Tracker & Results</span>
+        </button>
+      </div>
+
+      {pageTab === 'tracker' ? (
+        <div className="pt-2">
+          <PredictionHistory />
+        </div>
+      ) : (
+        <>
+          {/* How it Works Strip */}
+          <HowItWorks steps={HOW_IT_WORKS_STEPS} />
 
       {/* Model Provenance & Retrain Control Card */}
       <div className="p-4 rounded-2xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -832,6 +879,8 @@ export default function ViralPredictor() {
           )}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

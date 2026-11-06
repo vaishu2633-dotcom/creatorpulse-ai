@@ -134,14 +134,18 @@ def train_and_benchmark():
     df = load_and_prepare_data()
     total_samples = len(df)
     
-    # 80/20 time-based split
-    split_idx = int(total_samples * 0.8)
-    train_df = df.iloc[:split_idx].copy()
-    test_df = df.iloc[split_idx:].copy()
+    # Chronological 3-way leak-free split: 70% Train, 15% Calibration, 15% Untouched Held-Out Test
+    train_idx = int(total_samples * 0.70)
+    calib_idx = int(total_samples * 0.85)
+
+    train_df = df.iloc[:train_idx].copy()
+    calib_df = df.iloc[train_idx:calib_idx].copy()
+    test_df = df.iloc[calib_idx:].copy()
     
     print(f"Total dataset: {total_samples} posts (Chronological)")
-    print(f"Time-based Train set: {len(train_df)} posts ({train_df['published_at'].min().date()} to {train_df['published_at'].max().date()})")
-    print(f"Time-based Test set:  {len(test_df)} posts ({test_df['published_at'].min().date()} to {test_df['published_at'].max().date()})")
+    print(f"Time-based Train set:        {len(train_df)} posts ({train_df['published_at'].min().date()} to {train_df['published_at'].max().date()})")
+    print(f"Time-based Calibration set:  {len(calib_df)} posts ({calib_df['published_at'].min().date()} to {calib_df['published_at'].max().date()})")
+    print(f"Time-based Held-Out Test:    {len(test_df)} posts ({test_df['published_at'].min().date()} to {test_df['published_at'].max().date()})")
     
     # Imbalance scenarios to benchmark (percentile thresholds defining breakout)
     scenarios = [
@@ -156,6 +160,7 @@ def train_and_benchmark():
     best_pr_auc = -1.0
     
     X_train_raw = train_df[NUMERICAL_FEATURES + CATEGORICAL_FEATURES]
+    X_calib_raw = calib_df[NUMERICAL_FEATURES + CATEGORICAL_FEATURES]
     X_test_raw = test_df[NUMERICAL_FEATURES + CATEGORICAL_FEATURES]
     
     for sc in scenarios:
@@ -163,16 +168,19 @@ def train_and_benchmark():
         p_cutoff = sc["percentile"]
         print(f"\n--- Running Benchmark for Scenario: {sc['name']} ---")
         
-        # Determine labels per creator in train and test to simulate that exact base rate
+        # Determine labels per creator in each split chronologically
         train_thresh = train_df.groupby("creator_id")["engagement_rate"].transform(lambda s: s.quantile(p_cutoff))
+        calib_thresh = calib_df.groupby("creator_id")["engagement_rate"].transform(lambda s: s.quantile(p_cutoff))
         test_thresh = test_df.groupby("creator_id")["engagement_rate"].transform(lambda s: s.quantile(p_cutoff))
         
         y_train = (train_df["engagement_rate"] >= train_thresh).astype(int).values
+        y_calib = (calib_df["engagement_rate"] >= calib_thresh).astype(int).values
         y_test = (test_df["engagement_rate"] >= test_thresh).astype(int).values
         
         pos_train = np.sum(y_train)
+        pos_calib = np.sum(y_calib)
         pos_test = np.sum(y_test)
-        print(f"Train positive rate: {pos_train}/{len(y_train)} ({pos_train/len(y_train)*100:.1f}%), Test positive rate: {pos_test}/{len(y_test)} ({pos_test/len(y_test)*100:.1f}%)")
+        print(f"Train positive rate: {pos_train}/{len(y_train)} ({pos_train/len(y_train)*100:.1f}%), Calib: {pos_calib}/{len(y_calib)} ({pos_calib/len(y_calib)*100:.1f}%), Test: {pos_test}/{len(y_test)} ({pos_test/len(y_test)*100:.1f}%)")
         
         neg_count = len(y_train) - pos_train
         scale_pos_weight = max(1.0, float(neg_count / max(1, pos_train)))
@@ -219,17 +227,21 @@ def train_and_benchmark():
         scenario_metrics = {}
         for method_name, pipe in methods.items():
             try:
-                # Train pipeline strictly on X_train_raw and y_train
+                # 1. Train pipeline strictly on training split
                 pipe.fit(X_train_raw, y_train)
-                
-                # Check if threshold tuning
+
+                # 2. Fit probability calibrator strictly on separate calibration split (zero test leakage)
+                calibrated = CalibratedClassifierCV(estimator=pipe, method="sigmoid", cv="prefit")
+                calibrated.fit(X_calib_raw, y_calib)
+
+                # 3. Evaluate strictly on untouched held-out test split
                 if method_name == "threshold_tuning":
-                    train_probs = pipe.predict_proba(X_train_raw)[:, 1]
-                    best_thresh = find_best_threshold(y_train, train_probs)
-                    test_probs = pipe.predict_proba(X_test_raw)[:, 1]
+                    calib_probs = calibrated.predict_proba(X_calib_raw)[:, 1]
+                    best_thresh = find_best_threshold(y_calib, calib_probs)
+                    test_probs = calibrated.predict_proba(X_test_raw)[:, 1]
                     metrics = evaluate_predictions(y_test, test_probs, threshold=best_thresh)
                 else:
-                    test_probs = pipe.predict_proba(X_test_raw)[:, 1]
+                    test_probs = calibrated.predict_proba(X_test_raw)[:, 1]
                     metrics = evaluate_predictions(y_test, test_probs, threshold=0.5)
                 
                 scenario_metrics[method_name] = metrics
@@ -238,9 +250,6 @@ def train_and_benchmark():
                 # Save primary model from 90:10 scenario
                 if ratio_key == "90_10" and metrics["pr_auc"] > best_pr_auc:
                     best_pr_auc = metrics["pr_auc"]
-                    # Train calibrated model for production inference
-                    calibrated = CalibratedClassifierCV(estimator=pipe, method="sigmoid", cv="prefit")
-                    calibrated.fit(X_test_raw, y_test)
                     best_model_obj = {
                         "pipeline": pipe,
                         "calibrated_model": calibrated,
@@ -249,6 +258,12 @@ def train_and_benchmark():
                         "numerical_features": NUMERICAL_FEATURES,
                         "categorical_features": CATEGORICAL_FEATURES,
                         "base_rate": 0.10,
+                        "split_info": {
+                            "train_size": len(train_df),
+                            "calibration_size": len(calib_df),
+                            "test_size": len(test_df),
+                            "methodology": "3-way chronological split (zero calibration data leakage)"
+                        },
                         "trained_at": datetime.now(timezone.utc).isoformat()
                     }
                     
@@ -305,8 +320,9 @@ def train_and_benchmark():
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "total_posts": total_samples,
         "train_samples": len(train_df),
+        "calibration_samples": len(calib_df),
         "test_samples": len(test_df),
-        "split_method": "Time-based (80% past chronological train, 20% recent test)",
+        "split_method": "Time-based 3-way split (70% train, 15% calibration, 15% held-out test - zero calibration data leakage)",
         "feature_importances": feature_importance_dict,
         "benchmarks": benchmark_results,
         "explanation": explanation

@@ -84,14 +84,20 @@ const normalizeStatus = (status) => {
   return 'idea';
 };
 
-export default function CalendarDrafts() {
+export default function CalendarDrafts({ initialView = 'board' }) {
   const { selectedPlatform, lastRefreshed } = usePlatform();
   const { addToast } = useToast();
   const navigate = useNavigate();
 
   const [drafts, setDrafts] = useState([]);
-  const [viewMode, setViewMode] = useState('board'); // 'board', 'calendar', 'list'
+  const [viewMode, setViewMode] = useState(initialView); // 'board', 'calendar', 'list'
   const [statusFilter, setStatusFilter] = useState('all');
+
+  useEffect(() => {
+    if (initialView) {
+      setViewMode(initialView);
+    }
+  }, [initialView]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 

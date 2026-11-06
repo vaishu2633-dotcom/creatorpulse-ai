@@ -1,0 +1,391 @@
+{
+  "generated_at": "2026-11-06T14:47:54.028321+00:00",
+  "total_posts": 1800,
+  "train_samples": 1260,
+  "calibration_samples": 270,
+  "test_samples": 270,
+  "split_method": "Time-based 3-way split (70% train, 15% calibration, 15% held-out test - zero calibration data leakage)",
+  "feature_importances": {
+    "post_hour": 0.2215,
+    "title_length": 0.1654,
+    "post_weekday": 0.1218,
+    "hashtag_count": 0.0956,
+    "duration_sec": 0.0777,
+    "creator_avg_engagement": 0.045,
+    "follower_count": 0.0388,
+    "post_type_image_tweet": 0.0329,
+    "post_type_livestream": 0.031,
+    "post_type_carousel": 0.0208,
+    "post_type_thread": 0.0199,
+    "post_type_poll": 0.0164,
+    "platform_youtube": 0.0121,
+    "post_type_story_highlight": 0.012,
+    "post_type_long_video": 0.0117,
+    "post_type_single_tweet": 0.0106,
+    "post_type_reel": 0.0104,
+    "platform_linkedin": 0.0103,
+    "platform_instagram": 0.0092,
+    "post_type_short": 0.0086,
+    "post_type_single_image": 0.0083,
+    "post_type_story_post": 0.0081,
+    "platform_twitter": 0.0071,
+    "post_type_article": 0.0047
+  },
+  "benchmarks": {
+    "80_20": {
+      "name": "80:20 (20% Breakouts)",
+      "positive_rate_percent": 20.0,
+      "methods": {
+        "baseline_none": {
+          "pr_auc": 0.2591,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.1621,
+          "threshold": 0.5
+        },
+        "class_weight_balanced": {
+          "pr_auc": 0.2501,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.1618,
+          "threshold": 0.5
+        },
+        "random_oversampling": {
+          "pr_auc": 0.2489,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.1626,
+          "threshold": 0.5
+        },
+        "smote": {
+          "pr_auc": 0.2694,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.1614,
+          "threshold": 0.5
+        },
+        "smote_tomek": {
+          "pr_auc": 0.2863,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.16,
+          "threshold": 0.5
+        },
+        "balanced_random_forest": {
+          "pr_auc": 0.2654,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.161,
+          "threshold": 0.5
+        },
+        "xgboost_scale_weight": {
+          "pr_auc": 0.2586,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.1618,
+          "threshold": 0.5
+        },
+        "threshold_tuning": {
+          "pr_auc": 0.2501,
+          "f1": 0.3598,
+          "recall": 0.6071,
+          "precision": 0.2556,
+          "mcc": 0.1172,
+          "balanced_accuracy": 0.5723,
+          "brier_score": 0.1618,
+          "threshold": 0.2
+        }
+      }
+    },
+    "90_10": {
+      "name": "90:10 (10% Breakouts)",
+      "positive_rate_percent": 10.0,
+      "methods": {
+        "baseline_none": {
+          "pr_auc": 0.1953,
+          "f1": 0.0606,
+          "recall": 0.0312,
+          "precision": 1.0,
+          "mcc": 0.1663,
+          "balanced_accuracy": 0.5156,
+          "brier_score": 0.103,
+          "threshold": 0.5
+        },
+        "class_weight_balanced": {
+          "pr_auc": 0.1965,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.1025,
+          "threshold": 0.5
+        },
+        "random_oversampling": {
+          "pr_auc": 0.1666,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.1034,
+          "threshold": 0.5
+        },
+        "smote": {
+          "pr_auc": 0.197,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.102,
+          "threshold": 0.5
+        },
+        "smote_tomek": {
+          "pr_auc": 0.2018,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.1023,
+          "threshold": 0.5
+        },
+        "balanced_random_forest": {
+          "pr_auc": 0.2069,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.102,
+          "threshold": 0.5
+        },
+        "xgboost_scale_weight": {
+          "pr_auc": 0.1934,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.103,
+          "threshold": 0.5
+        },
+        "threshold_tuning": {
+          "pr_auc": 0.1965,
+          "f1": 0.24,
+          "recall": 0.4688,
+          "precision": 0.1613,
+          "mcc": 0.0959,
+          "balanced_accuracy": 0.5705,
+          "brier_score": 0.1025,
+          "threshold": 0.13
+        }
+      }
+    },
+    "95_5": {
+      "name": "95:5 (5% Breakouts)",
+      "positive_rate_percent": 5.0,
+      "methods": {
+        "baseline_none": {
+          "pr_auc": 0.0625,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.0561,
+          "threshold": 0.5
+        },
+        "class_weight_balanced": {
+          "pr_auc": 0.079,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.0558,
+          "threshold": 0.5
+        },
+        "random_oversampling": {
+          "pr_auc": 0.0638,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.0558,
+          "threshold": 0.5
+        },
+        "smote": {
+          "pr_auc": 0.129,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.0557,
+          "threshold": 0.5
+        },
+        "smote_tomek": {
+          "pr_auc": 0.1324,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.0556,
+          "threshold": 0.5
+        },
+        "balanced_random_forest": {
+          "pr_auc": 0.087,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.0556,
+          "threshold": 0.5
+        },
+        "xgboost_scale_weight": {
+          "pr_auc": 0.0856,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.0556,
+          "threshold": 0.5
+        },
+        "threshold_tuning": {
+          "pr_auc": 0.079,
+          "f1": 0.1212,
+          "recall": 0.5,
+          "precision": 0.069,
+          "mcc": 0.0357,
+          "balanced_accuracy": 0.5374,
+          "brier_score": 0.0558,
+          "threshold": 0.06
+        }
+      }
+    },
+    "99_1": {
+      "name": "99:1 (1% Breakouts)",
+      "positive_rate_percent": 1.0,
+      "methods": {
+        "baseline_none": {
+          "pr_auc": 0.0453,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.0288,
+          "threshold": 0.5
+        },
+        "class_weight_balanced": {
+          "pr_auc": 0.0478,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.0287,
+          "threshold": 0.5
+        },
+        "random_oversampling": {
+          "pr_auc": 0.0673,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.0283,
+          "threshold": 0.5
+        },
+        "smote": {
+          "pr_auc": 0.0565,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.0286,
+          "threshold": 0.5
+        },
+        "smote_tomek": {
+          "pr_auc": 0.0488,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.0287,
+          "threshold": 0.5
+        },
+        "balanced_random_forest": {
+          "pr_auc": 0.0488,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.0287,
+          "threshold": 0.5
+        },
+        "xgboost_scale_weight": {
+          "pr_auc": 0.0558,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": 0.0,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.0287,
+          "threshold": 0.5
+        },
+        "threshold_tuning": {
+          "pr_auc": 0.0478,
+          "f1": 0.0,
+          "recall": 0.0,
+          "precision": 0.0,
+          "mcc": -0.0185,
+          "balanced_accuracy": 0.4943,
+          "brier_score": 0.0287,
+          "threshold": 0.072
+        }
+      }
+    }
+  },
+  "explanation": {
+    "summary": "Why Accuracy Fails in Breakout Prediction",
+    "key_insights": [
+      "At 99:1 imbalance (1% breakouts), a naive model predicting 0 for every single post achieves 99% plain accuracy, but has 0% Recall and 0% F1, rendering it useless for creators.",
+      "PR-AUC (Precision-Recall Area Under Curve) and Matthews Correlation Coefficient (MCC) are far more reliable than ROC-AUC or Accuracy because they punish false discoveries in rare positive classes.",
+      "Resampling methods (SMOTE, SMOTE-Tomek, Random Oversampling) synthesize or balance the minority class inside the training pipeline, forcing decision boundaries to preserve breakout signals without test data contamination.",
+      "Balanced Random Forest and XGBoost with scale_pos_weight yield consistent gains when breakouts are moderately rare (5% to 10%), while threshold tuning optimizes precision/recall tradeoffs for extreme 1% cases.",
+      "Probability calibration (Platt Sigmoid / Isotonic) is critical for creator trust: an uncalibrated 80% model output often corresponds to only ~15% empirical breakout frequency."
+    ],
+    "disclaimer": "NOTE: All metrics are calculated on SYNTHETIC datasets generated specifically for the CreatorPulse AI prototype. They illustrate algorithmic dynamics and should not be interpreted as empirical findings on real platform algorithms."
+  }
+}

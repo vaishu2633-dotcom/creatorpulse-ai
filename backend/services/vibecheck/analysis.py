@@ -78,6 +78,50 @@ class VibeAnalyzer:
             return "VADER (Rule-based)", "Sentiment works best for English comments", False
 
     @staticmethod
+    def _score_sentiment(text: str) -> Tuple[float, str]:
+        """
+        Classifies sentiment using XLM-RoBERTa transformer if active,
+        or falls back cleanly to VADER polarity analyzer.
+        Returns: (compound_score [-1.0, 1.0], sentiment_label ['positive', 'neutral', 'negative'])
+        """
+        global _xlm_roberta_pipeline
+        if _xlm_roberta_pipeline is not None:
+            try:
+                clean_text = text[:512]
+                res = _xlm_roberta_pipeline(clean_text)
+                if res and isinstance(res, list) and len(res) > 0:
+                    item = res[0]
+                    raw_label = str(item.get("label", "")).lower()
+                    conf = float(item.get("score", 0.5))
+
+                    if "pos" in raw_label or raw_label == "label_2":
+                        label = "positive"
+                        compound = round(conf * 0.85, 3)
+                    elif "neg" in raw_label or raw_label == "label_0":
+                        label = "negative"
+                        compound = round(-conf * 0.85, 3)
+                    else:
+                        label = "neutral"
+                        compound = 0.0
+
+                    return compound, label
+            except Exception:
+                # Transparent fallback to VADER on any pipeline runtime error
+                pass
+
+        # VADER rule-based fallback
+        vs = analyzer.polarity_scores(text)
+        compound = round(float(vs["compound"]), 3)
+        if compound >= 0.15:
+            label = "positive"
+        elif compound <= -0.15:
+            label = "negative"
+        else:
+            label = "neutral"
+
+        return compound, label
+
+    @staticmethod
     def analyze(payload: AnalysisPayload) -> Dict[str, Any]:
         comments = payload.comments
         total_comments = len(comments)
@@ -100,17 +144,9 @@ class VibeAnalyzer:
             words = text.split()
             total_words += len(words)
 
-            # VADER sentiment
-            vs = analyzer.polarity_scores(text)
-            compound = vs["compound"]
+            # Sentiment Scoring (Transformer when active, otherwise VADER)
+            compound, sentiment_label = VibeAnalyzer._score_sentiment(text)
             sentiment_scores.append(compound)
-
-            if compound >= 0.15:
-                sentiment_label = "positive"
-            elif compound <= -0.15:
-                sentiment_label = "negative"
-            else:
-                sentiment_label = "neutral"
 
             # Spam Detection
             is_spam, spam_reason = VibeAnalyzer._detect_spam(text)

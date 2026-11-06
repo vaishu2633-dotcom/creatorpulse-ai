@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { usePlatform } from '../context/PlatformContext';
 import { useToast } from '../context/ToastContext';
 import { getReportsAnalytics, getReportsCsvExportUrl } from '../api/apiClient';
@@ -7,6 +8,7 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import SlideOver from '../components/ui/SlideOver';
 import PlatformBadge from '../components/PlatformBadge';
+import CompetitorAnalysis from './CompetitorAnalysis';
 import { getSampleThumbnail } from '../assets/sample/sampleThumbnails';
 import { formatIsoDateTime } from '../utils/timeFormat';
 import {
@@ -25,7 +27,8 @@ import {
   Sparkles,
   SlidersHorizontal,
   ChevronRight,
-  Filter
+  Filter,
+  Users
 } from 'lucide-react';
 import {
   AreaChart,
@@ -47,6 +50,19 @@ const formatNumber = (num) => {
 export default function Reports() {
   const { selectedPlatform, activeDataSource } = usePlatform();
   const { addToast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const [reportTab, setReportTab] = useState(
+    tabParam === 'competitors' || tabParam === 'competitor' ? 'competitors' : 'analytics'
+  );
+
+  useEffect(() => {
+    if (tabParam === 'competitors' || tabParam === 'competitor') {
+      setReportTab('competitors');
+    } else if (tabParam === 'analytics') {
+      setReportTab('analytics');
+    }
+  }, [tabParam]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -114,8 +130,41 @@ export default function Reports() {
         icon={BarChart3}
       />
 
-      {/* 2. Filter & Export Toolbar */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-[#161D2B] border border-[#E8E6DF] dark:border-[#222B3D] shadow-xs flex flex-wrap items-center justify-between gap-3">
+      {/* 2 Primary Tabs: Analytics Reports vs Competitor Comparison */}
+      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-1 sm:gap-2">
+        <button
+          onClick={() => { setReportTab('analytics'); setSearchParams({ tab: 'analytics' }); }}
+          className={`flex items-center space-x-2 py-3 px-4 font-semibold text-xs sm:text-sm border-b-2 transition ${
+            reportTab === 'analytics'
+              ? 'border-violet-600 text-violet-600 dark:text-violet-400 bg-violet-50/50 dark:bg-violet-950/20 rounded-t-lg'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          <span>Analytics Reports</span>
+        </button>
+
+        <button
+          onClick={() => { setReportTab('competitors'); setSearchParams({ tab: 'competitors' }); }}
+          className={`flex items-center space-x-2 py-3 px-4 font-semibold text-xs sm:text-sm border-b-2 transition ${
+            reportTab === 'competitors'
+              ? 'border-violet-600 text-violet-600 dark:text-violet-400 bg-violet-50/50 dark:bg-violet-950/20 rounded-t-lg'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>Competitor Comparison</span>
+        </button>
+      </div>
+
+      {reportTab === 'competitors' ? (
+        <div className="pt-2">
+          <CompetitorAnalysis />
+        </div>
+      ) : (
+        <>
+          {/* 2. Filter & Export Toolbar */}
+          <div className="p-4 rounded-2xl bg-white dark:bg-[#161D2B] border border-[#E8E6DF] dark:border-[#222B3D] shadow-xs flex flex-wrap items-center justify-between gap-3">
         {/* Time Filter Pills */}
         <div className="flex items-center space-x-1.5">
           <span className="text-xs font-bold text-slate-500 mr-1 flex items-center space-x-1">
@@ -467,6 +516,8 @@ export default function Reports() {
           </div>
         )}
       </SlideOver>
+      </>
+      )}
     </div>
   );
 }

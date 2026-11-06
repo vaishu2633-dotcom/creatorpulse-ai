@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/ui/PageHeader';
 import HowItWorks from '../components/ui/HowItWorks';
 import StatusChip from '../components/ui/StatusChip';
@@ -7,6 +7,7 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import SlideOver from '../components/ui/SlideOver';
 import ErrorState from '../components/ui/ErrorState';
+import CommentInsights from './CommentInsights';
 import { useToast } from '../context/ToastContext';
 import { analyzeVibe, getVibeCheckHistory, deleteVibeCheckReport } from '../api/apiClient';
 import {
@@ -33,7 +34,10 @@ import {
   Clock,
   RefreshCw,
   Copy,
-  Check
+  Check,
+  Smile,
+  BarChart2,
+  MessageSquareHeart
 } from 'lucide-react';
 import vibeIllustration from '../assets/illustrations/vibecheck-analyzer.svg';
 
@@ -70,6 +74,23 @@ Chris B.: Great breakdown, but is this applicable for small channels under 1,000
 export default function VibeCheck() {
   const { addToast } = useToast();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const [topTab, setTopTab] = useState(
+    tabParam === 'sentiment'
+      ? 'sentiment'
+      : tabParam === 'audience'
+      ? 'audience'
+      : tabParam === 'history'
+      ? 'history'
+      : 'analyze'
+  );
+
+  useEffect(() => {
+    if (tabParam === 'sentiment' || tabParam === 'audience' || tabParam === 'history' || tabParam === 'analyze') {
+      setTopTab(tabParam);
+    }
+  }, [tabParam]);
 
   const handleTurnIntoStudioIdea = (topicCandidate) => {
     const topic = topicCandidate || analysis?.metadata?.title || 'Audience Feedback Concept';
@@ -345,8 +366,227 @@ export default function VibeCheck() {
         }
       />
 
-      {/* How it Works Strip */}
-      <HowItWorks steps={HOW_IT_WORKS_STEPS} />
+      {/* 4 Primary Tabs in VibeCheck AI */}
+      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-1 sm:gap-2">
+        <button
+          onClick={() => { setTopTab('analyze'); setSearchParams({ tab: 'analyze' }); }}
+          className={`flex items-center space-x-2 py-3 px-4 font-semibold text-xs sm:text-sm border-b-2 transition ${
+            topTab === 'analyze'
+              ? 'border-violet-600 text-violet-600 dark:text-violet-400 bg-violet-50/50 dark:bg-violet-950/20 rounded-t-lg'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <SearchCheck className="w-4 h-4" />
+          <span>Analyze Post</span>
+        </button>
+
+        <button
+          onClick={() => { setTopTab('sentiment'); setSearchParams({ tab: 'sentiment' }); }}
+          className={`flex items-center space-x-2 py-3 px-4 font-semibold text-xs sm:text-sm border-b-2 transition ${
+            topTab === 'sentiment'
+              ? 'border-violet-600 text-violet-600 dark:text-violet-400 bg-violet-50/50 dark:bg-violet-950/20 rounded-t-lg'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <BarChart2 className="w-4 h-4" />
+          <span>Sentiment Overview</span>
+        </button>
+
+        <button
+          onClick={() => { setTopTab('audience'); setSearchParams({ tab: 'audience' }); }}
+          className={`flex items-center space-x-2 py-3 px-4 font-semibold text-xs sm:text-sm border-b-2 transition ${
+            topTab === 'audience'
+              ? 'border-violet-600 text-violet-600 dark:text-violet-400 bg-violet-50/50 dark:bg-violet-950/20 rounded-t-lg'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <MessageSquareHeart className="w-4 h-4" />
+          <span>Audience Voice</span>
+        </button>
+
+        <button
+          onClick={() => { setTopTab('history'); setSearchParams({ tab: 'history' }); }}
+          className={`flex items-center space-x-2 py-3 px-4 font-semibold text-xs sm:text-sm border-b-2 transition ${
+            topTab === 'history'
+              ? 'border-violet-600 text-violet-600 dark:text-violet-400 bg-violet-50/50 dark:bg-violet-950/20 rounded-t-lg'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <History className="w-4 h-4" />
+          <span>Analysis History ({historyReports.length})</span>
+        </button>
+      </div>
+
+      {topTab === 'audience' ? (
+        <div className="pt-2">
+          <CommentInsights />
+        </div>
+      ) : topTab === 'history' ? (
+        <div className="pt-2 space-y-4">
+          <Card className="p-6">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center space-x-2">
+                  <History className="w-5 h-5 text-violet-600" />
+                  <span>Saved VibeCheck Reports</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Click any report to reload its metrics, recommendations, and comment explorer.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                icon={RefreshCw}
+                onClick={fetchHistory}
+                loading={loadingHistory}
+              >
+                Refresh History
+              </Button>
+            </div>
+
+            {loadingHistory ? (
+              <div className="p-12 text-center text-xs text-slate-400">
+                <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-violet-600" />
+                Loading saved reports...
+              </div>
+            ) : historyReports.length === 0 ? (
+              <div className="p-12 text-center text-xs text-slate-400 space-y-2">
+                <p>No previous reports saved yet.</p>
+                <Button variant="primary" size="sm" onClick={() => setTopTab('analyze')}>
+                  Run First Analysis
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-4">
+                {historyReports.map((r) => (
+                  <div
+                    key={r.report_id}
+                    onClick={() => {
+                      loadReport(r);
+                      setTopTab('analyze');
+                    }}
+                    className="p-4 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 hover:border-violet-400 dark:hover:border-violet-600 transition cursor-pointer space-y-2 group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sm text-slate-900 dark:text-white truncate pr-2">
+                        {r.title}
+                      </span>
+                      <button
+                        onClick={(e) => deleteReport(r.report_id, e)}
+                        className="p-1 text-slate-400 hover:text-rose-500 transition opacity-0 group-hover:opacity-100"
+                        title="Delete report"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="flex items-center space-x-2 text-xs text-slate-500">
+                      <span className="capitalize font-semibold text-violet-600 dark:text-violet-400">{r.platform}</span>
+                      <span>•</span>
+                      <span>Vibe: <strong>{r.vibe_score}/100</strong></span>
+                      <span>•</span>
+                      <span>{r.comment_count} comments</span>
+                    </div>
+                    <div className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">
+                      {r.summary}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+      ) : topTab === 'sentiment' ? (
+        <div className="pt-2 space-y-6">
+          <Card className="p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center space-x-2">
+                  <BarChart2 className="w-5 h-5 text-violet-600" />
+                  <span>Sentiment & Emotion Distribution</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Multilingual polarity scoring and 8-vibe emotional classification from real audience comments.
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300 border border-violet-200 dark:border-violet-800">
+                  {analysis?.sentiment?.model_used || 'XLM-RoBERTa / VADER Engine'}
+                </span>
+              </div>
+            </div>
+
+            {analysis ? (
+              <div className="space-y-6 pt-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-center">
+                    <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">
+                      Positive Sentiment
+                    </div>
+                    <div className="text-2xl font-extrabold text-emerald-800 dark:text-emerald-200 mt-1">
+                      {analysis.sentiment?.positive_percent || 0}%
+                    </div>
+                    <div className="text-[11px] text-emerald-600 mt-0.5">High approval & praise</div>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-center">
+                    <div className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+                      Neutral Sentiment
+                    </div>
+                    <div className="text-2xl font-extrabold text-slate-800 dark:text-slate-200 mt-1">
+                      {analysis.sentiment?.neutral_percent || 0}%
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">Questions & observations</div>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-center">
+                    <div className="text-xs font-semibold text-rose-700 dark:text-rose-300 uppercase tracking-wider">
+                      Negative Sentiment
+                    </div>
+                    <div className="text-2xl font-extrabold text-rose-800 dark:text-rose-200 mt-1">
+                      {analysis.sentiment?.negative_percent || 0}%
+                    </div>
+                    <div className="text-[11px] text-rose-600 mt-0.5">Critique & pushback</div>
+                  </div>
+                </div>
+
+                {/* 8 Vibes Breakdown */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                    8 Emotional Vibes Clusters
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {Object.entries(analysis.vibes?.breakdown || {}).map(([vibeName, count]) => (
+                      <div
+                        key={vibeName}
+                        className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
+                      >
+                        <div className="text-xs font-semibold capitalize text-slate-700 dark:text-slate-300">
+                          {vibeName}
+                        </div>
+                        <div className="text-lg font-extrabold text-violet-600 dark:text-violet-400 mt-0.5">
+                          {count} <span className="text-[10px] text-slate-400 font-normal">comments</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="py-12 text-center text-xs text-slate-400 space-y-3">
+                <p>Run an analysis on any video or pasted comments to explore sentiment distribution.</p>
+                <Button variant="primary" size="sm" onClick={() => setTopTab('analyze')}>
+                  Analyze a Post Now
+                </Button>
+              </div>
+            )}
+          </Card>
+        </div>
+      ) : (
+        <>
+          {/* How it Works Strip */}
+          <HowItWorks steps={HOW_IT_WORKS_STEPS} />
 
       {/* Supported Platforms Strip */}
       <div className="p-4 rounded-2xl bg-white/70 dark:bg-[#171D2B]/70 border border-[#E8E6DF] dark:border-[#232B3E] flex flex-wrap items-center justify-between gap-3 text-xs">
@@ -1079,6 +1319,8 @@ export default function VibeCheck() {
             </div>
           </Card>
         </div>
+      )}
+      </>
       )}
 
       {/* History SlideOver */}

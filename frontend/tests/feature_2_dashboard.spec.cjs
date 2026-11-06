@@ -30,7 +30,7 @@ const assert = require('assert');
     // 1. Navigate to Dashboard
     console.log('[Step 1] Navigating to Dashboard');
     await page.goto(`${BASE_URL}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(2000);
 
     // 2. Verify Hero floating cards display real numbers
     console.log('[Step 2] Verifying Hero floating metrics');
