@@ -15,6 +15,7 @@ import re
 from typing import Dict, Any, Optional, List
 import httpx
 from .base import PlatformAdapter, AnalysisPayload, CommentItem, CoverageReport
+from backend.services import integrations_manager
 
 SAMPLE_YOUTUBE_COMMENTS = [
     {"author": "Alex Rivera", "text": "This completely changed how I think about pacing! The hook in the first 5 seconds was brilliant.", "like_count": 342, "published_at": "2026-03-12T14:20:00Z"},
@@ -36,7 +37,7 @@ class YouTubeAdapter(PlatformAdapter):
     """Adapter for YouTube URLs using official YouTube Data API v3."""
 
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.getenv("YOUTUBE_API_KEY", "").strip()
+        self.api_key = api_key or integrations_manager.get_secret("YOUTUBE_API_KEY")
 
     def can_handle(self, target: str) -> bool:
         if not target:
@@ -76,7 +77,7 @@ class YouTubeAdapter(PlatformAdapter):
             raise ValueError("Invalid YouTube URL: Could not extract a valid 11-character video ID from the provided link.")
 
         # Re-check API key dynamically in case it was added to .env
-        api_key = self.api_key or os.getenv("YOUTUBE_API_KEY", "").strip()
+        api_key = self.api_key or integrations_manager.get_secret("YOUTUBE_API_KEY")
         if not api_key or api_key.startswith("your_"):
             raise ValueError(
                 "YouTube Data API key is not configured in .env. "

@@ -20,12 +20,12 @@ import json
 import re
 from typing import Dict, Any, List, Optional
 import httpx
-from backend.services import prediction
+from backend.services import prediction, integrations_manager
 
 
 def get_llm_status() -> Dict[str, Any]:
-    """Returns current LLM provider configuration status."""
-    raw_key = os.getenv("LLM_API_KEY", "").strip()
+    """Returns current LLM provider configuration status using central integrations manager."""
+    raw_key = integrations_manager.get_secret("LLM_API_KEY")
     has_key = bool(raw_key and not raw_key.startswith("your_"))
     provider = os.getenv("LLM_PROVIDER", "").strip().lower()
 
@@ -40,7 +40,8 @@ def get_llm_status() -> Dict[str, Any]:
         "provider": provider if has_key else "template",
         "mode": "ai" if has_key else "template",
         "model_label": "Gemini 1.5 Flash" if provider == "gemini" else ("GPT-4o Mini" if provider == "openai" else "Curated Templates"),
-        "supported_languages": ["English", "Hindi", "Marathi"]
+        "supported_languages": ["English", "Hindi", "Marathi"],
+        "masked_key": integrations_manager.mask_key(raw_key) if has_key else None
     }
 
 
@@ -49,7 +50,7 @@ def call_external_llm_api(prompt: str, system_prompt: str = "") -> Optional[str]
     Calls the configured external LLM provider if LLM_API_KEY is available.
     Supports Gemini and OpenAI. Returns raw text response or None on failure/missing key.
     """
-    raw_key = os.getenv("LLM_API_KEY", "").strip()
+    raw_key = integrations_manager.get_secret("LLM_API_KEY")
     if not raw_key or raw_key.startswith("your_"):
         return None
 

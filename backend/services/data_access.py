@@ -23,6 +23,16 @@ import re
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional, Tuple
 
+from backend.database.connection import get_storage_mode, get_db, ensure_database_ready, DatabaseConnectionError
+from backend.database.models import SYSTEM_DEMO_WORKSPACE_ID, SYSTEM_DEMO_USER_ID
+from backend.database.repositories import (
+    post_repository,
+    prediction_repository,
+    draft_repository,
+    vibecheck_repository,
+    dataset_repository,
+)
+
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 ML_DIR = os.path.join(os.path.dirname(__file__), "..", "ml")
 
@@ -129,6 +139,12 @@ def get_system_metadata() -> Dict[str, Any]:
 
 def get_creators(platform: Optional[str] = None) -> List[Dict[str, Any]]:
     active_source = get_active_data_source()
+    mode = get_storage_mode()
+
+    if mode in ("sqlite", "postgres") and active_source == "sample":
+        ensure_database_ready()
+        with get_db() as session:
+            return post_repository.get_creators(session, SYSTEM_DEMO_WORKSPACE_ID, platform=platform)
 
     if active_source == "youtube":
         state = get_data_source_state()
@@ -199,7 +215,19 @@ def get_creator_base_rate(platform: str, creator_id: Optional[str] = None) -> fl
 
 def get_active_posts_raw() -> List[Dict[str, Any]]:
     """Loads all raw posts for current active data source."""
+    mode = get_storage_mode()
     active_source = get_active_data_source()
+
+    if mode in ("sqlite", "postgres"):
+        ensure_database_ready()
+        with get_db() as session:
+            if active_source == "uploaded_csv":
+                return post_repository.get_posts(session, SYSTEM_DEMO_WORKSPACE_ID, is_synthetic=False)
+            elif active_source == "youtube":
+                return post_repository.get_posts(session, SYSTEM_DEMO_WORKSPACE_ID, platform="youtube", is_synthetic=False)
+            else:
+                return post_repository.get_posts(session, SYSTEM_DEMO_WORKSPACE_ID)
+
     if active_source == "uploaded_csv":
         return _load_json("uploaded_posts.json")
     elif active_source == "youtube":
@@ -265,6 +293,13 @@ def get_bottom_posts(platform: Optional[str] = None, days: Optional[int] = None,
 
 def get_metric_snapshots(platform: Optional[str] = None, days: int = 30) -> List[Dict[str, Any]]:
     active_source = get_active_data_source()
+    mode = get_storage_mode()
+
+    if mode in ("sqlite", "postgres") and active_source == "sample":
+        ensure_database_ready()
+        with get_db() as session:
+            return post_repository.get_metric_snapshots(session, SYSTEM_DEMO_WORKSPACE_ID, platform=platform, days=days)
+
     if active_source == "sample":
         snapshots = _load_json("metric_snapshots.json")
         if platform and platform.lower() != "all":
@@ -623,6 +658,12 @@ def get_comments_summary(platform: Optional[str] = None) -> Dict[str, Any]:
 # ----------------- Prediction History -----------------
 
 def get_predictions(platform: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+    mode = get_storage_mode()
+    if mode in ("sqlite", "postgres"):
+        ensure_database_ready()
+        with get_db() as session:
+            return prediction_repository.get_predictions(session, SYSTEM_DEMO_WORKSPACE_ID, platform=platform, limit=limit)
+
     predictions = _load_json("predictions.json")
     if platform and platform.lower() != "all":
         predictions = [p for p in predictions if p.get("platform", "").lower() == platform.lower()]
@@ -638,6 +679,13 @@ def save_prediction(prediction_data: Dict[str, Any]) -> Dict[str, Any]:
         
     predictions.insert(0, prediction_data)
     _save_json("predictions.json", predictions)
+
+    mode = get_storage_mode()
+    if mode in ("sqlite", "postgres"):
+        ensure_database_ready()
+        with get_db() as session:
+            prediction_repository.save_prediction(session, SYSTEM_DEMO_WORKSPACE_ID, prediction_data)
+
     return prediction_data
 
 def update_prediction_actual(
@@ -648,6 +696,7 @@ def update_prediction_actual(
 ) -> Optional[Dict[str, Any]]:
     """Records real published post outcome for a prediction to close the learning loop."""
     predictions = _load_json("predictions.json")
+    updated_obj = None
     for p in predictions:
         if p.get("prediction_id") == prediction_id:
             p["actual_outcome"] = bool(actual_outcome)
@@ -656,9 +705,21 @@ def update_prediction_actual(
             if actual_engagement_rate is not None:
                 p["actual_engagement_rate"] = float(actual_engagement_rate)
             p["evaluated_at"] = datetime.now(timezone.utc).isoformat()
-            _save_json("predictions.json", predictions)
-            return p
-    return None
+            updated_obj = p
+            break
+
+    if updated_obj:
+        _save_json("predictions.json", predictions)
+
+    mode = get_storage_mode()
+    if mode in ("sqlite", "postgres"):
+        ensure_database_ready()
+        with get_db() as session:
+            prediction_repository.update_prediction_actual(
+                session, SYSTEM_DEMO_WORKSPACE_ID, prediction_id, actual_outcome, actual_views, actual_engagement_rate
+            )
+
+    return updated_obj
 
 def sync_youtube_prediction_outcomes() -> Dict[str, Any]:
     """Matches recent predictions against published YouTube videos to record real performance."""
@@ -786,6 +847,12 @@ def get_accuracy_scoreboard(platform: Optional[str] = None) -> Dict[str, Any]:
 # ----------------- Drafts & Calendar -----------------
 
 def get_drafts(platform: Optional[str] = None, status: Optional[str] = None) -> List[Dict[str, Any]]:
+    mode = get_storage_mode()
+    if mode in ("sqlite", "postgres"):
+        ensure_database_ready()
+        with get_db() as session:
+            return draft_repository.get_content_drafts(session, SYSTEM_DEMO_WORKSPACE_ID, platform=platform, status=status)
+
     drafts = _load_json("drafts.json")
     for d in drafts:
         if "id" not in d and "draft_id" in d:
@@ -812,24 +879,47 @@ def save_draft(draft: Dict[str, Any]) -> Dict[str, Any]:
         
     drafts.insert(0, draft)
     _save_json("drafts.json", drafts)
+
+    mode = get_storage_mode()
+    if mode in ("sqlite", "postgres"):
+        ensure_database_ready()
+        with get_db() as session:
+            draft_repository.save_content_draft(session, SYSTEM_DEMO_WORKSPACE_ID, draft)
+
     return draft
 
 def update_draft(draft_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     drafts = _load_json("drafts.json")
+    updated = None
     for idx, d in enumerate(drafts):
         if d.get("draft_id") == draft_id or d.get("id") == draft_id:
             drafts[idx].update(updates)
+            updated = drafts[idx]
             _save_json("drafts.json", drafts)
-            return drafts[idx]
-    return None
+            break
+
+    mode = get_storage_mode()
+    if mode in ("sqlite", "postgres") and updated:
+        ensure_database_ready()
+        with get_db() as session:
+            draft_repository.save_content_draft(session, SYSTEM_DEMO_WORKSPACE_ID, updated)
+
+    return updated
 
 def delete_draft(draft_id: str) -> bool:
     drafts = _load_json("drafts.json")
     new_drafts = [d for d in drafts if d.get("draft_id") != draft_id and d.get("id") != draft_id]
-    if len(new_drafts) < len(drafts):
+    deleted = len(new_drafts) < len(drafts)
+    if deleted:
         _save_json("drafts.json", new_drafts)
-        return True
-    return False
+
+    mode = get_storage_mode()
+    if mode in ("sqlite", "postgres"):
+        ensure_database_ready()
+        with get_db() as session:
+            draft_repository.delete_content_draft(session, SYSTEM_DEMO_WORKSPACE_ID, draft_id)
+
+    return deleted
 
 # ----------------- Imbalance Lab Results -----------------
 
@@ -858,11 +948,23 @@ def save_creator_benchmark_results(results: Dict[str, Any]) -> None:
 # ----------------- VibeCheck Reports Storage -----------------
 
 def get_vibecheck_reports(limit: int = 50) -> List[Dict[str, Any]]:
+    mode = get_storage_mode()
+    if mode in ("sqlite", "postgres"):
+        ensure_database_ready()
+        with get_db() as session:
+            return vibecheck_repository.get_vibecheck_reports(session, SYSTEM_DEMO_WORKSPACE_ID, limit=limit)
+
     reports = _load_json("vibecheck_reports.json")
     reports.sort(key=lambda x: x.get("created_at", ""), reverse=True)
     return reports[:limit]
 
 def get_vibecheck_report_by_id(report_id: str) -> Optional[Dict[str, Any]]:
+    mode = get_storage_mode()
+    if mode in ("sqlite", "postgres"):
+        ensure_database_ready()
+        with get_db() as session:
+            return vibecheck_repository.get_vibecheck_report(session, SYSTEM_DEMO_WORKSPACE_ID, report_id)
+
     reports = _load_json("vibecheck_reports.json")
     for r in reports:
         if r.get("report_id") == report_id:
@@ -878,15 +980,29 @@ def save_vibecheck_report(report_data: Dict[str, Any]) -> Dict[str, Any]:
     
     reports.insert(0, report_data)
     _save_json("vibecheck_reports.json", reports)
+
+    mode = get_storage_mode()
+    if mode in ("sqlite", "postgres"):
+        ensure_database_ready()
+        with get_db() as session:
+            vibecheck_repository.save_vibecheck_report(session, SYSTEM_DEMO_WORKSPACE_ID, report_data)
+
     return report_data
 
 def delete_vibecheck_report(report_id: str) -> bool:
     reports = _load_json("vibecheck_reports.json")
     new_reports = [r for r in reports if r.get("report_id") != report_id]
-    if len(new_reports) < len(reports):
+    deleted = len(new_reports) < len(reports)
+    if deleted:
         _save_json("vibecheck_reports.json", new_reports)
-        return True
-    return False
+
+    mode = get_storage_mode()
+    if mode in ("sqlite", "postgres"):
+        ensure_database_ready()
+        with get_db() as session:
+            vibecheck_repository.delete_vibecheck_report(session, SYSTEM_DEMO_WORKSPACE_ID, report_id)
+
+    return deleted
 
 # ----------------- CSV Validation, Preview & Import -----------------
 
@@ -1134,6 +1250,20 @@ def import_posts_from_csv(
 
     # Save to uploaded_posts.json
     _save_json("uploaded_posts.json", valid_posts)
+
+    mode = get_storage_mode()
+    if mode in ("sqlite", "postgres"):
+        ensure_database_ready()
+        with get_db() as session:
+            post_repository.save_posts(session, SYSTEM_DEMO_WORKSPACE_ID, valid_posts, is_synthetic=False)
+            dataset_repository.save_uploaded_dataset(
+                session,
+                SYSTEM_DEMO_WORKSPACE_ID,
+                name=filename or "upload.csv",
+                filename=filename or "upload.csv",
+                row_count=len(valid_posts),
+                bad_rows_count=len(bad_rows),
+            )
 
     # Update state
     state = get_data_source_state()

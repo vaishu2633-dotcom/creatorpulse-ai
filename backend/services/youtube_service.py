@@ -15,31 +15,19 @@ import re
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
 import httpx
+from backend.services import integrations_manager
 
 def get_youtube_api_key() -> str:
-    """Retrieves YOUTUBE_API_KEY from environment or backend/.env."""
-    key = os.getenv("YOUTUBE_API_KEY", "").strip()
-    if not key:
-        # Check backend/.env explicitly if not loaded in os.environ
-        env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
-        if os.path.exists(env_path):
-            with open(env_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line.startswith("YOUTUBE_API_KEY="):
-                        val = line.split("=", 1)[1].strip().strip('"').strip("'")
-                        if val and not val.startswith("your_"):
-                            key = val
-                            break
-    return key
+    """Retrieves YOUTUBE_API_KEY using central integrations manager."""
+    return integrations_manager.get_secret("YOUTUBE_API_KEY")
 
 def check_youtube_api_status() -> Dict[str, Any]:
-    """Returns whether the YouTube Data API key is configured."""
+    """Returns whether the YouTube Data API key is configured and operational."""
     key = get_youtube_api_key()
     configured = bool(key and not key.startswith("your_"))
     return {
         "configured": configured,
-        "masked_key": f"{key[:4]}...{key[-4:]}" if (configured and len(key) > 8) else None,
+        "masked_key": integrations_manager.mask_key(key),
         "message": "YouTube Data API key is ready." if configured else "YouTube Data API key is not configured in .env. Please set YOUTUBE_API_KEY to import live YouTube channel data."
     }
 

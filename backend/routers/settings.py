@@ -9,8 +9,8 @@ and the global Data Source switcher.
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Response
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
-from backend.services import data_access, youtube_service
+from typing import Optional, Dict, Any, List
+from backend.services import data_access, youtube_service, integrations_manager
 
 router = APIRouter(prefix="/api/settings", tags=["Settings & Integrations"])
 
@@ -28,6 +28,14 @@ class DataSourceSwitchRequest(BaseModel):
 class YouTubeConnectRequest(BaseModel):
     channel_url: str = Field(..., description="Channel URL, handle (@handle), or channel ID")
     set_as_active: Optional[bool] = True
+
+class KeyValidationRequest(BaseModel):
+    provider: str = Field(..., description="Provider identifier: 'youtube' or 'llm'")
+    api_key: Optional[str] = Field(None, description="Optional raw key to test without saving")
+
+class KeySaveRequest(BaseModel):
+    provider: str = Field(..., description="Provider identifier: 'youtube' or 'llm'")
+    api_key: str = Field(..., description="API key to save securely in backend/.env")
 
 # ----------------- Data Source Switcher -----------------
 
@@ -150,50 +158,13 @@ def connect_youtube_endpoint(payload: YouTubeConnectRequest):
 # ----------------- Platform Integrations Directory -----------------
 
 @router.get("/integrations")
-def get_integrations():
+def get_integrations(live_ping: bool = False):
+    """
+    Returns full integrations catalog, credentials status, quota parameters,
+    and supported features across all 6 platform connectors.
+    """
+    catalog = integrations_manager.get_all_integrations_summary(live_ping=live_ping)
     yt_status = youtube_service.check_youtube_api_status()
-    integrations = [
-        {
-            "id": "youtube",
-            "name": "YouTube",
-            "icon": "Youtube",
-            "status": "Ready for live channel sync" if yt_status["configured"] else "API key needed in .env",
-            "action": "Connect Channel",
-            "auth_type": "YouTube Data API v3",
-            "rate_limit": "10,000 units/day free quota",
-            "description": "Imports public video analytics, view counts, likes, comments, and duration."
-        },
-        {
-            "id": "instagram",
-            "name": "Instagram",
-            "icon": "Instagram",
-            "status": "Available via CSV export",
-            "action": "Upload CSV",
-            "auth_type": "CSV Export / Meta Graph API",
-            "rate_limit": "200 calls/hour per user",
-            "description": "Upload Meta Business Suite CSV export to analyze Reels metrics and reach."
-        },
-        {
-            "id": "twitter",
-            "name": "X (Twitter)",
-            "icon": "Twitter",
-            "status": "Available via CSV export",
-            "action": "Upload CSV",
-            "auth_type": "CSV Export / X API v2",
-            "rate_limit": "Usage based",
-            "description": "Upload X Analytics CSV to monitor tweet impressions and bookmarks."
-        },
-        {
-            "id": "linkedin",
-            "name": "LinkedIn",
-            "icon": "Linkedin",
-            "status": "Available via CSV export",
-            "action": "Upload CSV",
-            "auth_type": "CSV Export / LinkedIn OAuth",
-            "rate_limit": "Community Management API rate caps",
-            "description": "Upload LinkedIn Analytics export to evaluate impressions and post engagements."
-        }
-    ]
 
     data_sources_info = [
         {
@@ -215,7 +186,60 @@ def get_integrations():
 
     return {
         "metadata": data_access.get_system_metadata(),
-        "integrations": integrations,
+        "summary": catalog["summary"],
+        "integrations": catalog["integrations"],
         "data_sources": data_sources_info,
-        "youtube_api_configured": yt_status["configured"]
+        "youtube_api_configured": yt_status["configured"],
+        "llm_api_configured": catalog["summary"]["llm_status"]["is_configured"]
+    }
+
+@router.post("/integrations/validate")
+def validate_integration_endpoint(payload: KeyValidationRequest):
+    """
+    Validates an external API key (YouTube or LLM) with a lightweight probe call.
+    Never exposes raw secrets in response payloads.
+    """
+    provider = payload.provider.lower().strip()
+    if provider == "youtube":
+        return integrations_manager.validate_youtube_key(payload.api_key)
+    elif provider in ["llm", "gemini", "openai"]:
+        return integrations_manager.validate_llm_key(payload.api_key)
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Validation not supported for provider '{provider}'. Supported providers: 'youtube', 'llm'."
+        )
+
+@router.post("/integrations/save-key")
+def save_integration_key_endpoint(payload: KeySaveRequest):
+    """
+    Securely saves or updates an API key in backend/.env and updates active runtime.
+    Returns masked confirmation and operational status.
+    """
+    provider = payload.provider.lower().strip()
+    key_clean = payload.api_key.strip()
+
+    if not key_clean:
+        raise HTTPException(status_code=400, detail="API key cannot be empty.")
+
+    if provider == "youtube":
+        env_var = "YOUTUBE_API_KEY"
+        success = integrations_manager.set_secret_in_env(env_var, key_clean)
+        status = integrations_manager.validate_youtube_key(key_clean)
+    elif provider in ["llm", "gemini", "openai"]:
+        env_var = "LLM_API_KEY"
+        success = integrations_manager.set_secret_in_env(env_var, key_clean)
+        status = integrations_manager.validate_llm_key(key_clean)
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported provider '{provider}'.")
+
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to write configuration to backend/.env.")
+
+    return {
+        "success": True,
+        "provider": provider,
+        "masked_key": integrations_manager.mask_key(key_clean),
+        "validation_status": status,
+        "message": f"Successfully configured and activated {provider.upper()} API integration."
     }

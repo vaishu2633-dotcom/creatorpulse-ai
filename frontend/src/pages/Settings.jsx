@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getIntegrations } from '../api/apiClient';
+import { getIntegrations, validateIntegration, saveIntegrationKey } from '../api/apiClient';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { useUser } from '../context/UserContext';
@@ -41,7 +41,11 @@ import {
   Radio,
   ExternalLink,
   RefreshCw,
-  Eye
+  Eye,
+  Key,
+  Lock,
+  Shield,
+  Sparkles
 } from 'lucide-react';
 import { YoutubeIcon } from '../components/SocialIcons';
 
@@ -145,6 +149,78 @@ export default function Settings() {
 
   // Guided tour replay
   const [replayTour, setReplayTour] = useState(false);
+
+  // Central API Key Management state
+  const [keyModal, setKeyModal] = useState(null);
+  const [inputKey, setInputKey] = useState('');
+  const [showKeyText, setShowKeyText] = useState(false);
+  const [testingKey, setTestingKey] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [savingKey, setSavingKey] = useState(false);
+
+  const handleOpenKeyModal = (item) => {
+    const prov = item.id === 'youtube' ? 'youtube' : 'llm';
+    setKeyModal({
+      provider: prov,
+      title: item.name,
+      envVar: item.env_var || (prov === 'youtube' ? 'YOUTUBE_API_KEY' : 'LLM_API_KEY'),
+      masked: item.masked_key
+    });
+    setInputKey('');
+    setShowKeyText(false);
+    setTestResult(null);
+  };
+
+  const handleTestKeyConnection = async () => {
+    if (!inputKey.trim()) {
+      addToast('Please enter an API key to test.', 'error');
+      return;
+    }
+    setTestingKey(true);
+    setTestResult(null);
+    try {
+      const res = await validateIntegration({
+        provider: keyModal.provider,
+        api_key: inputKey.trim()
+      });
+      setTestResult(res);
+      if (res.status === 'active') {
+        addToast('Connection verified successfully (HTTP 200)!', 'success');
+      } else {
+        addToast(res.message || 'Key check returned an error', 'warning');
+      }
+    } catch (err) {
+      setTestResult({
+        is_configured: false,
+        status: 'error',
+        message: err.message || 'Validation request failed'
+      });
+      addToast(err.message || 'Validation request failed', 'error');
+    } finally {
+      setTestingKey(false);
+    }
+  };
+
+  const handleSaveKeyToEnv = async () => {
+    if (!inputKey.trim()) {
+      addToast('Please enter an API key to save.', 'error');
+      return;
+    }
+    setSavingKey(true);
+    try {
+      const res = await saveIntegrationKey({
+        provider: keyModal.provider,
+        api_key: inputKey.trim()
+      });
+      addToast(res.message || 'Key saved securely!', 'success');
+      setKeyModal(null);
+      await fetchSettingsAndStatus();
+    } catch (err) {
+      addToast(err.message || 'Failed to save key', 'error');
+    } finally {
+      setSavingKey(false);
+    }
+  };
 
   const fetchSettingsAndStatus = async () => {
     setLoading(true);
@@ -534,7 +610,121 @@ export default function Settings() {
         </div>
       </Card>
 
-      {/* 2. CSV File Ingestion Section (Full validation & diagnostics) */}
+      {/* 2. Central API Integrations & Secure Key Management Card */}
+      <Card className="p-6 space-y-5 border-2 border-slate-200/80 dark:border-slate-800 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-4">
+          <div>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span>Official API Integrations & Key Management</span>
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Backend-only credential handling. API keys are strictly stored on your server in .env and never exposed to the browser.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+              <Key className="w-3.5 h-3.5 text-emerald-600" />
+              {data?.summary?.api_keys_configured || (youtubeStatus?.configured ? 1 : 0)} / 2 Keys Configured
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              icon={RefreshCw}
+              onClick={() => fetchSettingsAndStatus()}
+              className="text-xs"
+            >
+              Refresh Status
+            </Button>
+          </div>
+        </div>
+
+        {/* 6 Integrations Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {integrations.map((item) => {
+            const isYt = item.id === 'youtube';
+            const isLlm = item.id === 'llm';
+            const isConfigured = item.is_configured;
+
+            return (
+              <div
+                key={item.id}
+                className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 flex flex-col justify-between hover:border-slate-300 dark:hover:border-slate-700 transition"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <PlatformBadge platform={item.platform || item.id} size="sm" />
+                      <span className="text-xs font-bold text-slate-900 dark:text-white">
+                        {item.name}
+                      </span>
+                    </div>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                        item.badge_color === 'green'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                          : item.badge_color === 'amber'
+                          ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
+                          : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
+                      }`}
+                    >
+                      {item.badge_label || (isConfigured ? 'Working now' : 'Key Needed')}
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                    {item.description}
+                  </p>
+
+                  {/* Masked Key & Quota Pill */}
+                  <div className="space-y-1.5 pt-1 border-t border-slate-200/60 dark:border-slate-800 text-[11px]">
+                    <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                      <span className="font-semibold text-slate-500">Credential:</span>
+                      <span className="font-mono text-[10px] bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                        {item.masked_key ? item.masked_key : 'None (Template/CSV)'}
+                      </span>
+                    </div>
+                    {item.quota_info && (
+                      <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                        <span className="font-semibold text-slate-500">Quota:</span>
+                        <span className="text-[10px] text-slate-700 dark:text-slate-300 font-medium">
+                          {item.quota_info}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-3.5 mt-2">
+                  {isYt || isLlm ? (
+                    <Button
+                      variant={isConfigured ? 'outline' : 'primary'}
+                      size="sm"
+                      icon={Key}
+                      className="w-full text-xs"
+                      onClick={() => handleOpenKeyModal(item)}
+                    >
+                      {isConfigured ? 'Update / Test Key' : 'Configure API Key'}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      icon={ExternalLink}
+                      className="w-full text-xs"
+                      onClick={() => setActivePlatformDetail(item)}
+                    >
+                      View Export Guide
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* 3. CSV File Ingestion Section (Full validation & diagnostics) */}
       <Card className="p-6 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
@@ -1027,6 +1217,127 @@ export default function Settings() {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        )}
+      </SlideOver>
+
+      {/* 7. Key Configuration & Testing SlideOver */}
+      <SlideOver
+        isOpen={!!keyModal}
+        onClose={() => {
+          setKeyModal(null);
+          setTestResult(null);
+          setInputKey('');
+        }}
+        title={`Configure ${keyModal?.title || 'API Key'}`}
+        subtitle="Credentials are kept backend-only in .env and never sent to clients"
+      >
+        {keyModal && (
+          <div className="space-y-6">
+            <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 space-y-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span>Zero-Exposure Security Guarantee</span>
+              </div>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                Your key will be securely saved to <code className="bg-emerald-100/70 dark:bg-emerald-900/50 px-1 py-0.5 rounded font-mono text-emerald-900 dark:text-emerald-200">backend/.env</code> as <code className="font-mono text-emerald-900 dark:text-emerald-200">{keyModal.envVar}</code>. The backend never exposes the raw string to frontend responses.
+              </p>
+              {keyModal.masked && (
+                <div className="text-[11px] text-slate-500 pt-1">
+                  Currently active key: <span className="font-mono font-bold text-slate-700 dark:text-slate-200">{keyModal.masked}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                Enter {keyModal.title} Secret Key
+              </label>
+              <div className="relative">
+                <input
+                  type={showKeyText ? 'text' : 'password'}
+                  value={inputKey}
+                  onChange={(e) => {
+                    setInputKey(e.target.value);
+                    setTestResult(null);
+                  }}
+                  placeholder={keyModal.provider === 'youtube' ? 'AIzaSy...' : 'sk-... or AIzaSy...'}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono focus:ring-2 focus:ring-emerald-500/30 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowKeyText(!showKeyText)}
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                  title={showKeyText ? 'Hide key' : 'Show key'}
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-400">
+                {keyModal.provider === 'youtube'
+                  ? 'Obtained from Google Cloud Console > APIs & Services > Credentials.'
+                  : 'Obtained from Google AI Studio (Gemini) or OpenAI Developer Platform.'}
+              </p>
+            </div>
+
+            {/* Test result display */}
+            {testResult && (
+              <div
+                className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
+                  testResult.status === 'active'
+                    ? 'bg-emerald-50 text-emerald-900 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800'
+                    : testResult.status === 'quota_exceeded'
+                    ? 'bg-amber-50 text-amber-900 border-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-800'
+                    : 'bg-rose-50 text-rose-900 border-rose-200 dark:bg-rose-950/40 dark:text-rose-200 dark:border-rose-800'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 font-bold">
+                  {testResult.status === 'active' ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-rose-600" />
+                  )}
+                  <span>
+                    {testResult.status === 'active'
+                      ? 'Live Validation Succeeded!'
+                      : testResult.status === 'quota_exceeded'
+                      ? 'Quota Limit Warning'
+                      : 'Validation Failed'}
+                  </span>
+                </div>
+                <p className="text-[11px] leading-relaxed">{testResult.message}</p>
+                {testResult.quota_limit && (
+                  <div className="text-[10px] text-slate-500 pt-1">
+                    Rate ceiling: {testResult.quota_limit}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <Button
+                variant="outline"
+                size="sm"
+                icon={RefreshCw}
+                loading={testingKey}
+                disabled={!inputKey.trim()}
+                onClick={handleTestKeyConnection}
+                className="text-xs"
+              >
+                Test Connection
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                icon={Check}
+                loading={savingKey}
+                disabled={!inputKey.trim()}
+                onClick={handleSaveKeyToEnv}
+                className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                Save & Activate
+              </Button>
             </div>
           </div>
         )}

@@ -181,8 +181,20 @@ export const getMlResults = () =>
   request('/api/ml/results');
 
 // ----------------- Settings & Integrations -----------------
-export const getIntegrations = () =>
-  request('/api/settings/integrations');
+export const getIntegrations = (livePing = false) =>
+  request(`/api/settings/integrations?live_ping=${livePing}`);
+
+export const validateIntegration = (payload) =>
+  request('/api/settings/integrations/validate', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const saveIntegrationKey = (payload) =>
+  request('/api/settings/integrations/save-key', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 
 export const getHealth = () =>
   request('/api/health');

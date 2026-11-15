@@ -70,3 +70,9 @@ backend/data/*.json
 
 # Large data files (> 5 MB)
 *.csv
+
+# SQLite and Local Databases
+*.db
+*.sqlite
+*.sqlite3
+backend/*.db
