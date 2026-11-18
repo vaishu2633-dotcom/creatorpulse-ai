@@ -1,44 +1,25 @@
 """
-VibeCheck AI - Analysis Pipeline
---------------------------------
-Provides:
-- VADER sentiment analysis with sarcasm disclaimer
-- 8-category Vibe classification
-- Topic clustering and theme extraction
-- Spam & bot detection
-- Engagement metrics & insights
-- Evidence-backed recommendations strictly citing actual comment counts
+CreatorPulse AI - VibeCheck AI Analysis Pipeline
+------------------------------------------------
+Analyzes audience sentiment of YouTube videos and X (Twitter) posts
+using traditional Machine Learning algorithms (TF-IDF + Best ML Model).
+
+Strictly adheres to academic Machine Learning principles:
+- No LLM-based sentiment prediction
+- No Generative AI or Deep Learning / neural networks
+- Transparent, truthful evaluation metrics (Accuracy, Precision, Recall, F1, Confusion Matrix)
+- Actual sentiment distribution percentages calculated directly from ML predictions
+- If no usable text is retrieved, does not display a sentiment prediction.
 """
 
 import os
 import re
 from typing import List, Dict, Any, Tuple
 from collections import Counter
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+
 from .base import AnalysisPayload, CommentItem
-
-# Initialize VADER analyzer once
-analyzer = SentimentIntensityAnalyzer()
-_xlm_roberta_pipeline = None
-_xlm_roberta_attempted = False
-
-STOPWORDS = {
-    "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't",
-    "as", "at", "be", "because", "been", "before", "being", "below", "between", "both", "but", "by",
-    "can't", "cannot", "could", "couldn't", "did", "didn't", "do", "does", "doesn't", "doing", "don't",
-    "down", "during", "each", "few", "for", "from", "further", "had", "hadn't", "has", "hasn't", "have",
-    "haven't", "having", "he", "he'd", "he'll", "he's", "her", "here", "here's", "hers", "herself", "him",
-    "himself", "his", "how", "how's", "i", "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", "isn't",
-    "it", "it's", "its", "itself", "let's", "me", "more", "most", "mustn't", "my", "myself", "no", "nor",
-    "not", "of", "off", "on", "once", "only", "or", "other", "ought", "our", "ours", "ourselves", "out",
-    "over", "own", "same", "shan't", "she", "she'd", "she'll", "she's", "should", "shouldn't", "so", "some",
-    "such", "than", "that", "that's", "the", "their", "theirs", "them", "themselves", "then", "there",
-    "there's", "these", "they", "they'd", "they'll", "they're", "they've", "this", "those", "through",
-    "to", "too", "under", "until", "up", "very", "was", "wasn't", "we", "we'd", "we'll", "we're", "we've",
-    "were", "weren't", "what", "what's", "when", "when's", "where", "where's", "which", "while", "who",
-    "who's", "whom", "why", "why's", "with", "won't", "would", "wouldn't", "you", "you'd", "you'll",
-    "you're", "you've", "your", "yours", "yourself", "yourselves", "video", "content", "post", "channel"
-}
+from backend.ml.classifier import classify_comments, get_model_metadata
+from backend.ml.preprocessor import clean_text
 
 SPAM_PATTERNS = [
     r"(?i)\b(telegram|whatsapp|crypto|forex|invest|guaranteed return|dm me|in bio|100x|cash app|signal)\b",
@@ -49,201 +30,172 @@ SPAM_PATTERNS = [
 
 
 class VibeAnalyzer:
-    """Core analysis engine for CreatorPulse VibeCheck AI."""
+    """Core ML sentiment analysis engine for CreatorPulse VibeCheck AI."""
 
     @staticmethod
-    def get_sentiment_engine() -> Tuple[str, str, bool]:
-        """
-        Multilingual sentiment engine resolver.
-        Checks for XLM-RoBERTa availability; falls back cleanly to VADER.
-        """
-        global _xlm_roberta_pipeline, _xlm_roberta_attempted
-        use_transformer = os.getenv("USE_TRANSFORMER_SENTIMENT", "false").lower() in ("true", "1")
-        if use_transformer and not _xlm_roberta_attempted:
-            _xlm_roberta_attempted = True
-            try:
-                from transformers import pipeline
-                _xlm_roberta_pipeline = pipeline(
-                    "sentiment-analysis",
-                    model="cardiffnlp/twitter-xlm-roberta-base-sentiment",
-                    max_length=512,
-                    truncation=True
-                )
-            except Exception:
-                _xlm_roberta_pipeline = None
-
-        if _xlm_roberta_pipeline:
-            return "XLM-RoBERTa (Multilingual)", "Multilingual sentiment active across 100+ languages via XLM-RoBERTa.", True
-        else:
-            return "VADER (Rule-based)", "Sentiment works best for English comments", False
+    def get_selected_model_name() -> str:
+        """Returns the name of the winning traditional ML model from training evaluation."""
+        meta = get_model_metadata()
+        return meta.get("best_model", "Multinomial Naive Bayes")
 
     @staticmethod
-    def _score_sentiment(text: str) -> Tuple[float, str]:
-        """
-        Classifies sentiment using XLM-RoBERTa transformer if active,
-        or falls back cleanly to VADER polarity analyzer.
-        Returns: (compound_score [-1.0, 1.0], sentiment_label ['positive', 'neutral', 'negative'])
-        """
-        global _xlm_roberta_pipeline
-        if _xlm_roberta_pipeline is not None:
-            try:
-                clean_text = text[:512]
-                res = _xlm_roberta_pipeline(clean_text)
-                if res and isinstance(res, list) and len(res) > 0:
-                    item = res[0]
-                    raw_label = str(item.get("label", "")).lower()
-                    conf = float(item.get("score", 0.5))
+    def _detect_spam(text: str) -> Tuple[bool, str]:
+        """Flags promotional spam or bots using regex pattern rules."""
+        for pattern in SPAM_PATTERNS:
+            if re.search(pattern, text):
+                return True, "Promotional or bot phrase detected"
+        return False, ""
 
-                    if "pos" in raw_label or raw_label == "label_2":
-                        label = "positive"
-                        compound = round(conf * 0.85, 3)
-                    elif "neg" in raw_label or raw_label == "label_0":
-                        label = "negative"
-                        compound = round(-conf * 0.85, 3)
-                    else:
-                        label = "neutral"
-                        compound = 0.0
+    @staticmethod
+    def _extract_topics(classified_comments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Extracts high-frequency keywords mentioned in comments."""
+        stopwords = {
+            "a", "about", "after", "again", "all", "also", "am", "an", "and", "any", "are",
+            "as", "at", "be", "because", "been", "before", "being", "both", "but", "by",
+            "can", "could", "did", "do", "does", "doing", "down", "for", "from", "had",
+            "has", "have", "he", "her", "here", "him", "his", "how", "i", "if", "in",
+            "into", "is", "it", "its", "just", "like", "me", "more", "my", "no", "not",
+            "of", "off", "on", "once", "only", "or", "other", "our", "out", "over",
+            "so", "some", "such", "than", "that", "the", "their", "them", "then", "there",
+            "these", "they", "this", "those", "through", "to", "too", "under", "until",
+            "up", "very", "was", "we", "were", "what", "when", "where", "which", "while",
+            "who", "whom", "why", "will", "with", "would", "you", "your", "video", "post",
+            "channel", "make", "really", "get", "one", "even", "much", "see", "think"
+        }
+        word_counts = Counter()
+        for c in classified_comments:
+            words = c.get("clean_text", "").split()
+            for w in words:
+                if len(w) > 3 and w not in stopwords and not w.isdigit():
+                    word_counts[w] += 1
 
-                    return compound, label
-            except Exception:
-                # Transparent fallback to VADER on any pipeline runtime error
-                pass
-
-        # VADER rule-based fallback
-        vs = analyzer.polarity_scores(text)
-        compound = round(float(vs["compound"]), 3)
-        if compound >= 0.15:
-            label = "positive"
-        elif compound <= -0.15:
-            label = "negative"
-        else:
-            label = "neutral"
-
-        return compound, label
+        top_words = word_counts.most_common(5)
+        topics = []
+        for word, count in top_words:
+            matched = [c for c in classified_comments if word in c.get("clean_text", "")]
+            pos = sum(1 for m in matched if m["sentiment"] == "positive")
+            neu = sum(1 for m in matched if m["sentiment"] == "neutral")
+            neg = sum(1 for m in matched if m["sentiment"] == "negative")
+            total = max(1, len(matched))
+            topics.append({
+                "keyword": word.capitalize(),
+                "count": count,
+                "sentiment_distribution": {
+                    "positive": round((pos / total) * 100, 1),
+                    "neutral": round((neu / total) * 100, 1),
+                    "negative": round((neg / total) * 100, 1)
+                }
+            })
+        return topics
 
     @staticmethod
     def analyze(payload: AnalysisPayload) -> Dict[str, Any]:
-        comments = payload.comments
-        total_comments = len(comments)
+        """
+        Runs full sentiment analysis pipeline using traditional ML algorithms:
+        1. Preprocesses text samples.
+        2. Feeds processed text to trained ML model (MultinomialNB / LinearSVC / LogisticRegression).
+        3. Computes positive, neutral, negative counts and percentages.
+        4. Determines Overall Vibe.
+        5. Generates Analysis Summary and metadata.
+        """
+        comments = payload.comments or []
+        model_meta = get_model_metadata()
+        selected_model = model_meta.get("best_model", "Multinomial Naive Bayes")
 
-        model_name, model_notice, is_multilingual = VibeAnalyzer.get_sentiment_engine()
+        # Handle empty content case: If no usable text is retrieved, do not display a sentiment prediction
+        if not comments:
+            return VibeAnalyzer._empty_analysis(payload, selected_model)
 
-        if total_comments == 0:
-            return VibeAnalyzer._empty_analysis(payload, model_name, model_notice, is_multilingual)
+        raw_texts = [c.text for c in comments]
 
-        # 1. Analyze Each Comment (Sentiment, Vibe, Spam check)
+        # Machine Learning batch classification (TF-IDF + Best ML model)
+        ml_classifications = classify_comments(raw_texts)
+
         analyzed_comments = []
-        sentiment_scores = []
-        vibes_counter = Counter()
         spam_comments = []
         questions = []
-        total_words = 0
+        pos_count = 0
+        neu_count = 0
+        neg_count = 0
 
-        for c in comments:
-            text = c.text
-            words = text.split()
-            total_words += len(words)
+        for idx, (c, ml_res) in enumerate(zip(comments, ml_classifications)):
+            sentiment = ml_res["sentiment"].lower()
+            confidence = ml_res["confidence"]
+            cleaned = ml_res["clean_text"]
 
-            # Sentiment Scoring (Transformer when active, otherwise VADER)
-            compound, sentiment_label = VibeAnalyzer._score_sentiment(text)
-            sentiment_scores.append(compound)
+            if sentiment == "positive":
+                pos_count += 1
+            elif sentiment == "negative":
+                neg_count += 1
+            else:
+                sentiment = "neutral"
+                neu_count += 1
 
-            # Spam Detection
-            is_spam, spam_reason = VibeAnalyzer._detect_spam(text)
+            is_spam, spam_reason = VibeAnalyzer._detect_spam(c.text)
             if is_spam:
                 spam_comments.append({
                     "comment_id": c.comment_id,
                     "author": c.author,
-                    "text": text,
+                    "text": c.text,
                     "reason": spam_reason
                 })
 
-            # Detect Question
-            is_question = bool(re.search(r"\?|^(how|why|what|when|where|can you|could you|is this|do you)\b", text, re.IGNORECASE))
+            is_question = bool(re.search(
+                r"\?|^(how|why|what|when|where|can you|could you|is this|do you|which)\b",
+                c.text,
+                re.IGNORECASE
+            ))
             if is_question and not is_spam:
                 questions.append({
                     "author": c.author,
-                    "text": text,
-                    "likes": c.like_count
+                    "text": c.text,
+                    "like_count": c.like_count
                 })
 
-            # Detect Vibe
-            vibe, vibe_conf = VibeAnalyzer._classify_vibe(text, compound, is_question)
-            vibes_counter[vibe] += 1
-
             analyzed_comments.append({
-                "comment_id": c.comment_id,
-                "author": c.author,
-                "text": text,
+                "comment_id": c.comment_id or f"c_{idx+1}",
+                "author": c.author or f"User #{idx+1}",
+                "text": c.text,
+                "clean_text": cleaned,
                 "like_count": c.like_count,
                 "published_at": c.published_at,
-                "sentiment": sentiment_label,
-                "compound_score": round(compound, 3),
-                "vibe": vibe,
-                "vibe_confidence": vibe_conf,
+                "sentiment": sentiment,
+                "confidence": confidence,
                 "is_question": is_question,
                 "is_spam": is_spam
             })
 
-        # 2. Overall Sentiment Metrics
-        pos_count = sum(1 for c in analyzed_comments if c["sentiment"] == "positive")
-        neu_count = sum(1 for c in analyzed_comments if c["sentiment"] == "neutral")
-        neg_count = sum(1 for c in analyzed_comments if c["sentiment"] == "negative")
+        total_analyzed = len(analyzed_comments)
 
-        avg_compound = sum(sentiment_scores) / total_comments
-        vibe_score = round(max(0, min(100, (avg_compound + 1.0) / 2.0 * 100)), 1)
+        # Calculate exact percentages from actual predictions
+        pos_pct = round((pos_count / total_analyzed) * 100, 1)
+        neg_pct = round((neg_count / total_analyzed) * 100, 1)
+        # Ensure percentages sum nicely to 100
+        neu_pct = round(100.0 - pos_pct - neg_pct, 1)
+        if neu_pct < 0:
+            neu_pct = round((neu_count / total_analyzed) * 100, 1)
 
-        # 3. 8-Category Vibe Breakdown
-        vibe_categories = [
-            "Enthusiastic",
-            "Curious & Inquiring",
-            "Supportive & Wholesome",
-            "Humorous & Memeing",
-            "Neutral & Informative",
-            "Critical & Skeptical",
-            "Confused & Puzzled",
-            "Frustrated & Annoyed"
-        ]
+        # Determine Overall Vibe: Positive, Negative, or Neutral
+        if pos_count > neg_count and pos_count >= neu_count:
+            overall_vibe = "Positive"
+        elif neg_count > pos_count and neg_count >= neu_count:
+            overall_vibe = "Negative"
+        else:
+            overall_vibe = "Neutral"
 
-        vibe_breakdown = [
-            {
-                "vibe": cat,
-                "count": vibes_counter[cat],
-                "percentage": round(vibes_counter[cat] / total_comments * 100, 1)
-            }
-            for cat in vibe_categories
-        ]
-        # Sort by count descending
-        vibe_breakdown.sort(key=lambda x: x["count"], reverse=True)
-        dominant_vibe = vibe_breakdown[0]["vibe"] if vibe_breakdown else "Neutral & Informative"
-
-        # 4. Topic Clustering / Keywords
+        # Topic Extraction
         topics = VibeAnalyzer._extract_topics(analyzed_comments)
 
-        # 5. Evidence-Backed Actionable Recommendations citing exact numbers
-        recommendations = VibeAnalyzer._build_recommendations(
-            total_comments=total_comments,
-            dominant_vibe=dominant_vibe,
-            questions=questions,
-            spam_comments=spam_comments,
-            neg_count=neg_count,
-            topics=topics,
-            analyzed_comments=analyzed_comments
-        )
+        # Analysis Summary
+        if overall_vibe == "Positive":
+            tone_desc = f"predominantly Positive ({pos_pct}% positive feedback). Viewers responded enthusiastically with minimal criticism ({neg_pct}%)."
+        elif overall_vibe == "Negative":
+            tone_desc = f"predominantly Negative ({neg_pct}% negative feedback). Viewers expressed notable concern, disappointment, or constructive critiques."
+        else:
+            tone_desc = f"predominantly Neutral/Balanced ({neu_pct}% neutral, {pos_pct}% positive, {neg_pct}% negative). Audience reactions were informative and mixed."
 
-        # 6. Content Summary
-        summary = VibeAnalyzer._synthesize_summary(
-            payload=payload,
-            dominant_vibe=dominant_vibe,
-            vibe_score=vibe_score,
-            pos_count=pos_count,
-            neg_count=neg_count,
-            total_comments=total_comments,
-            topics=topics
-        )
-
-        # Top engaged comments
-        top_engaged = sorted(analyzed_comments, key=lambda x: x["like_count"], reverse=True)[:5]
+        topic_str = f" Key discussion themes included {', '.join([t['keyword'] for t in topics[:3]])}." if topics else ""
+        analysis_summary = f"Audience reaction for this content is {tone_desc}{topic_str} Analyzed {total_analyzed} text samples using {selected_model}."
 
         return {
             "metadata": {
@@ -254,228 +206,50 @@ class VibeAnalyzer:
                 "thumbnail_url": payload.thumbnail_url,
                 "published_at": payload.published_at,
                 "caption": payload.caption,
-                "transcript": payload.transcript,
                 "view_count": payload.view_count,
                 "like_count": payload.like_count,
-                "comment_count": payload.comment_count or total_comments
+                "comment_count": payload.comment_count,
+                "comments_analyzed": total_analyzed,
+                "data_source": payload.coverage.source_type if payload.coverage else "url",
+                "analyzed_at": getattr(payload, "analyzed_at", None)
             },
-            "coverage": payload.coverage.model_dump(),
-            "sentiment": {
-                "vibe_score": vibe_score,
-                "dominant_vibe": dominant_vibe,
-                "average_compound": round(avg_compound, 3),
-                "model_used": model_name,
-                "model_notice": model_notice,
-                "is_multilingual": is_multilingual,
-                "breakdown": {
-                    "positive": round(pos_count / total_comments * 100, 1),
-                    "neutral": round(neu_count / total_comments * 100, 1),
-                    "negative": round(neg_count / total_comments * 100, 1)
+            "coverage": payload.coverage.model_dump() if payload.coverage else {},
+            "vibecheck_results": {
+                "has_prediction": True,
+                "overall_vibe": overall_vibe,
+                "sentiment_distribution": {
+                    "positive_percentage": pos_pct,
+                    "negative_percentage": neg_pct,
+                    "neutral_percentage": neu_pct
                 },
                 "counts": {
                     "positive": pos_count,
-                    "neutral": neu_count,
                     "negative": neg_count,
-                    "total": total_comments
+                    "neutral": neu_count,
+                    "total": total_analyzed
                 },
-                "sarcasm_disclaimer": "Automated sentiment cannot reliably detect heavy sarcasm, irony, or inside jokes without creator context."
+                "analysis_summary": analysis_summary,
+                "analysis_information": {
+                    "platform": "YouTube" if payload.platform == "youtube" else "X (Twitter)",
+                    "url": payload.post_url,
+                    "samples_analyzed": total_analyzed,
+                    "selected_ml_model": selected_model,
+                    "analysis_status": "Completed successfully"
+                }
             },
-            "vibes": vibe_breakdown,
             "topics": topics,
-            "questions": questions[:10],
-            "engagement": {
-                "total_comments": total_comments,
-                "question_count": len(questions),
-                "question_rate": round(len(questions) / total_comments * 100, 1),
-                "average_word_length": round(total_words / total_comments, 1),
-                "spam_count": len(spam_comments),
-                "spam_rate": round(len(spam_comments) / total_comments * 100, 1),
-                "top_engaged_comments": top_engaged
-            },
-            "spam_detection": {
-                "flagged_count": len(spam_comments),
-                "spam_percentage": round(len(spam_comments) / total_comments * 100, 1),
-                "items": spam_comments
-            },
-            "summary": summary,
-            "recommendations": recommendations,
+            "questions": questions,
+            "spam_comments": spam_comments,
             "comments": analyzed_comments
         }
 
     @staticmethod
-    def _classify_vibe(text: str, compound: float, is_question: bool) -> Tuple[str, float]:
-        text_lower = text.lower()
-
-        # Check Humorous / Memeing
-        if any(w in text_lower for w in ["lmao", "lol", "haha", "dead 😂", "skull", "funny", "crying 😭", "rofl", "died"]):
-            return "Humorous & Memeing", 0.88
-
-        # Check Frustrated & Annoyed
-        if any(w in text_lower for w in ["clickbait", "waste of time", "annoying", "desync", "audio issue", "terrible", "worst", "unsubscribed", "hate"]):
-            return "Frustrated & Annoyed", 0.85
-
-        # Check Confused & Puzzled
-        if any(w in text_lower for w in ["huh", "wait what", "confused", "don't get it", "what happened", "lost me", "makes no sense"]):
-            return "Confused & Puzzled", 0.82
-
-        # Check Curious & Inquiring
-        if is_question or any(w in text_lower for w in ["tutorial", "how do you", "which mic", "what software", "can you", "could you", "where can i"]):
-            return "Curious & Inquiring", 0.90
-
-        # Check Critical & Skeptical
-        if any(w in text_lower for w in ["disagree", "cap", "fake", "misleading", "overhyped", "doubt", "contrast issues", "skeptical"]) or compound <= -0.35:
-            return "Critical & Skeptical", 0.80
-
-        # Check Enthusiastic
-        if compound >= 0.55 or any(w in text_lower for w in ["amazing", "goat", "masterclass", "perfection", "obsessed", "brilliant", "10/10", "fire 🔥"]):
-            return "Enthusiastic", 0.87
-
-        # Check Supportive & Wholesome
-        if compound >= 0.20 or any(w in text_lower for w in ["proud", "wholesome", "thanks", "helpful", "saving this", "inspiring", "keep going", "needed this"]):
-            return "Supportive & Wholesome", 0.84
-
-        return "Neutral & Informative", 0.75
-
-    @staticmethod
-    def _detect_spam(text: str) -> Tuple[bool, str]:
-        for pattern in SPAM_PATTERNS:
-            if re.search(pattern, text):
-                return True, "Promotional or financial bot keyword pattern detected"
-        # Check emoji flood
-        emojis = re.findall(r"[\U00010000-\U0010ffff]", text)
-        if len(emojis) > 6 and len(text) < 40:
-            return True, "Repetitive emoji spam sequence"
-        return False, ""
-
-    @staticmethod
-    def _extract_topics(analyzed_comments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        # Count non-stopword tokens
-        word_freq = Counter()
-        topic_comments = {}
-
-        for c in analyzed_comments:
-            if c.get("is_spam"):
-                continue
-            words = re.findall(r"[a-zA-Z]{3,}", c["text"].lower())
-            seen_in_comment = set()
-            for w in words:
-                if w not in STOPWORDS and w not in seen_in_comment:
-                    seen_in_comment.add(w)
-                    word_freq[w] += 1
-                    if w not in topic_comments:
-                        topic_comments[w] = []
-                    topic_comments[w].append(c)
-
-        top_words = word_freq.most_common(6)
-        topics = []
-        for word, count in top_words:
-            matched_comments = topic_comments.get(word, [])
-            pos = sum(1 for mc in matched_comments if mc["sentiment"] == "positive")
-            neg = sum(1 for mc in matched_comments if mc["sentiment"] == "negative")
-            neu = len(matched_comments) - (pos + neg)
-
-            topics.append({
-                "keyword": word.capitalize(),
-                "mention_count": count,
-                "sentiment_distribution": {
-                    "positive": round(pos / max(1, len(matched_comments)) * 100, 1),
-                    "neutral": round(neu / max(1, len(matched_comments)) * 100, 1),
-                    "negative": round(neg / max(1, len(matched_comments)) * 100, 1)
-                },
-                "sample_quotes": [mc["text"] for mc in matched_comments[:3]]
-            })
-
-        return topics
-
-    @staticmethod
-    def _build_recommendations(
-        total_comments: int,
-        dominant_vibe: str,
-        questions: List[Dict[str, Any]],
-        spam_comments: List[Dict[str, Any]],
-        neg_count: int,
-        topics: List[Dict[str, Any]],
-        analyzed_comments: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
-        recs = []
-
-        # 1. Questions recommendation
-        q_count = len(questions)
-        if q_count > 0:
-            top_q = questions[0]["text"]
-            recs.append({
-                "type": "content_opportunity",
-                "title": f"Turn {q_count} Viewer Questions Into Your Next Short or Reel",
-                "evidence": f"{q_count} of {total_comments} comments ({round(q_count/total_comments*100, 1)}%) directly asked questions (e.g., \"{top_q[:80]}...\").",
-                "action": "Record a quick 45-second follow-up video answering the most frequently asked questions. This taps directly into proven audience curiosity."
-            })
-
-        # 2. Dominant Vibe recommendation
-        recs.append({
-            "type": "tone_tuning",
-            "title": f"Reinforce Your Strong \"{dominant_vibe}\" Audience Resonance",
-            "evidence": f"The dominant sentiment cluster is \"{dominant_vibe}\", showing audience emotional buy-in.",
-            "action": "Maintain this pacing, visual tone, and conversational angle in your upcoming releases."
-        })
-
-        # 3. Topic focus
-        if topics:
-            top_t = topics[0]
-            recs.append({
-                "type": "topic_expansion",
-                "title": f"Double Down on \"{top_t['keyword']}\"",
-                "evidence": f"\"{top_t['keyword']}\" was mentioned in {top_t['mention_count']} comments with {top_t['sentiment_distribution']['positive']}% positive feedback.",
-                "action": f"Expand \"{top_t['keyword']}\" into a dedicated deep-dive post or carousel."
-            })
-
-        # 4. Critical / spam moderation
-        if spam_comments:
-            recs.append({
-                "type": "community_hygiene",
-                "title": f"Moderate {len(spam_comments)} Detected Promotional Spam Comments",
-                "evidence": f"{len(spam_comments)} comments ({round(len(spam_comments)/total_comments*100, 1)}%) matched crypto, WhatsApp, or referral spam patterns.",
-                "action": "Add keywords like 'WhatsApp', 'telegram', and 'crypto' to your platform's blocked words filter."
-            })
-
-        if neg_count > 0 and not spam_comments:
-            crit_comments = [c for c in analyzed_comments if c["sentiment"] == "negative"]
-            sample_crit = crit_comments[0]["text"] if crit_comments else "Feedback noted"
-            recs.append({
-                "type": "production_refinement",
-                "title": f"Address Constructive Critique from {neg_count} Viewers",
-                "evidence": f"{neg_count} comment(s) highlighted specific critique or production notes (e.g., \"{sample_crit[:75]}...\").",
-                "action": "Review pacing and technical quality points raised by viewers before publishing your next edit."
-            })
-
-        return recs
-
-    @staticmethod
-    def _synthesize_summary(
-        payload: AnalysisPayload,
-        dominant_vibe: str,
-        vibe_score: float,
-        pos_count: int,
-        neg_count: int,
-        total_comments: int,
-        topics: List[Dict[str, Any]]
-    ) -> str:
-        topic_str = ", ".join([t["keyword"] for t in topics[:3]]) if topics else "general engagement"
-        pct_pos = round(pos_count / total_comments * 100, 1)
-
-        tone_assessment = "overwhelmingly positive" if pct_pos >= 70 else ("balanced" if pct_pos >= 40 else "mixed")
-        return (
-            f"Audience response is {tone_assessment} with a Vibe Score of {vibe_score}/100. "
-            f"The dominant reaction vibe is \"{dominant_vibe}\" ({pct_pos}% positive comments across {total_comments} analyzed). "
-            f"Key discussion drivers centered around {topic_str}."
-        )
-
-    @staticmethod
-    def _empty_analysis(
-        payload: AnalysisPayload,
-        model_name: str = "VADER (Rule-based)",
-        model_notice: str = "Sentiment works best for English comments",
-        is_multilingual: bool = False
-    ) -> Dict[str, Any]:
+    def _empty_analysis(payload: AnalysisPayload, selected_model: str) -> Dict[str, Any]:
+        """
+        Returns structured payload when no usable text could be retrieved.
+        Adheres to requirement: 'If no usable text is retrieved, do not display a sentiment prediction.'
+        """
+        notice = payload.coverage.notice if payload.coverage else "No audience comments could be retrieved."
         return {
             "metadata": {
                 "platform": payload.platform,
@@ -485,37 +259,34 @@ class VibeAnalyzer:
                 "thumbnail_url": payload.thumbnail_url,
                 "published_at": payload.published_at,
                 "caption": payload.caption,
-                "transcript": payload.transcript,
                 "view_count": payload.view_count,
                 "like_count": payload.like_count,
-                "comment_count": 0
+                "comment_count": 0,
+                "comments_analyzed": 0,
+                "data_source": payload.coverage.source_type if payload.coverage else "url"
             },
-            "coverage": payload.coverage.model_dump(),
-            "sentiment": {
-                "vibe_score": 50.0,
-                "dominant_vibe": "Neutral & Informative",
-                "average_compound": 0.0,
-                "model_used": model_name,
-                "model_notice": model_notice,
-                "is_multilingual": is_multilingual,
-                "breakdown": {"positive": 0.0, "neutral": 100.0, "negative": 0.0},
-                "counts": {"positive": 0, "neutral": 0, "negative": 0, "total": 0},
-                "sarcasm_disclaimer": "Automated sentiment cannot reliably detect heavy sarcasm, irony, or inside jokes without creator context."
+            "coverage": payload.coverage.model_dump() if payload.coverage else {},
+            "vibecheck_results": {
+                "has_prediction": False,
+                "overall_vibe": None,
+                "sentiment_distribution": None,
+                "counts": {
+                    "positive": 0,
+                    "negative": 0,
+                    "neutral": 0,
+                    "total": 0
+                },
+                "analysis_summary": "No usable text was retrieved for sentiment analysis. " + notice,
+                "analysis_information": {
+                    "platform": "YouTube" if payload.platform == "youtube" else "X (Twitter)",
+                    "url": payload.post_url,
+                    "samples_analyzed": 0,
+                    "selected_ml_model": selected_model,
+                    "analysis_status": "No usable comments retrieved"
+                }
             },
-            "vibes": [],
             "topics": [],
             "questions": [],
-            "engagement": {
-                "total_comments": 0,
-                "question_count": 0,
-                "question_rate": 0.0,
-                "average_word_length": 0.0,
-                "spam_count": 0,
-                "spam_rate": 0.0,
-                "top_engaged_comments": []
-            },
-            "spam_detection": {"flagged_count": 0, "spam_percentage": 0.0, "items": []},
-            "summary": "No comments available to analyze. Paste comments or import a transcript to view audience vibes.",
-            "recommendations": [],
+            "spam_comments": [],
             "comments": []
         }

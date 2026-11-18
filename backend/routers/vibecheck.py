@@ -1,210 +1,221 @@
 """
 CreatorPulse AI - VibeCheck AI Router
 -------------------------------------
-Social media sentiment and content intelligence endpoints.
-Connects multi-platform adapters (YouTube, Instagram, TikTok, Manual/Transcript/CSV)
-to the VibeAnalyzer pipeline and persists report history via the DAL.
+Social media sentiment analysis endpoints for YouTube and X (Twitter).
+Connects official platform adapters to the traditional ML sentiment pipeline.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
+import os
+
 from backend.services import data_access
 from backend.services.vibecheck import (
     YouTubeAdapter,
-    InstagramAdapter,
-    TikTokAdapter,
+    TwitterAdapter,
     ManualAdapter,
     VibeAnalyzer
 )
-
-import os
+from backend.ml.classifier import get_model_metadata
 
 router = APIRouter(prefix="/api/vibecheck", tags=["VibeCheck AI"])
 
-# Initialize adapters
+# Initialize platform adapters (YouTube, X, and direct text input)
 yt_adapter = YouTubeAdapter()
-ig_adapter = InstagramAdapter()
-tt_adapter = TikTokAdapter()
+tw_adapter = TwitterAdapter()
 manual_adapter = ManualAdapter()
 
 
 @router.get("/status")
 def get_vibecheck_status():
-    """Returns whether live YouTube API is configured or operating in sample mode."""
-    api_key = os.getenv("YOUTUBE_API_KEY", "").strip()
-    is_live = bool(api_key)
+    """Returns platform API configuration status and winning ML model."""
+    yt_key = os.getenv("YOUTUBE_API_KEY", "").strip()
+    x_token = os.getenv("TWITTER_BEARER_TOKEN", "").strip()
+    model_name = VibeAnalyzer.get_selected_model_name()
+
     return {
-        "youtube_api_configured": is_live,
-        "status": "live" if is_live else "limited",
-        "badge_label": "Live" if is_live else "Limited",
-        "badge_color": "green" if is_live else "gray",
-        "message": "Connected to official YouTube Data API v3" if is_live else "Operating in sample data mode (add YOUTUBE_API_KEY in backend/.env for live comments)"
+        "status": "operational",
+        "feature": "VibeCheck AI",
+        "selected_ml_model": model_name,
+        "youtube_api_configured": bool(yt_key and not yt_key.startswith("your_")),
+        "x_api_configured": bool(x_token and not x_token.startswith("your_")),
+        "supported_platforms": ["youtube", "twitter"],
+        "message": f"VibeCheck AI active with {model_name}."
     }
 
 
-class AnalyzeRequest(BaseModel):
-    target: Optional[str] = Field(None, description="URL of the video or post")
-    input_type: str = Field("url", description="'url', 'pasted_comments', 'transcript', or 'csv_text'")
-    platform: Optional[str] = Field("youtube", description="Platform identifier: youtube, instagram, tiktok, general")
-    title: Optional[str] = Field(None, description="Optional custom post title")
-    author: Optional[str] = Field(None, description="Optional custom creator name")
-    raw_text: Optional[str] = Field(None, description="Raw text for pasted comments, transcript, or CSV")
-    save_to_history: bool = Field(True, description="Whether to persist report in DAL history")
+@router.get("/models")
+def get_ml_models_comparison():
+    """
+    Returns the rigorous evaluation and comparison metrics of the 3 traditional ML algorithms:
+    1. Logistic Regression
+    2. Multinomial Naive Bayes
+    3. Linear Support Vector Machine (Linear SVM)
+    Includes Accuracy, Precision, Recall, F1-score, and Confusion Matrices.
+    """
+    meta = get_model_metadata()
+    if not meta or "models" not in meta:
+        from backend.ml.trainer import train_and_evaluate_models
+        meta = train_and_evaluate_models()
+    return meta
 
 
 @router.get("/supported-platforms")
 def get_supported_platforms():
-    """Returns capabilities and coverage notices for all supported input modes."""
+    """Returns capabilities and guidelines for the two supported platforms."""
     return {
-        "metadata": data_access.get_system_metadata(),
-        "platforms": [
+        "supported_platforms": [
             {
                 "id": "youtube",
                 "name": "YouTube",
                 "icon": "Youtube",
-                "status": "Working now (API or Sample)",
-                "capabilities": ["Video Metadata", "Live Top Comments", "Like Counts", "Pacing & Sentiment"],
-                "limitations": "Requires YOUTUBE_API_KEY in backend/.env for live comments; falls back cleanly to realistic sample data.",
-                "url_examples": ["https://www.youtube.com/watch?v=...", "https://youtu.be/..."]
+                "status": "Active (Official YouTube Data API v3)",
+                "capabilities": ["Video Metadata", "Live Top Comments", "Audience Sentiment", "Keyword Extraction"],
+                "url_examples": [
+                    "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                    "https://youtu.be/dQw4w9WgXcQ"
+                ],
+                "notes": "Retrieves real top-level video comments through the official YouTube API v3."
             },
             {
-                "id": "instagram",
-                "name": "Instagram",
-                "icon": "Instagram",
-                "status": "Working now (oEmbed + Pasted)",
-                "capabilities": ["oEmbed Thumbnail", "Author", "Caption", "Audience Vibe via Pasted Comments"],
-                "limitations": "Meta Graph API limits third-party comment access without OAuth; paste comments into fallback tab for deep sentiment.",
-                "url_examples": ["https://www.instagram.com/p/...", "https://www.instagram.com/reel/..."]
-            },
-            {
-                "id": "tiktok",
-                "name": "TikTok",
-                "icon": "Video",
-                "status": "Working now (oEmbed + Pasted)",
-                "capabilities": ["oEmbed Preview", "Author Name", "Title", "Audience Vibe via Pasted Comments"],
-                "limitations": "TikTok oEmbed does not include comment streams; paste comments or transcript for topic analysis.",
-                "url_examples": ["https://www.tiktok.com/@creator/video/..."]
-            },
-            {
-                "id": "manual",
-                "name": "Pasted Comments & CSV",
-                "icon": "MessageSquare",
-                "status": "Working now (100% Real User Data)",
-                "capabilities": ["Batch Sentiment", "8 Vibe Clusters", "Spam & Bot Filtering", "Question Identification", "Evidence Quotes"],
-                "limitations": "None. Directly processes creator-supplied audience feedback.",
-                "url_examples": []
-            },
-            {
-                "id": "transcript",
-                "name": "Audio / Video Transcript",
-                "icon": "FileText",
-                "status": "Working now (100% Real User Data)",
-                "capabilities": ["Pacing Breakdown", "Key Topics", "Local Whisper Instructions (Zero Cloud Cost)"],
-                "limitations": "Accepts plain text transcripts or SRT subtitle files with timestamp auto-stripping.",
-                "url_examples": []
+                "id": "twitter",
+                "name": "X (Twitter)",
+                "icon": "Twitter",
+                "status": "Active (Official X API v2)",
+                "capabilities": ["Post Validation", "Public Preview", "Audience Replies / Post Text Sentiment"],
+                "url_examples": [
+                    "https://x.com/username/status/1234567890",
+                    "https://twitter.com/username/status/1234567890"
+                ],
+                "notes": "Authenticates using official X API v2 Bearer Token. If developer credits are depleted (HTTP 402), users can paste comments directly for ML sentiment prediction."
             }
         ]
     }
 
 
+class AnalyzeRequest(BaseModel):
+    target: Optional[str] = Field(None, description="URL of the YouTube video or X post")
+    input_type: str = Field("url", description="'url' or 'pasted_comments'")
+    platform: Optional[str] = Field("youtube", description="Platform identifier: youtube or twitter")
+    title: Optional[str] = Field(None, description="Optional custom title")
+    raw_text: Optional[str] = Field(None, description="Optional audience comments or post text")
+    save_to_history: bool = Field(True, description="Whether to persist report in history")
+
+
 @router.post("/analyze")
 def analyze_content(req: AnalyzeRequest):
     """
-    Main entry point for VibeCheck AI.
-    Fetches post metadata and comments through the appropriate adapter, runs VADER
-    sentiment and 8-vibe classification, extracts topics, detects spam, and generates
-    concrete recommendations citing exact numbers.
+    Main VibeCheck AI analysis endpoint.
+    Retrieves content from YouTube or X (Twitter), extracts text, runs preprocessing,
+    and applies the trained traditional Machine Learning model for sentiment prediction.
     """
     target = (req.target or "").strip()
     input_type = req.input_type.strip().lower()
 
-    # Route to matching adapter with explicit error propagation (never faking sample data)
     try:
         if input_type == "url" and target:
+            lower_target = target.lower()
+
+            # Reject unsupported platforms
+            if "instagram.com" in lower_target:
+                raise HTTPException(
+                    status_code=400,
+                    detail="CreatorPulse AI supports YouTube and X (Twitter) only. Instagram is not supported."
+                )
+            if "tiktok.com" in lower_target:
+                raise HTTPException(
+                    status_code=400,
+                    detail="CreatorPulse AI supports YouTube and X (Twitter) only. TikTok is not supported."
+                )
+            if "linkedin.com" in lower_target:
+                raise HTTPException(
+                    status_code=400,
+                    detail="CreatorPulse AI supports YouTube and X (Twitter) only. LinkedIn is not supported."
+                )
+
             if yt_adapter.can_handle(target):
                 payload = yt_adapter.fetch_data({"url": target})
-            elif ig_adapter.can_handle(target):
-                payload = ig_adapter.fetch_data({"url": target, "comments_text": req.raw_text})
-            elif tt_adapter.can_handle(target):
-                payload = tt_adapter.fetch_data({"url": target, "comments_text": req.raw_text})
+            elif tw_adapter.can_handle(target):
+                payload = tw_adapter.fetch_data({"url": target, "comments_text": req.raw_text})
             else:
-                # Fallback to manual parser
-                payload = manual_adapter.fetch_data({
-                    "input_type": "pasted_comments",
-                    "raw_text": req.raw_text or target,
-                    "platform": req.platform or "general",
-                    "title": req.title,
-                    "author": req.author
-                })
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Invalid URL. Please enter a valid YouTube URL (e.g., https://www.youtube.com/watch?v=...) "
+                        "or X post URL (e.g., https://x.com/username/status/...)."
+                    )
+                )
         else:
-            # Manual input (pasted comments, transcript, or CSV)
+            # Direct text or pasted comments
+            raw_text = (req.raw_text or "").strip()
+            if not raw_text:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No text or comments provided. Please enter a URL or paste text to analyze."
+                )
+
+            platform_choice = (req.platform or "youtube").lower()
+            if platform_choice not in ("youtube", "twitter", "x"):
+                platform_choice = "youtube"
+
             payload = manual_adapter.fetch_data({
-                "input_type": input_type,
-                "raw_text": req.raw_text or "",
-                "platform": req.platform or "general",
-                "title": req.title,
-                "author": req.author
+                "input_type": "pasted_comments",
+                "raw_text": raw_text,
+                "platform": "twitter" if platform_choice in ("twitter", "x") else "youtube",
+                "title": req.title or "Audience Feedback",
+                "author": "Audience"
             })
+    except HTTPException:
+        raise
     except ValueError as val_err:
         raise HTTPException(status_code=400, detail=str(val_err))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(exc)}")
 
-    # Run analysis pipeline
+    # Run ML analysis pipeline
     analysis = VibeAnalyzer.analyze(payload)
 
-    # Save to history if requested
-    if req.save_to_history:
+    # Save to history if requested and if analysis was successful
+    if req.save_to_history and analysis.get("vibecheck_results", {}).get("has_prediction"):
+        res = analysis["vibecheck_results"]
         saved_record = {
             "title": analysis["metadata"]["title"],
             "platform": analysis["metadata"]["platform"],
-            "author": analysis["metadata"]["author"],
-            "post_url": analysis["metadata"]["post_url"],
-            "vibe_score": analysis["sentiment"]["vibe_score"],
-            "dominant_vibe": analysis["sentiment"]["dominant_vibe"],
-            "comment_count": analysis["engagement"]["total_comments"],
-            "positive_pct": analysis["sentiment"]["breakdown"]["positive"],
-            "negative_pct": analysis["sentiment"]["breakdown"]["negative"],
-            "summary": analysis["summary"],
-            "full_analysis": analysis
+            "overall_sentiment": res["overall_vibe"],
+            "overall_score": res["sentiment_distribution"]["positive_percentage"],
+            "dominant_vibe": res["overall_vibe"],
+            "total_comments": analysis["metadata"]["comments_analyzed"],
+            "data_source": analysis["metadata"].get("data_source") or "url",
+            "created_at": analysis["metadata"].get("analyzed_at"),
+            "summary": res["analysis_summary"]
         }
-        persisted = data_access.save_vibecheck_report(saved_record)
-        analysis["report_id"] = persisted.get("report_id")
+        try:
+            data_access.save_vibecheck_report(saved_record)
+        except Exception:
+            pass
 
     return analysis
 
 
 @router.get("/history")
-def get_vibecheck_history(limit: int = 50):
-    """Retrieves previous VibeCheck analysis reports."""
-    reports = data_access.get_vibecheck_reports(limit=limit)
+def get_vibecheck_history():
+    """Returns saved analysis reports."""
+    try:
+        history = data_access.get_vibecheck_history()
+    except Exception:
+        history = []
     return {
-        "metadata": data_access.get_system_metadata(),
-        "total": len(reports),
-        "reports": reports
+        "total_reports": len(history),
+        "reports": history
     }
 
 
-@router.get("/history/{report_id}")
-def get_vibecheck_report_detail(report_id: str):
-    """Retrieves a single VibeCheck analysis report by ID."""
-    report = data_access.get_vibecheck_report_by_id(report_id)
-    if not report:
-        raise HTTPException(status_code=404, detail="VibeCheck report not found")
-    return report
-
-
 @router.delete("/history/{report_id}")
-def delete_vibecheck_report_endpoint(report_id: str):
-    """Deletes a stored VibeCheck report."""
-    success = data_access.delete_vibecheck_report(report_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Report not found")
-    return {"success": True, "message": f"Deleted report {report_id}"}
-
-
-@router.get("/whisper-guide")
-def get_whisper_guide():
-    """Provides local OpenAI Whisper transcription setup instructions."""
-    return ManualAdapter.get_whisper_instructions()
+def delete_report(report_id: str):
+    """Deletes an analysis report from history."""
+    try:
+        success = data_access.delete_vibecheck_report(report_id)
+        return {"success": success, "report_id": report_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

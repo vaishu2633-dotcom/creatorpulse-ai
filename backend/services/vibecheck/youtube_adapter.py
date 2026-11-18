@@ -168,11 +168,12 @@ class YouTubeAdapter(PlatformAdapter):
                 except Exception:
                     pass
 
-                notice_text = (
-                    "Comments are disabled on this video by the creator."
-                    if comments_disabled
-                    else f"Successfully fetched {len(comments_list)} live top-level comments via YouTube Data API v3 (N={len(comments_list)} of {comment_count:,} available)."
-                )
+                if comments_disabled:
+                    notice_text = "Comments are disabled on this video by the creator."
+                elif len(comments_list) == 0:
+                    notice_text = "No public comments found on this video or comments are unavailable."
+                else:
+                    notice_text = f"Successfully fetched {len(comments_list)} live top-level comments via YouTube Data API v3 (N={len(comments_list)} of {comment_count:,} available)."
 
                 coverage = CoverageReport(
                     has_metadata=True,

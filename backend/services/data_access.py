@@ -226,7 +226,7 @@ def get_active_posts_raw() -> List[Dict[str, Any]]:
             elif active_source == "youtube":
                 return post_repository.get_posts(session, SYSTEM_DEMO_WORKSPACE_ID, platform="youtube", is_synthetic=False)
             else:
-                return post_repository.get_posts(session, SYSTEM_DEMO_WORKSPACE_ID)
+                return post_repository.get_posts(session, SYSTEM_DEMO_WORKSPACE_ID, is_synthetic=True)
 
     if active_source == "uploaded_csv":
         return _load_json("uploaded_posts.json")
@@ -1255,6 +1255,7 @@ def import_posts_from_csv(
     if mode in ("sqlite", "postgres"):
         ensure_database_ready()
         with get_db() as session:
+            post_repository.clear_uploaded_posts(session, SYSTEM_DEMO_WORKSPACE_ID)
             post_repository.save_posts(session, SYSTEM_DEMO_WORKSPACE_ID, valid_posts, is_synthetic=False)
             dataset_repository.save_uploaded_dataset(
                 session,

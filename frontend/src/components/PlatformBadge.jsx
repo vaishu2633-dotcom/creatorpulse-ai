@@ -1,6 +1,6 @@
 import React from 'react';
 import { Layers } from 'lucide-react';
-import { YoutubeIcon, InstagramIcon, TwitterIcon, LinkedinIcon } from './SocialIcons';
+import { YoutubeIcon, TwitterIcon } from './SocialIcons';
 
 export default function PlatformBadge({ platform, size = 'sm', showName = true }) {
   const p = (platform || '').toLowerCase();
@@ -19,17 +19,6 @@ export default function PlatformBadge({ platform, size = 'sm', showName = true }
     );
   }
 
-  if (p === 'instagram') {
-    return (
-      <span
-        className={`inline-flex items-center space-x-1.5 font-medium rounded-full bg-pink-50 text-pink-600 border border-pink-200 dark:bg-pink-950/40 dark:text-pink-400 dark:border-pink-900/50 ${padding}`}
-      >
-        <InstagramIcon className={`${iconSize} text-[#E1306C]`} />
-        {showName && <span>Instagram</span>}
-      </span>
-    );
-  }
-
   if (p === 'twitter' || p === 'x') {
     return (
       <span
@@ -37,17 +26,6 @@ export default function PlatformBadge({ platform, size = 'sm', showName = true }
       >
         <TwitterIcon className={`${iconSize} text-slate-900 dark:text-white`} />
         {showName && <span>X (Twitter)</span>}
-      </span>
-    );
-  }
-
-  if (p === 'linkedin') {
-    return (
-      <span
-        className={`inline-flex items-center space-x-1.5 font-medium rounded-full bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/50 ${padding}`}
-      >
-        <LinkedinIcon className={`${iconSize} text-[#0A66C2]`} />
-        {showName && <span>LinkedIn</span>}
       </span>
     );
   }

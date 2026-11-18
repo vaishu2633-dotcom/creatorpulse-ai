@@ -6,10 +6,19 @@ Manages SQLAlchemy engine, session factories, and explicit storage modes.
 import os
 from contextlib import contextmanager
 from typing import Generator, Optional
+from dotenv import load_dotenv
 from sqlalchemy import create_engine, Engine, text, event
 from sqlalchemy.orm import sessionmaker, Session
 
 from .models import Base
+
+# Ensure environment variables from backend/.env and root .env are loaded
+_backend_env = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
+_root_env = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
+if os.path.exists(_backend_env):
+    load_dotenv(_backend_env)
+if os.path.exists(_root_env):
+    load_dotenv(_root_env)
 
 
 class DatabaseConnectionError(RuntimeError):

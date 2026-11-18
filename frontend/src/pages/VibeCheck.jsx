@@ -1,1383 +1,898 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import PageHeader from '../components/ui/PageHeader';
-import HowItWorks from '../components/ui/HowItWorks';
-import StatusChip from '../components/ui/StatusChip';
-import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import SlideOver from '../components/ui/SlideOver';
-import ErrorState from '../components/ui/ErrorState';
-import CommentInsights from './CommentInsights';
-import { useToast } from '../context/ToastContext';
-import { analyzeVibe, getVibeCheckHistory, deleteVibeCheckReport } from '../api/apiClient';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   SearchCheck,
   Sparkles,
   Link2,
-  FileText,
-  MessageSquare,
-  Upload,
   AlertCircle,
   CheckCircle2,
-  Download,
-  Trash2,
-  HelpCircle,
-  Filter,
-  ShieldAlert,
-  Terminal,
   ExternalLink,
-  ChevronRight,
-  TrendingUp,
-  History,
-  Eye,
-  ThumbsUp,
-  Clock,
+  Cpu,
+  BarChart2,
+  MessageSquare,
   RefreshCw,
   Copy,
   Check,
-  Smile,
-  BarChart2,
-  MessageSquareHeart
+  ChevronDown,
+  ChevronUp,
+  ThumbsUp,
+  ThumbsDown,
+  Minus,
+  Info,
+  Layers,
+  ArrowRight
 } from 'lucide-react';
-import vibeIllustration from '../assets/illustrations/vibecheck-analyzer.svg';
+import { YoutubeIcon, TwitterIcon } from '../components/SocialIcons';
+import { analyzeVibe, getVibeCheckStatus, getMlModelsComparison } from '../api/apiClient';
+import { useToast } from '../context/ToastContext';
 
-const HOW_IT_WORKS_STEPS = [
-  {
-    title: 'Input Post or Comments',
-    description: 'Paste any public YouTube, Instagram, or TikTok link, or supply your own audience comments or video transcript directly.'
-  },
-  {
-    title: 'Multi-Platform Adapter',
-    description: 'Parses captions, likes, and viewer comments via official APIs or fallback parsers with zero unauthorized scraping.'
-  },
-  {
-    title: 'Sentiment & 8-Vibe Engine',
-    description: 'VADER-powered polarity scoring clusters audience reactions into 8 distinct emotional vibes and flags promotional bots.'
-  },
-  {
-    title: 'Evidence-Backed Actions',
-    description: 'Delivers high-leverage content ideas and production fixes, strictly citing exact comment counts and viewer questions.'
-  }
-];
-
-const SAMPLE_COMMENTS_PRESET = `Alex Rivera: This completely changed how I think about pacing! The hook in the first 5 seconds was brilliant.
-TechExplored: Can you make a dedicated tutorial on the exact color grading LUT you used at 02:45? Been trying to replicate that look forever.
-DevSam: The audio seems slightly desynced around the 4 minute mark on mobile, anyone else notice that?
-CryptoKing2026: Check out my profile for 100x crypto signals guaranteed returns telegram link in bio 🚀🚀🚀
-Elena M.: Bro the transition at 01:15 had me laughing out loud 😂 such clean editing!
-Mark Vance: I disagree with point #3. In 2026, audience attention spans are actually shorter, not longer. Look at retention graphs.
-Sophia Lin: Always inspiring to watch your process. Thanks for breaking down the actual analytics instead of giving vague advice.
-bot_earn_cash: Message Mr James on WhatsApp +18005550199 for investment advice he made me 50k
-Maya Patel: The pacing was so good that a 12 minute video felt like 3 minutes. More content like this please!
-Chris B.: Great breakdown, but is this applicable for small channels under 1,000 subscribers or just established creators?`;
-
-export default function VibeCheck() {
+export default function VibeCheck({ initialTab = 'analyze', onTabChange }) {
   const { addToast } = useToast();
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tabParam = searchParams.get('tab');
-  const [topTab, setTopTab] = useState(
-    tabParam === 'sentiment'
-      ? 'sentiment'
-      : tabParam === 'audience'
-      ? 'audience'
-      : tabParam === 'history'
-      ? 'history'
-      : 'analyze'
-  );
+
+  // Active top tab: 'analyze' or 'benchmark'
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   useEffect(() => {
-    if (tabParam === 'sentiment' || tabParam === 'audience' || tabParam === 'history' || tabParam === 'analyze') {
-      setTopTab(tabParam);
+    if (initialTab) {
+      setActiveTab(initialTab);
     }
-  }, [tabParam]);
+  }, [initialTab]);
 
-  const handleTurnIntoStudioIdea = (topicCandidate) => {
-    const topic = topicCandidate || analysis?.metadata?.title || 'Audience Feedback Concept';
-    addToast(`Loading "${topic.slice(0, 35)}..." into Content Studio`, 'info');
-    navigate(`/studio?topic=${encodeURIComponent(topic)}&platform=${analysis?.metadata?.platform || 'youtube'}`);
+  const handleTabSwitch = (tab) => {
+    setActiveTab(tab);
+    if (onTabChange) onTabChange(tab);
   };
 
+  // Platform selection: 'youtube' or 'twitter'
+  const [selectedPlatform, setSelectedPlatform] = useState('youtube');
+
   // Input states
-  const [activeTab, setActiveTab] = useState('url'); // 'url', 'pasted', 'transcript', 'csv', 'whisper'
   const [urlInput, setUrlInput] = useState('');
-  const [customText, setCustomText] = useState('');
-  const [customTitle, setCustomTitle] = useState('');
-  const [customAuthor, setCustomAuthor] = useState('');
+  const [pastedText, setPastedText] = useState('');
+  const [showOptionalTextInput, setShowOptionalTextInput] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
   const [error, setError] = useState(null);
 
-  // Results state
+  // Analysis result state
   const [analysis, setAnalysis] = useState(null);
-  const [selectedTopic, setSelectedTopic] = useState('all');
-  const [sentimentFilter, setSentimentFilter] = useState('all');
-  const [copiedWhisper, setCopiedWhisper] = useState(false);
+  const [commentFilter, setCommentFilter] = useState('all');
 
-  const location = useLocation();
-
-  // History slide-over
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [historyReports, setHistoryReports] = useState([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-
-  // Supported platforms list
-  const [platformsInfo, setPlatformsInfo] = useState([]);
+  // Status & ML Model Comparison state
+  const [apiStatus, setApiStatus] = useState(null);
+  const [mlModels, setMlModels] = useState(null);
+  const [loadingModels, setLoadingModels] = useState(false);
 
   useEffect(() => {
-    fetchSupportedPlatforms();
-    fetchHistory();
+    getVibeCheckStatus()
+      .then((res) => setApiStatus(res))
+      .catch(() => {});
 
-    // Check URL query parameters (e.g. from Dashboard VibeCheck strip)
-    const params = new URLSearchParams(location.search);
-    const targetUrl = params.get('url');
-    const autoAnalyze = params.get('auto');
+    fetchModelBenchmark();
+  }, []);
 
-    if (targetUrl) {
-      setUrlInput(targetUrl);
-      setActiveTab('url');
-      if (autoAnalyze === 'true') {
-        setTimeout(() => {
-          runAnalysisForUrl(targetUrl);
-        }, 200);
-      }
-    }
-  }, [location.search]);
-
-  const fetchSupportedPlatforms = async () => {
+  const fetchModelBenchmark = async () => {
+    setLoadingModels(true);
     try {
-      const res = await fetch('/api/vibecheck/supported-platforms');
-      if (res.ok) {
-        const data = await res.json();
-        setPlatformsInfo(data.platforms || []);
-      }
-    } catch {
-      // quiet fallback
-    }
-  };
-
-  const fetchHistory = async () => {
-    setLoadingHistory(true);
-    try {
-      const data = await getVibeCheckHistory();
-      setHistoryReports(data.reports || []);
+      const data = await getMlModelsComparison();
+      setMlModels(data);
     } catch {
       // quiet fallback
     } finally {
-      setLoadingHistory(false);
+      setLoadingModels(false);
     }
   };
 
-  const runAnalysisForUrl = async (url) => {
+  const handleAnalyze = async (e) => {
+    if (e) e.preventDefault();
     setError(null);
+    setAnalysis(null);
+
+    const trimmedUrl = urlInput.trim();
+    const trimmedPasted = pastedText.trim();
+
+    if (!trimmedUrl && !trimmedPasted) {
+      setError('Please provide a video or post URL (or paste text directly).');
+      return;
+    }
+
+    // Client-side quick check
+    if (trimmedUrl) {
+      const lower = trimmedUrl.toLowerCase();
+      if (selectedPlatform === 'youtube' && !lower.includes('youtube.com') && !lower.includes('youtu.be')) {
+        setError('The entered URL does not appear to be a YouTube link. Please check the URL or select X (Twitter).');
+        return;
+      }
+      if (selectedPlatform === 'twitter' && !lower.includes('x.com') && !lower.includes('twitter.com')) {
+        setError('The entered URL does not appear to be an X (Twitter) link. Please check the URL or select YouTube.');
+        return;
+      }
+    }
+
     setLoading(true);
     setLoadingStep(1);
 
     const stepInterval = setInterval(() => {
       setLoadingStep((prev) => (prev < 4 ? prev + 1 : prev));
-    }, 700);
+    }, 600);
 
     try {
-      const data = await analyzeVibe({
-        target: url,
-        input_type: 'url',
+      const payload = {
+        platform: selectedPlatform,
         save_to_history: true,
-      });
-      clearInterval(stepInterval);
-      setAnalysis(data);
-      addToast('VibeCheck analysis completed successfully!', 'success');
-      fetchHistory();
-    } catch (err) {
-      clearInterval(stepInterval);
-      setError(err.message || 'Could not complete analysis.');
-    } finally {
-      setLoading(false);
-      setLoadingStep(0);
-    }
-  };
+      };
 
-  const runAnalysis = async () => {
-    setError(null);
-    setLoading(true);
-    setLoadingStep(1);
-
-    const stepInterval = setInterval(() => {
-      setLoadingStep((prev) => (prev < 4 ? prev + 1 : prev));
-    }, 700);
-
-    let payload = {
-      save_to_history: true
-    };
-
-    if (activeTab === 'url') {
-      if (!urlInput.trim()) {
-        setError('Please enter a valid YouTube, Instagram, or TikTok URL');
-        setLoading(false);
-        clearInterval(stepInterval);
-        return;
-      }
-      payload.target = urlInput.trim();
-      payload.input_type = 'url';
-    } else if (activeTab === 'pasted') {
-      if (!customText.trim()) {
-        setError('Please paste comments to analyze');
-        setLoading(false);
-        clearInterval(stepInterval);
-        return;
-      }
-      payload.input_type = 'pasted_comments';
-      payload.raw_text = customText.trim();
-      payload.title = customTitle.trim() || 'Audience Comments Analysis';
-      payload.author = customAuthor.trim() || 'Creator';
-    } else if (activeTab === 'transcript') {
-      if (!customText.trim()) {
-        setError('Please paste transcript or subtitle text');
-        setLoading(false);
-        clearInterval(stepInterval);
-        return;
-      }
-      payload.input_type = 'transcript';
-      payload.raw_text = customText.trim();
-      payload.title = customTitle.trim() || 'Video Transcript Review';
-      payload.author = customAuthor.trim() || 'Creator';
-    } else if (activeTab === 'csv') {
-      if (!customText.trim()) {
-        setError('Please upload or paste CSV comments');
-        setLoading(false);
-        clearInterval(stepInterval);
-        return;
-      }
-      payload.input_type = 'csv_text';
-      payload.raw_text = customText.trim();
-      payload.title = customTitle.trim() || 'CSV Export Audience Review';
-    }
-
-    try {
-      const data = await analyzeVibe(payload);
-      clearInterval(stepInterval);
-      setAnalysis(data);
-      addToast('VibeCheck analysis completed successfully!', 'success');
-      fetchHistory();
-    } catch (err) {
-      clearInterval(stepInterval);
-      setError(err.message || 'Could not complete analysis. Check server connection.');
-    } finally {
-      setLoading(false);
-      setLoadingStep(0);
-    }
-  };
-
-  const handleFileUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result;
-      if (typeof text === 'string') {
-        setCustomText(text);
-        if (!customTitle) {
-          setCustomTitle(file.name.replace(/\.[^/.]+$/, ''));
+      if (trimmedUrl) {
+        payload.target = trimmedUrl;
+        payload.input_type = 'url';
+        if (trimmedPasted) {
+          payload.raw_text = trimmedPasted;
         }
-        addToast(`Loaded ${file.name} successfully`, 'info');
+      } else {
+        payload.input_type = 'pasted_comments';
+        payload.raw_text = trimmedPasted;
       }
+
+      const res = await analyzeVibe(payload);
+      clearInterval(stepInterval);
+      setAnalysis(res);
+
+      if (res?.vibecheck_results?.has_prediction) {
+        addToast(`Sentiment analysis completed using ${res.vibecheck_results.analysis_information.selected_ml_model}!`, 'success');
+      } else {
+        addToast('Content retrieved, but no comments available to analyze.', 'info');
+      }
+    } catch (err) {
+      clearInterval(stepInterval);
+      setError(err.message || 'An error occurred during sentiment analysis.');
+    } finally {
+      setLoading(false);
+      setLoadingStep(0);
+    }
+  };
+
+  const results = analysis?.vibecheck_results;
+  const metadata = analysis?.metadata;
+  const coverage = analysis?.coverage;
+
+  const getOverallVibeBadge = (vibe) => {
+    const v = (vibe || '').toLowerCase();
+    if (v === 'positive') {
+      return {
+        label: 'Positive',
+        bg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
+        icon: ThumbsUp,
+        desc: 'Audience reaction is overwhelmingly favorable, supportive, and enthusiastic.',
+      };
+    }
+    if (v === 'negative') {
+      return {
+        label: 'Negative',
+        bg: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30',
+        icon: ThumbsDown,
+        desc: 'Audience reaction expresses notable dissatisfaction, criticism, or disappointment.',
+      };
+    }
+    return {
+      label: 'Neutral',
+      bg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30',
+      icon: Minus,
+      desc: 'Audience reaction is balanced, objective, or purely informative with mixed sentiments.',
     };
-    reader.readAsText(file);
   };
 
-  const loadReport = (report) => {
-    if (report.full_analysis) {
-      setAnalysis(report.full_analysis);
-      setHistoryOpen(false);
-      addToast(`Loaded report: "${report.title}"`, 'info');
-    }
-  };
-
-  const deleteReport = async (reportId, e) => {
-    e.stopPropagation();
-    try {
-      await deleteVibeCheckReport(reportId);
-      setHistoryReports((prev) => prev.filter((r) => r.report_id !== reportId));
-      addToast('Report deleted', 'info');
-    } catch {
-      addToast('Failed to delete report', 'error');
-    }
-  };
-
-  const exportCSV = () => {
-    if (!analysis || !analysis.comments) return;
-    const headers = ['Comment ID', 'Author', 'Text', 'Sentiment', 'Vibe', 'Likes', 'Is Question', 'Is Spam'];
-    const rows = analysis.comments.map((c) => [
-      c.comment_id,
-      `"${(c.author || '').replace(/"/g, '""')}"`,
-      `"${(c.text || '').replace(/"/g, '""')}"`,
-      c.sentiment,
-      c.vibe,
-      c.like_count || 0,
-      c.is_question ? 'YES' : 'NO',
-      c.is_spam ? 'YES' : 'NO'
-    ]);
-    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `vibecheck_${analysis.metadata.title.replace(/\s+/g, '_').toLowerCase()}.csv`;
-    link.click();
-    addToast('Downloaded comments CSV', 'success');
-  };
-
-  // Filtered comments
-  const commentsToDisplay = (analysis?.comments || []).filter((c) => {
-    if (sentimentFilter === 'positive' && c.sentiment !== 'positive') return false;
-    if (sentimentFilter === 'neutral' && c.sentiment !== 'neutral') return false;
-    if (sentimentFilter === 'negative' && c.sentiment !== 'negative') return false;
-    if (sentimentFilter === 'questions' && !c.is_question) return false;
-    if (sentimentFilter === 'spam' && !c.is_spam) return false;
-
-    if (selectedTopic !== 'all') {
-      const kw = selectedTopic.toLowerCase();
-      if (!c.text.toLowerCase().includes(kw)) return false;
-    }
-    return true;
+  const filteredComments = (analysis?.comments || []).filter((c) => {
+    if (commentFilter === 'all') return true;
+    return c.sentiment === commentFilter;
   });
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-16">
-      {/* Page Header */}
-      <PageHeader
-        title="VibeCheck AI"
-        subtitle="Analyze audience sentiment, emotional vibes, and spam patterns with evidence-backed recommendations"
-        tag="Analyzer"
-        status="Working now"
-        icon={SearchCheck}
-        illustration={vibeIllustration}
-        actions={
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              icon={History}
-              onClick={() => setHistoryOpen(true)}
-            >
-              Reports ({historyReports.length})
-            </Button>
+    <div className="space-y-8">
+      {/* View Switcher: VibeCheck vs ML Models Benchmark */}
+      {activeTab === 'benchmark' ? (
+        <MLModelBenchmarkView
+          mlModels={mlModels}
+          loading={loadingModels}
+          onBack={() => handleTabSwitch('analyze')}
+        />
+      ) : (
+        <>
+          {/* Hero Header */}
+          <div className="text-center max-w-2xl mx-auto space-y-2">
+            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-semibold bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Machine Learning Sentiment Classification</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1E1B4B] dark:text-[#F8FAFC] tracking-tight">
+              VibeCheck <span className="text-violet-600 dark:text-violet-400">AI</span>
+            </h1>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Analyze audience sentiment for any YouTube video or X post. Predicts whether the overall reaction is{' '}
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400">Positive</span>,{' '}
+              <span className="font-semibold text-blue-600 dark:text-blue-400">Neutral</span>, or{' '}
+              <span className="font-semibold text-rose-600 dark:text-rose-400">Negative</span> using traditional Machine Learning.
+            </p>
           </div>
-        }
-      />
 
-      {/* 4 Primary Tabs in VibeCheck AI */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-1 sm:gap-2">
-        <button
-          onClick={() => { setTopTab('analyze'); setSearchParams({ tab: 'analyze' }); }}
-          className={`flex items-center space-x-2 py-3 px-4 font-semibold text-xs sm:text-sm border-b-2 transition ${
-            topTab === 'analyze'
-              ? 'border-violet-600 text-violet-600 dark:text-violet-400 bg-violet-50/50 dark:bg-violet-950/20 rounded-t-lg'
-              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-          }`}
-        >
-          <SearchCheck className="w-4 h-4" />
-          <span>Analyze Post</span>
-        </button>
+          {/* Main Input Card */}
+          <div className="bg-white dark:bg-[#131927] rounded-2xl border border-[#EAE7F5] dark:border-[#1F293D] shadow-sm p-5 sm:p-7 space-y-6">
+            {/* 1. Platform Selection */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2.5">
+                1. Select Platform
+              </label>
+              <div className="grid grid-cols-2 gap-3 max-w-md">
+                <button
+                  type="button"
+                  onClick={() => setSelectedPlatform('youtube')}
+                  className={`flex items-center justify-center space-x-2.5 p-3 rounded-xl border text-sm font-semibold transition ${
+                    selectedPlatform === 'youtube'
+                      ? 'bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-700 shadow-xs'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
+                  }`}
+                >
+                  <YoutubeIcon className="w-5 h-5 text-[#FF0000]" />
+                  <span>YouTube</span>
+                </button>
 
-        <button
-          onClick={() => { setTopTab('sentiment'); setSearchParams({ tab: 'sentiment' }); }}
-          className={`flex items-center space-x-2 py-3 px-4 font-semibold text-xs sm:text-sm border-b-2 transition ${
-            topTab === 'sentiment'
-              ? 'border-violet-600 text-violet-600 dark:text-violet-400 bg-violet-50/50 dark:bg-violet-950/20 rounded-t-lg'
-              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-          }`}
-        >
-          <BarChart2 className="w-4 h-4" />
-          <span>Sentiment Overview</span>
-        </button>
-
-        <button
-          onClick={() => { setTopTab('audience'); setSearchParams({ tab: 'audience' }); }}
-          className={`flex items-center space-x-2 py-3 px-4 font-semibold text-xs sm:text-sm border-b-2 transition ${
-            topTab === 'audience'
-              ? 'border-violet-600 text-violet-600 dark:text-violet-400 bg-violet-50/50 dark:bg-violet-950/20 rounded-t-lg'
-              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-          }`}
-        >
-          <MessageSquareHeart className="w-4 h-4" />
-          <span>Audience Voice</span>
-        </button>
-
-        <button
-          onClick={() => { setTopTab('history'); setSearchParams({ tab: 'history' }); }}
-          className={`flex items-center space-x-2 py-3 px-4 font-semibold text-xs sm:text-sm border-b-2 transition ${
-            topTab === 'history'
-              ? 'border-violet-600 text-violet-600 dark:text-violet-400 bg-violet-50/50 dark:bg-violet-950/20 rounded-t-lg'
-              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-          }`}
-        >
-          <History className="w-4 h-4" />
-          <span>Analysis History ({historyReports.length})</span>
-        </button>
-      </div>
-
-      {topTab === 'audience' ? (
-        <div className="pt-2">
-          <CommentInsights />
-        </div>
-      ) : topTab === 'history' ? (
-        <div className="pt-2 space-y-4">
-          <Card className="p-6">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
-              <div>
-                <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center space-x-2">
-                  <History className="w-5 h-5 text-violet-600" />
-                  <span>Saved VibeCheck Reports</span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Click any report to reload its metrics, recommendations, and comment explorer.
-                </p>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPlatform('twitter')}
+                  className={`flex items-center justify-center space-x-2.5 p-3 rounded-xl border text-sm font-semibold transition ${
+                    selectedPlatform === 'twitter'
+                      ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white border-slate-400 dark:border-slate-600 shadow-xs'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
+                  }`}
+                >
+                  <TwitterIcon className="w-4 h-4 text-slate-900 dark:text-white" />
+                  <span>X (Twitter)</span>
+                </button>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                icon={RefreshCw}
-                onClick={fetchHistory}
-                loading={loadingHistory}
-              >
-                Refresh History
-              </Button>
             </div>
 
-            {loadingHistory ? (
-              <div className="p-12 text-center text-xs text-slate-400">
-                <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-violet-600" />
-                Loading saved reports...
-              </div>
-            ) : historyReports.length === 0 ? (
-              <div className="p-12 text-center text-xs text-slate-400 space-y-2">
-                <p>No previous reports saved yet.</p>
-                <Button variant="primary" size="sm" onClick={() => setTopTab('analyze')}>
-                  Run First Analysis
-                </Button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-4">
-                {historyReports.map((r) => (
-                  <div
-                    key={r.report_id}
-                    onClick={() => {
-                      loadReport(r);
-                      setTopTab('analyze');
-                    }}
-                    className="p-4 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 hover:border-violet-400 dark:hover:border-violet-600 transition cursor-pointer space-y-2 group"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-sm text-slate-900 dark:text-white truncate pr-2">
-                        {r.title}
-                      </span>
-                      <button
-                        onClick={(e) => deleteReport(r.report_id, e)}
-                        className="p-1 text-slate-400 hover:text-rose-500 transition opacity-0 group-hover:opacity-100"
-                        title="Delete report"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <div className="flex items-center space-x-2 text-xs text-slate-500">
-                      <span className="capitalize font-semibold text-violet-600 dark:text-violet-400">{r.platform}</span>
-                      <span>•</span>
-                      <span>Vibe: <strong>{r.vibe_score}/100</strong></span>
-                      <span>•</span>
-                      <span>{r.comment_count} comments</span>
-                    </div>
-                    <div className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">
-                      {r.summary}
-                    </div>
+            {/* 2. URL Input */}
+            <form onSubmit={handleAnalyze} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+                  2. Paste {selectedPlatform === 'youtube' ? 'YouTube Video' : 'X Post'} URL
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Link2 className="w-4 h-4" />
                   </div>
-                ))}
+                  <input
+                    type="url"
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    placeholder={
+                      selectedPlatform === 'youtube'
+                        ? 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+                        : 'https://x.com/username/status/1234567890'
+                    }
+                    disabled={loading}
+                    className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-[#0B0F19] border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-slate-900 dark:text-white placeholder-slate-400"
+                  />
+                </div>
+                <div className="flex items-center justify-between mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                  <span>
+                    {selectedPlatform === 'youtube'
+                      ? 'Official YouTube Data API v3 retrieves real audience comments.'
+                      : 'Official X API v2 Bearer Token integration.'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowOptionalTextInput(!showOptionalTextInput)}
+                    className="text-violet-600 dark:text-violet-400 hover:underline inline-flex items-center space-x-1"
+                  >
+                    <span>{showOptionalTextInput ? 'Hide custom text' : 'Paste custom replies/comments'}</span>
+                    {showOptionalTextInput ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Optional Manual Comments Input Accordion */}
+              {showOptionalTextInput && (
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#0B0F19] border border-slate-200 dark:border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Optional: Custom Audience Comments or Post Text
+                    </label>
+                    <span className="text-[10px] text-slate-500">1 comment per line</span>
+                  </div>
+                  <textarea
+                    rows={4}
+                    value={pastedText}
+                    onChange={(e) => setPastedText(e.target.value)}
+                    placeholder="Alex: Loved the explanation in this video!&#10;Chris: Audio was too quiet at the beginning.&#10;Sam: What lens did you use for the setup?"
+                    className="w-full p-2.5 bg-white dark:bg-[#131927] border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                  />
+                  <p className="text-[11px] text-slate-500">
+                    Useful if comments on YouTube are disabled or if X developer credits are exhausted (HTTP 402).
+                  </p>
+                </div>
+              )}
+
+              {/* 3. Analyze Vibe Button */}
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={loading || (!urlInput.trim() && !pastedText.trim())}
+                  className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-semibold text-sm shadow-md shadow-violet-500/25 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                >
+                  {loading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Analyzing Vibe...</span>
+                    </>
+                  ) : (
+                    <>
+                      <SearchCheck className="w-4 h-4" />
+                      <span>Analyze Vibe</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+
+            {/* Loading Indicator */}
+            {loading && (
+              <div className="p-4 rounded-xl bg-violet-50/50 dark:bg-violet-950/20 border border-violet-200/60 dark:border-violet-800/40 space-y-3">
+                <div className="flex items-center justify-between text-xs font-semibold text-violet-900 dark:text-violet-200">
+                  <div className="flex items-center space-x-2">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-violet-600" />
+                    <span>ML Sentiment Analysis in Progress...</span>
+                  </div>
+                  <span>Step {loadingStep} of 4</span>
+                </div>
+                <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                  <div
+                    className="bg-violet-600 h-full transition-all duration-300"
+                    style={{ width: `${(loadingStep / 4) * 100}%` }}
+                  />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                  <span className={loadingStep >= 1 ? 'font-semibold text-violet-600 dark:text-violet-400' : ''}>
+                    1. URL Validation
+                  </span>
+                  <span className={loadingStep >= 2 ? 'font-semibold text-violet-600 dark:text-violet-400' : ''}>
+                    2. Content Retrieval
+                  </span>
+                  <span className={loadingStep >= 3 ? 'font-semibold text-violet-600 dark:text-violet-400' : ''}>
+                    3. TF-IDF Preprocessing
+                  </span>
+                  <span className={loadingStep >= 4 ? 'font-semibold text-violet-600 dark:text-violet-400' : ''}>
+                    4. ML Classification
+                  </span>
+                </div>
               </div>
             )}
-          </Card>
-        </div>
-      ) : topTab === 'sentiment' ? (
-        <div className="pt-2 space-y-6">
-          <Card className="p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100 dark:border-slate-800">
-              <div>
-                <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center space-x-2">
-                  <BarChart2 className="w-5 h-5 text-violet-600" />
-                  <span>Sentiment & Emotion Distribution</span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  Multilingual polarity scoring and 8-vibe emotional classification from real audience comments.
-                </p>
+
+            {/* Error Message */}
+            {error && (
+              <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 flex items-start space-x-3 text-sm">
+                <AlertCircle className="w-5 h-5 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="font-bold">Analysis Notice</div>
+                  <div className="text-xs leading-relaxed">{error}</div>
+                </div>
               </div>
+            )}
+          </div>
 
-              <div className="flex items-center space-x-2">
-                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300 border border-violet-200 dark:border-violet-800">
-                  {analysis?.sentiment?.model_used || 'XLM-RoBERTa / VADER Engine'}
-                </span>
-              </div>
-            </div>
-
-            {analysis ? (
-              <div className="space-y-6 pt-6">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-center">
-                    <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">
-                      Positive Sentiment
-                    </div>
-                    <div className="text-2xl font-extrabold text-emerald-800 dark:text-emerald-200 mt-1">
-                      {analysis.sentiment?.positive_percent || 0}%
-                    </div>
-                    <div className="text-[11px] text-emerald-600 mt-0.5">High approval & praise</div>
+          {/* VIBECHECK RESULTS INTERFACE */}
+          {analysis && (
+            <div className="space-y-6">
+              {/* Content Header Banner */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#131927] border border-[#EAE7F5] dark:border-[#1F293D] shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                      {metadata?.platform === 'youtube' ? 'YouTube Video' : 'X (Twitter) Post'}
+                    </span>
+                    {metadata?.post_url && (
+                      <a
+                        href={metadata.post_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-violet-600 dark:text-violet-400 hover:underline inline-flex items-center space-x-1"
+                      >
+                        <span>View Source</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
                   </div>
-
-                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-center">
-                    <div className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
-                      Neutral Sentiment
-                    </div>
-                    <div className="text-2xl font-extrabold text-slate-800 dark:text-slate-200 mt-1">
-                      {analysis.sentiment?.neutral_percent || 0}%
-                    </div>
-                    <div className="text-[11px] text-slate-500 mt-0.5">Questions & observations</div>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-center">
-                    <div className="text-xs font-semibold text-rose-700 dark:text-rose-300 uppercase tracking-wider">
-                      Negative Sentiment
-                    </div>
-                    <div className="text-2xl font-extrabold text-rose-800 dark:text-rose-200 mt-1">
-                      {analysis.sentiment?.negative_percent || 0}%
-                    </div>
-                    <div className="text-[11px] text-rose-600 mt-0.5">Critique & pushback</div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white line-clamp-1">
+                    {metadata?.title || 'Analyzed Content'}
+                  </h2>
+                  <div className="text-xs text-slate-500">
+                    By <span className="font-semibold text-slate-700 dark:text-slate-300">{metadata?.author || 'Creator'}</span>
+                    {metadata?.view_count > 0 && ` • ${metadata.view_count.toLocaleString()} views`}
+                    {metadata?.like_count > 0 && ` • ${metadata.like_count.toLocaleString()} likes`}
                   </div>
                 </div>
 
-                {/* 8 Vibes Breakdown */}
-                <div className="space-y-3">
-                  <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
-                    8 Emotional Vibes Clusters
-                  </h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {Object.entries(analysis.vibes?.breakdown || {}).map(([vibeName, count]) => (
-                      <div
-                        key={vibeName}
-                        className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
-                      >
-                        <div className="text-xs font-semibold capitalize text-slate-700 dark:text-slate-300">
-                          {vibeName}
+                <div className="shrink-0 flex items-center space-x-2">
+                  <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                    {results?.analysis_information?.samples_analyzed || 0} samples analyzed
+                  </span>
+                </div>
+              </div>
+
+              {/* Case 1: Usable text retrieved & ML Prediction available */}
+              {results?.has_prediction ? (
+                <>
+                  {/* Row 1: Overall Vibe & Sentiment Distribution */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    {/* A. Overall Vibe Card */}
+                    {(() => {
+                      const badge = getOverallVibeBadge(results.overall_vibe);
+                      const BadgeIcon = badge.icon;
+                      return (
+                        <div className="bg-white dark:bg-[#131927] rounded-2xl border border-[#EAE7F5] dark:border-[#1F293D] shadow-sm p-5 sm:p-6 flex flex-col justify-between">
+                          <div>
+                            <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                              A. Overall Vibe
+                            </div>
+                            <div className="flex items-center space-x-3 my-3">
+                              <div className={`p-3 rounded-2xl border ${badge.bg}`}>
+                                <BadgeIcon className="w-7 h-7" />
+                              </div>
+                              <div>
+                                <span className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                                  {badge.label}
+                                </span>
+                                <div className="text-xs text-slate-500 font-medium">Predominant audience sentiment</div>
+                              </div>
+                            </div>
+                          </div>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-slate-800/80 pt-3">
+                            {badge.desc}
+                          </p>
                         </div>
-                        <div className="text-lg font-extrabold text-violet-600 dark:text-violet-400 mt-0.5">
-                          {count} <span className="text-[10px] text-slate-400 font-normal">comments</span>
+                      );
+                    })()}
+
+                    {/* B. Sentiment Distribution Visualization */}
+                    <div className="md:col-span-2 bg-white dark:bg-[#131927] rounded-2xl border border-[#EAE7F5] dark:border-[#1F293D] shadow-sm p-5 sm:p-6 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                          B. Sentiment Distribution
+                        </div>
+                        <span className="text-[11px] text-slate-500">
+                          Based on {results.counts.total} ML text predictions
+                        </span>
+                      </div>
+
+                      {/* Stacked Progress Bar */}
+                      <div className="h-4 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex shadow-inner">
+                        <div
+                          style={{ width: `${results.sentiment_distribution.positive_percentage}%` }}
+                          className="bg-emerald-500 transition-all duration-500"
+                          title={`Positive: ${results.sentiment_distribution.positive_percentage}%`}
+                        />
+                        <div
+                          style={{ width: `${results.sentiment_distribution.neutral_percentage}%` }}
+                          className="bg-blue-500 transition-all duration-500"
+                          title={`Neutral: ${results.sentiment_distribution.neutral_percentage}%`}
+                        />
+                        <div
+                          style={{ width: `${results.sentiment_distribution.negative_percentage}%` }}
+                          className="bg-rose-500 transition-all duration-500"
+                          title={`Negative: ${results.sentiment_distribution.negative_percentage}%`}
+                        />
+                      </div>
+
+                      {/* Percentage Detail Cards */}
+                      <div className="grid grid-cols-3 gap-3 pt-1">
+                        <div className="p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/50">
+                          <div className="flex items-center space-x-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                            <ThumbsUp className="w-3.5 h-3.5" />
+                            <span>Positive</span>
+                          </div>
+                          <div className="text-xl font-extrabold text-emerald-900 dark:text-emerald-200 mt-1">
+                            {results.sentiment_distribution.positive_percentage}%
+                          </div>
+                          <div className="text-[11px] text-emerald-600/80 dark:text-emerald-400/80">
+                            {results.counts.positive} comments
+                          </div>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-800/50">
+                          <div className="flex items-center space-x-1.5 text-xs font-bold text-blue-700 dark:text-blue-400">
+                            <Minus className="w-3.5 h-3.5" />
+                            <span>Neutral</span>
+                          </div>
+                          <div className="text-xl font-extrabold text-blue-900 dark:text-blue-200 mt-1">
+                            {results.sentiment_distribution.neutral_percentage}%
+                          </div>
+                          <div className="text-[11px] text-blue-600/80 dark:text-blue-400/80">
+                            {results.counts.neutral} comments
+                          </div>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/60 dark:border-rose-800/50">
+                          <div className="flex items-center space-x-1.5 text-xs font-bold text-rose-700 dark:text-rose-400">
+                            <ThumbsDown className="w-3.5 h-3.5" />
+                            <span>Negative</span>
+                          </div>
+                          <div className="text-xl font-extrabold text-rose-900 dark:text-rose-200 mt-1">
+                            {results.sentiment_distribution.negative_percentage}%
+                          </div>
+                          <div className="text-[11px] text-rose-600/80 dark:text-rose-400/80">
+                            {results.counts.negative} comments
+                          </div>
                         </div>
                       </div>
-                    ))}
+                    </div>
+                  </div>
+
+                  {/* Row 2: Analysis Summary & Analysis Information */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {/* C. Analysis Summary */}
+                    <div className="bg-white dark:bg-[#131927] rounded-2xl border border-[#EAE7F5] dark:border-[#1F293D] shadow-sm p-5 sm:p-6 space-y-2.5">
+                      <div className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                        C. Analysis Summary
+                      </div>
+                      <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
+                        {results.analysis_summary}
+                      </p>
+                      {coverage?.notice && (
+                        <div className="text-xs text-slate-500 bg-slate-50 dark:bg-[#0B0F19] p-2.5 rounded-lg border border-slate-100 dark:border-slate-800">
+                          {coverage.notice}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* D. Analysis Information */}
+                    <div className="bg-white dark:bg-[#131927] rounded-2xl border border-[#EAE7F5] dark:border-[#1F293D] shadow-sm p-5 sm:p-6 space-y-3">
+                      <div className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                        D. Analysis Information
+                      </div>
+                      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                        <div>
+                          <dt className="text-slate-500">Platform</dt>
+                          <dd className="font-bold text-slate-900 dark:text-white">
+                            {results.analysis_information.platform}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-slate-500">Selected ML Model</dt>
+                          <dd className="font-bold text-violet-600 dark:text-violet-400">
+                            {results.analysis_information.selected_ml_model}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-slate-500">Analyzed Samples</dt>
+                          <dd className="font-bold text-slate-900 dark:text-white">
+                            {results.analysis_information.samples_analyzed}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-slate-500">Analysis Status</dt>
+                          <dd className="font-bold text-emerald-600 dark:text-emerald-400">
+                            {results.analysis_information.analysis_status}
+                          </dd>
+                        </div>
+                      </dl>
+                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
+                        <span>Traditional ML (TF-IDF + Stratified Classifier)</span>
+                        <button
+                          onClick={() => handleTabSwitch('benchmark')}
+                          className="text-violet-600 dark:text-violet-400 hover:underline font-semibold inline-flex items-center space-x-1"
+                        >
+                          <span>View Benchmark</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Individual Comments with Sentiment Tags */}
+                  {analysis?.comments && analysis.comments.length > 0 && (
+                    <div className="bg-white dark:bg-[#131927] rounded-2xl border border-[#EAE7F5] dark:border-[#1F293D] shadow-sm p-5 sm:p-6 space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                        <div className="flex items-center space-x-2">
+                          <MessageSquare className="w-4 h-4 text-slate-400" />
+                          <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                            Analyzed Audience Comments ({analysis.comments.length})
+                          </h3>
+                        </div>
+
+                        {/* Filter pills */}
+                        <div className="flex items-center space-x-1 bg-slate-100 dark:bg-[#0B0F19] p-1 rounded-xl text-xs">
+                          {['all', 'positive', 'neutral', 'negative'].map((flt) => (
+                            <button
+                              key={flt}
+                              onClick={() => setCommentFilter(flt)}
+                              className={`px-2.5 py-1 rounded-lg capitalize font-medium transition ${
+                                commentFilter === flt
+                                  ? 'bg-white dark:bg-[#1E2638] text-slate-900 dark:text-white shadow-2xs'
+                                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                              }`}
+                            >
+                              {flt}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Comments Scrollable List */}
+                      <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
+                        {filteredComments.map((c, i) => (
+                          <div
+                            key={c.comment_id || i}
+                            className="p-3 rounded-xl bg-slate-50 dark:bg-[#0B0F19] border border-slate-100 dark:border-slate-800/80 flex items-start justify-between gap-3 text-xs"
+                          >
+                            <div className="space-y-1 flex-1">
+                              <div className="flex items-center space-x-2">
+                                <span className="font-semibold text-slate-800 dark:text-slate-200">{c.author}</span>
+                                {c.is_spam && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                                    Spam
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-slate-600 dark:text-slate-400 text-xs leading-relaxed">{c.text}</p>
+                            </div>
+
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize shrink-0 border ${
+                                c.sentiment === 'positive'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+                                  : c.sentiment === 'negative'
+                                  ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
+                                  : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800'
+                              }`}
+                            >
+                              {c.sentiment}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* Case 2: No usable text retrieved -> Honest Notice without Sentiment Prediction */
+                <div className="p-6 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 space-y-3">
+                  <div className="flex items-center space-x-2 text-base font-bold">
+                    <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                    <span>No Sentiment Prediction Displayed</span>
+                  </div>
+                  <p className="text-sm leading-relaxed">
+                    {coverage?.notice ||
+                      'No usable comments or text content could be retrieved from the target URL. In accordance with honest evaluation requirements, no fabricated sentiment prediction is shown.'}
+                  </p>
+                  <div className="text-xs text-amber-800/80 dark:text-amber-300/80 bg-white/60 dark:bg-[#131927]/60 p-3 rounded-xl border border-amber-200/50 dark:border-amber-800/50 space-y-1">
+                    <div className="font-semibold">Why did this happen?</div>
+                    <ul className="list-disc pl-4 space-y-0.5">
+                      {metadata?.platform === 'youtube' ? (
+                        <>
+                          <li>The video creator may have disabled comments on this video.</li>
+                          <li>The video is newly uploaded and currently has 0 comments.</li>
+                        </>
+                      ) : (
+                        <>
+                          <li>The official X API v2 returned HTTP 402 (Payment Required: credits depleted).</li>
+                          <li>Per project policy, no additional paid credits are purchased.</li>
+                        </>
+                      )}
+                    </ul>
+                  </div>
+                  <div className="pt-2">
+                    <button
+                      onClick={() => setShowOptionalTextInput(true)}
+                      className="px-4 py-2 rounded-xl bg-amber-600 text-white font-semibold text-xs hover:bg-amber-700 transition"
+                    >
+                      Paste Audience Comments Directly
+                    </button>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="py-12 text-center text-xs text-slate-400 space-y-3">
-                <p>Run an analysis on any video or pasted comments to explore sentiment distribution.</p>
-                <Button variant="primary" size="sm" onClick={() => setTopTab('analyze')}>
-                  Analyze a Post Now
-                </Button>
-              </div>
-            )}
-          </Card>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ----------------- ML Models Benchmark Sub-component -----------------
+function MLModelBenchmarkView({ mlModels, loading, onBack }) {
+  const models = mlModels?.models || {};
+  const datasetInfo = mlModels?.dataset_info || {};
+  const bestModelName = mlModels?.best_model || 'Multinomial Naive Bayes';
+
+  const modelKeys = Object.keys(models);
+
+  return (
+    <div className="space-y-6">
+      {/* Benchmark Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
+        <div>
+          <button
+            onClick={onBack}
+            className="text-xs font-semibold text-violet-600 dark:text-violet-400 hover:underline mb-1 inline-flex items-center space-x-1"
+          >
+            <span>← Back to VibeCheck Analyzer</span>
+          </button>
+          <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white">
+            Machine Learning Algorithm Comparison
+          </h2>
+          <p className="text-xs text-slate-500">
+            Rigorously trained and tested on {datasetInfo.total_samples || 1200} balanced social media sentiment samples (80% Train, 20% Stratified Test Split).
+          </p>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+            Selected Winner: {bestModelName}
+          </span>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="p-8 text-center text-slate-500 space-y-2">
+          <RefreshCw className="w-6 h-6 animate-spin mx-auto text-violet-600" />
+          <p className="text-xs">Loading Machine Learning benchmark results...</p>
         </div>
       ) : (
         <>
-          {/* How it Works Strip */}
-          <HowItWorks steps={HOW_IT_WORKS_STEPS} />
-
-      {/* Supported Platforms Strip */}
-      <div className="p-4 rounded-2xl bg-white/70 dark:bg-[#171D2B]/70 border border-[#E8E6DF] dark:border-[#232B3E] flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex items-center space-x-2 text-[#5B6475] dark:text-[#94A3B8] font-semibold">
-          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-          <span>Supported Input Modes:</span>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="px-2.5 py-1 rounded-lg bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900/40 font-medium">
-            YouTube Data API v3
-          </span>
-          <span className="px-2.5 py-1 rounded-lg bg-pink-50 dark:bg-pink-950/30 text-pink-700 dark:text-pink-300 border border-pink-200 dark:border-pink-900/40 font-medium">
-            Instagram oEmbed
-          </span>
-          <span className="px-2.5 py-1 rounded-lg bg-sky-50 dark:bg-sky-950/30 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-900/40 font-medium">
-            TikTok oEmbed
-          </span>
-          <span className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/40 font-medium">
-            Pasted Comments (100% Real)
-          </span>
-          <span className="px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-900/40 font-medium">
-            Audio / SRT Transcripts
-          </span>
-        </div>
-      </div>
-
-      {/* Main Analysis Input Box */}
-      <Card className="p-6">
-        <div className="flex items-center space-x-2 border-b border-[#E8E6DF] dark:border-[#232B3E] pb-3 mb-5 overflow-x-auto">
-          <button
-            onClick={() => setActiveTab('url')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors shrink-0 ${
-              activeTab === 'url'
-                ? 'bg-[#5B5BD6] text-white'
-                : 'text-[#5B6475] dark:text-[#94A3B8] hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <Link2 className="w-3.5 h-3.5" />
-            <span>Public Post URL</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('pasted')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors shrink-0 ${
-              activeTab === 'pasted'
-                ? 'bg-[#5B5BD6] text-white'
-                : 'text-[#5B6475] dark:text-[#94A3B8] hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-            <span>Pasted Comments</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('transcript')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors shrink-0 ${
-              activeTab === 'transcript'
-                ? 'bg-[#5B5BD6] text-white'
-                : 'text-[#5B6475] dark:text-[#94A3B8] hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5" />
-            <span>Transcript / SRT</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('csv')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors shrink-0 ${
-              activeTab === 'csv'
-                ? 'bg-[#5B5BD6] text-white'
-                : 'text-[#5B6475] dark:text-[#94A3B8] hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <Upload className="w-3.5 h-3.5" />
-            <span>Upload CSV</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('whisper')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors shrink-0 ${
-              activeTab === 'whisper'
-                ? 'bg-[#14B8A6] text-white'
-                : 'text-[#5B6475] dark:text-[#94A3B8] hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <Terminal className="w-3.5 h-3.5" />
-            <span>Local Whisper Audio Guide</span>
-          </button>
-        </div>
-
-        {/* Tab 1: Public Post URL */}
-        {activeTab === 'url' && (
-          <div className="space-y-4">
-            <div className="flex flex-col md:flex-row items-stretch gap-3">
-              <div className="relative flex-1">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                  <Link2 className="w-4 h-4" />
-                </div>
-                <input
-                  type="url"
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  placeholder="https://www.youtube.com/watch?v=... or instagram.com/p/... or tiktok.com/@user/..."
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] text-sm text-[#1F2430] dark:text-[#F1F5F9] focus:outline-none focus:ring-2 focus:ring-[#5B5BD6]/20 focus:border-[#5B5BD6]"
-                />
-              </div>
-              <Button
-                variant="primary"
-                size="md"
-                onClick={runAnalysis}
-                loading={loading}
-                icon={SearchCheck}
-                className="shrink-0"
-              >
-                Run VibeCheck
-              </Button>
-            </div>
-
-            <div className="flex items-center justify-between text-xs text-[#5B6475] dark:text-[#94A3B8]">
-              <span className="flex items-center space-x-1">
-                <span>Try sample video:</span>
-                <button
-                  type="button"
-                  onClick={() => setUrlInput('https://www.youtube.com/watch?v=dQw4w9WgXcQ')}
-                  className="text-[#5B5BD6] dark:text-brand-300 font-semibold hover:underline"
-                >
-                  YouTube Masterclass
-                </button>
-                <span>or</span>
-                <button
-                  type="button"
-                  onClick={() => setUrlInput('https://www.instagram.com/reel/C3x9L')}
-                  className="text-[#5B5BD6] dark:text-brand-300 font-semibold hover:underline"
-                >
-                  Instagram Reel
-                </button>
-              </span>
-              <span className="text-[11px] text-slate-400">Zero HTML scraping • Strict API compliance</span>
-            </div>
-          </div>
-        )}
-
-        {/* Tab 2: Pasted Comments */}
-        {activeTab === 'pasted' && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <input
-                type="text"
-                value={customTitle}
-                onChange={(e) => setCustomTitle(e.target.value)}
-                placeholder="Post title or topic (e.g., Color Grading Masterclass)"
-                className="px-3.5 py-2 rounded-xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] text-xs text-[#1F2430] dark:text-[#F1F5F9]"
-              />
-              <input
-                type="text"
-                value={customAuthor}
-                onChange={(e) => setCustomAuthor(e.target.value)}
-                placeholder="Creator / Channel name"
-                className="px-3.5 py-2 rounded-xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] text-xs text-[#1F2430] dark:text-[#F1F5F9]"
-              />
-            </div>
-            <textarea
-              rows={6}
-              value={customText}
-              onChange={(e) => setCustomText(e.target.value)}
-              placeholder="Paste comments here (one comment per line, or 'Username: comment text')..."
-              className="w-full p-3.5 rounded-xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] text-xs font-mono text-[#1F2430] dark:text-[#F1F5F9] focus:outline-none focus:ring-2 focus:ring-[#5B5BD6]/20 focus:border-[#5B5BD6]"
-            />
-            <div className="flex items-center justify-between">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCustomText(SAMPLE_COMMENTS_PRESET)}
-              >
-                Insert Realistic Sample Comments
-              </Button>
-              <Button
-                variant="primary"
-                size="md"
-                onClick={runAnalysis}
-                loading={loading}
-                icon={SearchCheck}
-              >
-                Analyze Comments
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Tab 3: Transcript / SRT */}
-        {activeTab === 'transcript' && (
-          <div className="space-y-4">
-            <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900/40 text-xs text-purple-900 dark:text-purple-300">
-              Paste your video script, dialogue, or SRT subtitle text. Subtitle timestamps (e.g. 00:01:20) are automatically detected and stripped.
-            </div>
-            <textarea
-              rows={6}
-              value={customText}
-              onChange={(e) => setCustomText(e.target.value)}
-              placeholder="Paste dialogue or SRT subtitles here..."
-              className="w-full p-3.5 rounded-xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] text-xs font-mono text-[#1F2430] dark:text-[#F1F5F9]"
-            />
-            <div className="flex justify-end">
-              <Button
-                variant="primary"
-                size="md"
-                onClick={runAnalysis}
-                loading={loading}
-                icon={SearchCheck}
-              >
-                Analyze Transcript
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Tab 4: Upload CSV */}
-        {activeTab === 'csv' && (
-          <div className="space-y-4">
-            <div className="border-2 border-dashed border-[#E8E6DF] dark:border-[#232B3E] rounded-2xl p-6 text-center hover:bg-slate-50 dark:hover:bg-[#1a2133] transition cursor-pointer">
-              <input
-                type="file"
-                accept=".csv,.txt"
-                onChange={handleFileUpload}
-                id="csv-vibe-upload"
-                className="hidden"
-              />
-              <label htmlFor="csv-vibe-upload" className="cursor-pointer block">
-                <Upload className="w-8 h-8 mx-auto text-[#5B5BD6] mb-2" />
-                <div className="text-sm font-bold text-[#1F2430] dark:text-[#F1F5F9]">
-                  Upload CSV of Comments
-                </div>
-                <div className="text-xs text-[#5B6475] dark:text-[#94A3B8] mt-1">
-                  Supports columns: comment/text, author, likes
-                </div>
-              </label>
-            </div>
-            {customText && (
-              <div className="flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
-                <span>✓ Loaded {customText.splitlines?.()?.length || customText.split('\n').length} CSV lines</span>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={runAnalysis}
-                  loading={loading}
-                  icon={SearchCheck}
-                >
-                  Analyze Uploaded CSV
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Tab 5: Local Whisper Audio Guide */}
-        {activeTab === 'whisper' && (
-          <div className="space-y-4 p-4 rounded-xl bg-slate-50 dark:bg-[#141A28] border border-[#E8E6DF] dark:border-[#232B3E]">
-            <div className="flex items-start space-x-3">
-              <div className="w-9 h-9 rounded-xl bg-teal-100 dark:bg-teal-900/40 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
-                <Terminal className="w-5 h-5" />
-              </div>
-              <div className="space-y-1">
-                <div className="text-sm font-bold text-[#1F2430] dark:text-[#F1F5F9]">
-                  Run OpenAI Whisper Locally (100% Free & Private)
-                </div>
-                <div className="text-xs text-[#5B6475] dark:text-[#94A3B8]">
-                  Transcribe long videos on your own laptop with zero cloud costs and zero privacy leaks.
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2 text-xs">
-              <div className="font-semibold text-slate-700 dark:text-slate-300">
-                1. In your terminal, install OpenAI Whisper:
-              </div>
-              <div className="p-2.5 rounded-lg bg-slate-900 text-teal-300 font-mono text-[11px] flex items-center justify-between">
-                <code>pip install openai-whisper</code>
-              </div>
-
-              <div className="font-semibold text-slate-700 dark:text-slate-300 mt-2">
-                2. Transcribe any video or audio file:
-              </div>
-              <div className="p-2.5 rounded-lg bg-slate-900 text-teal-300 font-mono text-[11px] flex items-center justify-between">
-                <code>whisper "my_video.mp4" --model base --output_format txt</code>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText('whisper "my_video.mp4" --model base --output_format txt');
-                    setCopiedWhisper(true);
-                    setTimeout(() => setCopiedWhisper(false), 2000);
-                  }}
-                  className="p-1 hover:text-white transition"
-                  title="Copy command"
-                >
-                  {copiedWhisper ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-
-              <div className="font-semibold text-slate-700 dark:text-slate-300 mt-2">
-                3. Paste the generated .txt content into the <button onClick={() => setActiveTab('transcript')} className="text-[#5B5BD6] font-bold underline">Transcript / SRT tab</button> above!
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Animated Progress Indicator */}
-        {loading && (
-          <div className="mt-6 p-4 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-900/40 space-y-3">
-            <div className="flex items-center justify-between text-xs font-bold text-[#5B5BD6] dark:text-brand-300">
-              <span className="flex items-center space-x-2">
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Running VibeCheck AI Pipeline...</span>
-              </span>
-              <span>Step {loadingStep} of 4</span>
-            </div>
-            <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-              <div
-                className="bg-[#5B5BD6] h-full transition-all duration-300 rounded-full"
-                style={{ width: `${(loadingStep / 4) * 100}%` }}
-              />
-            </div>
-            <div className="text-[11px] text-[#5B6475] dark:text-[#94A3B8]">
-              {loadingStep === 1 && '1/4 Fetching post metadata and comments through platform adapter...'}
-              {loadingStep === 2 && '2/4 Calculating VADER polarity and 8-category emotional vibe clustering...'}
-              {loadingStep === 3 && '3/4 Scanning comment corpus for promotional spam & bot patterns...'}
-              {loadingStep === 4 && '4/4 Synthesizing evidence-backed recommendations citing comment counts...'}
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="mt-4">
-            <ErrorState
-              title="Analysis Error"
-              description={error}
-              onRetry={runAnalysis}
-            />
-          </div>
-        )}
-      </Card>
-
-      {/* Analysis Results Display */}
-      {analysis && (
-        <div className="space-y-8 animate-fadeIn">
-          {/* Post Header Card & Coverage Report */}
-          <Card className="p-6">
-            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 pb-6 border-b border-[#E8E6DF] dark:border-[#232B3E]">
-              <div className="flex items-start space-x-4 min-w-0">
-                {analysis.metadata.thumbnail_url ? (
-                  <img
-                    src={analysis.metadata.thumbnail_url}
-                    alt={analysis.metadata.title}
-                    className="w-24 h-16 rounded-xl object-cover shrink-0 shadow-xs border border-slate-200 dark:border-slate-700"
-                  />
-                ) : (
-                  <div className="w-24 h-16 rounded-xl bg-gradient-to-tr from-[#5B5BD6] to-[#14B8A6] flex items-center justify-center text-white shrink-0 shadow-xs font-bold text-lg">
-                    {analysis.metadata.platform.toUpperCase().slice(0, 2)}
-                  </div>
-                )}
-                <div className="min-w-0 space-y-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                      {analysis.metadata.platform}
-                    </span>
-                    {analysis.coverage.is_sample_data ? (
-                      <StatusChip status="Uses sample data" size="sm" />
-                    ) : (
-                      <StatusChip status="Working now" size="sm" />
-                    )}
-                  </div>
-                  <h2 className="text-lg font-bold text-[#1F2430] dark:text-[#F1F5F9] truncate">
-                    {analysis.metadata.title}
-                  </h2>
-                  <div className="text-xs text-[#5B6475] dark:text-[#94A3B8]">
-                    By <span className="font-semibold text-slate-800 dark:text-slate-200">{analysis.metadata.author}</span>
-                    {analysis.metadata.view_count ? ` • ${analysis.metadata.view_count.toLocaleString()} views` : ''}
-                    {analysis.metadata.like_count ? ` • ${analysis.metadata.like_count.toLocaleString()} likes` : ''}
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  icon={Sparkles}
-                  onClick={() => handleTurnIntoStudioIdea(analysis.metadata.title)}
-                >
-                  Turn into Studio idea
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  icon={Download}
-                  onClick={exportCSV}
-                >
-                  Export CSV
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  icon={Copy}
-                  onClick={() => {
-                    navigator.clipboard.writeText(analysis.summary);
-                    addToast('Copied summary to clipboard', 'info');
-                  }}
-                >
-                  Copy Summary
-                </Button>
-              </div>
-            </div>
-
-            {/* Coverage Notice Banner */}
-            <div className="mt-4 p-3 rounded-xl bg-slate-50 dark:bg-[#141A28] border border-[#E8E6DF] dark:border-[#232B3E] flex items-start space-x-3 text-xs text-[#5B6475] dark:text-[#94A3B8]">
-              <HelpCircle className="w-4 h-4 text-[#5B5BD6] shrink-0 mt-0.5" />
-              <div className="space-y-0.5">
-                <span className="font-semibold text-slate-800 dark:text-slate-200">
-                  Data Coverage:
-                </span>{' '}
-                {analysis.coverage.notice}
-              </div>
-            </div>
-          </Card>
-
-          {/* Vibe & Sentiment Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* 1. Overall Vibe Scorecard */}
-            <Card className="p-6 flex flex-col justify-between">
-              <div>
-                <div className="text-xs font-semibold text-[#5B6475] dark:text-[#94A3B8] uppercase tracking-wider mb-2">
-                  Audience Vibe Score
-                </div>
-                <div className="flex items-baseline space-x-2">
-                  <span className="text-4xl font-extrabold text-[#1F2430] dark:text-[#F1F5F9]">
-                    {analysis.sentiment.vibe_score}
-                  </span>
-                  <span className="text-sm text-slate-400">/ 100</span>
-                </div>
-                <div className="mt-2 inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-teal-50 dark:bg-teal-950/30 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-900/40 text-xs font-bold">
-                  <Sparkles className="w-3.5 h-3.5 text-teal-500" />
-                  <span>Dominant: {analysis.sentiment.dominant_vibe}</span>
-                </div>
-              </div>
-              <div className="mt-4 pt-3 border-t border-[#E8E6DF] dark:border-[#232B3E] space-y-1.5 text-xs text-[#5B6475] dark:text-[#94A3B8]">
-                <div className="flex justify-between items-center">
-                  <span>Sentiment Model:</span>
-                  <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
-                    {analysis.sentiment.model_used || 'VADER (Rule-based)'}
-                  </span>
-                </div>
-                {analysis.sentiment.model_notice && (
-                  <div className="text-[11px] text-amber-700 dark:text-amber-400 font-medium italic">
-                    {analysis.sentiment.model_notice}
-                  </div>
-                )}
-                <div className="text-[10px] text-slate-400">
-                  Compound polarity average: {analysis.sentiment.average_compound}
-                </div>
-              </div>
-            </Card>
-
-            {/* 2. Sentiment Breakdown */}
-            <Card className="p-6 flex flex-col justify-between">
-              <div>
-                <div className="text-xs font-semibold text-[#5B6475] dark:text-[#94A3B8] uppercase tracking-wider mb-3">
-                  Sentiment Polarity
-                </div>
-                {/* Visual Bar */}
-                <div className="h-3 w-full rounded-full overflow-hidden flex bg-slate-200 dark:bg-slate-700 mb-3">
-                  <div
-                    style={{ width: `${analysis.sentiment.breakdown.positive}%` }}
-                    className="bg-emerald-500 h-full"
-                    title={`Positive: ${analysis.sentiment.breakdown.positive}%`}
-                  />
-                  <div
-                    style={{ width: `${analysis.sentiment.breakdown.neutral}%` }}
-                    className="bg-slate-400 h-full"
-                    title={`Neutral: ${analysis.sentiment.breakdown.neutral}%`}
-                  />
-                  <div
-                    style={{ width: `${analysis.sentiment.breakdown.negative}%` }}
-                    className="bg-rose-500 h-full"
-                    title={`Negative: ${analysis.sentiment.breakdown.negative}%`}
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                  <div>
-                    <div className="font-bold text-emerald-600 dark:text-emerald-400">
-                      {analysis.sentiment.breakdown.positive}%
-                    </div>
-                    <div className="text-[10px] text-slate-400">Positive ({analysis.sentiment.counts.positive})</div>
-                  </div>
-                  <div>
-                    <div className="font-bold text-slate-600 dark:text-slate-300">
-                      {analysis.sentiment.breakdown.neutral}%
-                    </div>
-                    <div className="text-[10px] text-slate-400">Neutral ({analysis.sentiment.counts.neutral})</div>
-                  </div>
-                  <div>
-                    <div className="font-bold text-rose-600 dark:text-rose-400">
-                      {analysis.sentiment.breakdown.negative}%
-                    </div>
-                    <div className="text-[10px] text-slate-400">Negative ({analysis.sentiment.counts.negative})</div>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 pt-2 text-[10px] text-slate-400 dark:text-slate-500 italic">
-                {analysis.sentiment.sarcasm_disclaimer}
-              </div>
-            </Card>
-
-            {/* 3. Community Hygiene & Spam Check */}
-            <Card className="p-6 flex flex-col justify-between">
-              <div>
-                <div className="text-xs font-semibold text-[#5B6475] dark:text-[#94A3B8] uppercase tracking-wider mb-2">
-                  Community Hygiene
-                </div>
-                <div className="flex items-center space-x-2">
-                  {analysis.spam_detection.flagged_count === 0 ? (
-                    <div className="flex items-center space-x-2 text-emerald-600 dark:text-emerald-400 font-bold text-lg">
-                      <CheckCircle2 className="w-5 h-5" />
-                      <span>Clean feed (0% Spam)</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center space-x-2 text-amber-600 dark:text-amber-400 font-bold text-lg">
-                      <ShieldAlert className="w-5 h-5" />
-                      <span>{analysis.spam_detection.flagged_count} Flagged ({analysis.spam_detection.spam_percentage}%)</span>
-                    </div>
-                  )}
-                </div>
-                <div className="text-xs text-[#5B6475] dark:text-[#94A3B8] mt-2">
-                  {analysis.engagement.question_count} viewer questions identified ({analysis.engagement.question_rate}% of audience).
-                </div>
-              </div>
-              <div className="mt-3 pt-2 border-t border-[#E8E6DF] dark:border-[#232B3E] text-xs text-[#5B6475] dark:text-[#94A3B8]">
-                Avg comment length: {analysis.engagement.average_word_length} words
-              </div>
-            </Card>
-          </div>
-
-          {/* 8-Category Vibe Breakdown Grid */}
-          <Card className="p-6">
-            <h3 className="text-sm font-bold text-[#1F2430] dark:text-[#F1F5F9] mb-4">
-              8-Category Audience Vibe Clusters
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {analysis.vibes.map((vb) => (
-                <div
-                  key={vb.vibe}
-                  className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#141A28] border border-[#E8E6DF] dark:border-[#232B3E] space-y-2"
-                >
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-[#1F2430] dark:text-[#F1F5F9] truncate pr-1">
-                      {vb.vibe}
-                    </span>
-                    <span className="text-slate-400 text-[11px] shrink-0 font-medium">
-                      {vb.count} ({vb.percentage}%)
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-                    <div
-                      className="bg-[#5B5BD6] h-full rounded-full transition-all duration-300"
-                      style={{ width: `${vb.percentage}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          {/* Evidence-Backed Recommendations Section */}
-          <Card className="p-6">
-            <div className="flex items-center space-x-2 mb-4">
-              <Sparkles className="w-5 h-5 text-[#5B5BD6]" />
-              <h3 className="text-base font-bold text-[#1F2430] dark:text-[#F1F5F9]">
-                Evidence-Backed Content Actions
+          {/* Algorithm Comparison Table */}
+          <div className="bg-white dark:bg-[#131927] rounded-2xl border border-[#EAE7F5] dark:border-[#1F293D] shadow-sm overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                <BarChart2 className="w-4 h-4 text-violet-600" />
+                <span>Evaluation Metrics Table (Traditional ML)</span>
               </h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {analysis.recommendations.map((rec, idx) => (
-                <div
-                  key={idx}
-                  className="p-4 rounded-xl bg-[#FAF9F6] dark:bg-[#121724] border border-[#E8E6DF] dark:border-[#232B3E] space-y-2"
-                >
-                  <div className="text-xs font-bold text-[#5B5BD6] dark:text-brand-300 uppercase tracking-wider">
-                    {rec.type.replace('_', ' ')}
-                  </div>
-                  <h4 className="text-sm font-bold text-[#1F2430] dark:text-[#F1F5F9]">
-                    {rec.title}
-                  </h4>
-                  <p className="text-xs text-[#5B6475] dark:text-[#94A3B8]">
-                    <strong className="text-slate-700 dark:text-slate-300">Data Evidence:</strong> {rec.evidence}
-                  </p>
-                  <p className="text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-[#171D2B] p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-800">
-                    <strong>Recommended Next Step:</strong> {rec.action}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => handleTurnIntoStudioIdea(rec.title)}
-                    className="text-[11px] font-bold text-[#5B5BD6] hover:underline flex items-center space-x-1 pt-1"
-                  >
-                    <Sparkles className="w-3 h-3" />
-                    <span>Turn into Studio idea</span>
-                    <ChevronRight className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          {/* Interactive Comment Explorer with Topic Chips */}
-          <Card className="p-6">
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-5 pb-4 border-b border-[#E8E6DF] dark:border-[#232B3E]">
-              <div>
-                <h3 className="text-base font-bold text-[#1F2430] dark:text-[#F1F5F9]">
-                  Audience Comment Explorer ({commentsToDisplay.length})
-                </h3>
-                <div className="text-xs text-[#5B6475] dark:text-[#94A3B8]">
-                  Filter comments by topic keyword or sentiment polarity
-                </div>
-              </div>
-
-              {/* Sentiment filter pills */}
-              <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                {['all', 'positive', 'neutral', 'negative', 'questions', 'spam'].map((f) => (
-                  <button
-                    key={f}
-                    onClick={() => setSentimentFilter(f)}
-                    className={`px-2.5 py-1 rounded-lg capitalize font-medium transition ${
-                      sentimentFilter === f
-                        ? 'bg-[#5B5BD6] text-white'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    {f}
-                  </button>
-                ))}
-              </div>
+              <span className="text-[11px] text-slate-400">Zero Data Leakage • TF-IDF (1,2 n-grams)</span>
             </div>
 
-            {/* Topic Chips */}
-            {analysis.topics.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2 mb-4">
-                <span className="text-xs font-semibold text-[#5B6475] dark:text-[#94A3B8]">
-                  Topics:
-                </span>
-                <button
-                  onClick={() => setSelectedTopic('all')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
-                    selectedTopic === 'all'
-                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                  }`}
-                >
-                  All Topics
-                </button>
-                {analysis.topics.map((t) => (
-                  <button
-                    key={t.keyword}
-                    onClick={() => setSelectedTopic(t.keyword)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
-                      selectedTopic === t.keyword
-                        ? 'bg-[#14B8A6] text-white'
-                        : 'bg-teal-50 dark:bg-teal-950/30 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-900/40'
-                    }`}
-                  >
-                    {t.keyword} ({t.mention_count})
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-[#0B0F19] text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px] tracking-wider border-b border-slate-100 dark:border-slate-800">
+                  <tr>
+                    <th className="py-3 px-4">Algorithm</th>
+                    <th className="py-3 px-4">Accuracy</th>
+                    <th className="py-3 px-4">Precision (Weighted)</th>
+                    <th className="py-3 px-4">Recall (Weighted)</th>
+                    <th className="py-3 px-4">F1-Score (Weighted)</th>
+                    <th className="py-3 px-4">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                  {modelKeys.map((key) => {
+                    const m = models[key];
+                    const isWinner = m.model_name === bestModelName;
+                    return (
+                      <tr
+                        key={key}
+                        className={isWinner ? 'bg-violet-50/40 dark:bg-violet-950/20 font-medium' : ''}
+                      >
+                        <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                          <span>{m.model_name}</span>
+                          {isWinner && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] bg-violet-600 text-white font-extrabold uppercase">
+                              Active in VibeCheck
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300">
+                          {(m.accuracy * 100).toFixed(2)}%
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300">
+                          {(m.precision_weighted * 100).toFixed(2)}%
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300">
+                          {(m.recall_weighted * 100).toFixed(2)}%
+                        </td>
+                        <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
+                          {(m.f1_score_weighted * 100).toFixed(2)}%
+                        </td>
+                        <td className="py-3.5 px-4">
+                          {isWinner ? (
+                            <span className="inline-flex items-center space-x-1 text-emerald-600 dark:text-emerald-400 font-bold">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Best Model</span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 font-normal">Candidate</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-            {/* Comments List */}
-            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
-              {commentsToDisplay.length === 0 ? (
-                <div className="p-8 text-center text-xs text-slate-400">
-                  No comments match the selected filters.
-                </div>
-              ) : (
-                commentsToDisplay.map((c) => (
+          {/* Confusion Matrices Grid */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+              <Cpu className="w-4 h-4 text-violet-600" />
+              <span>Confusion Matrices on Test Set (240 Holdout Samples)</span>
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {modelKeys.map((key) => {
+                const m = models[key];
+                const matrix = m.confusion_matrix?.matrix || [
+                  [0, 0, 0],
+                  [0, 0, 0],
+                  [0, 0, 0],
+                ];
+                const labels = m.confusion_matrix?.labels || ['positive', 'neutral', 'negative'];
+                const isWinner = m.model_name === bestModelName;
+
+                return (
                   <div
-                    key={c.comment_id}
-                    className={`p-3.5 rounded-xl border transition ${
-                      c.is_spam
-                        ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/40'
-                        : 'bg-white dark:bg-[#171D2B] border-[#E8E6DF] dark:border-[#232B3E]'
-                    }`}
+                    key={key}
+                    className={`p-4 rounded-2xl bg-white dark:bg-[#131927] border ${
+                      isWinner
+                        ? 'border-violet-400 dark:border-violet-600 ring-2 ring-violet-400/20'
+                        : 'border-[#EAE7F5] dark:border-[#1F293D]'
+                    } space-y-3`}
                   >
-                    <div className="flex items-center justify-between text-xs mb-1.5">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-bold text-[#1F2430] dark:text-[#F1F5F9]">
-                          {c.author}
-                        </span>
-                        {c.is_spam && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 font-bold">
-                            Spam
-                          </span>
-                        )}
-                        {c.is_question && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 font-bold">
-                            Question
-                          </span>
-                        )}
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs text-slate-900 dark:text-white">{m.model_name}</span>
+                      {isWinner && (
+                        <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400">Winner</span>
+                      )}
+                    </div>
+
+                    <div className="text-[11px] text-slate-500 font-medium">Rows = Actual, Columns = Predicted</div>
+
+                    <div className="grid grid-cols-4 gap-1 text-center text-[10.5px]">
+                      {/* Header */}
+                      <div className="text-slate-400"></div>
+                      <div className="font-bold text-emerald-600">Pos</div>
+                      <div className="font-bold text-blue-600">Neu</div>
+                      <div className="font-bold text-rose-600">Neg</div>
+
+                      {/* Row 0: Pos */}
+                      <div className="font-bold text-emerald-600 flex items-center justify-end pr-1">Pos</div>
+                      <div className="p-1.5 rounded bg-emerald-50 dark:bg-emerald-950/40 font-bold text-emerald-800 dark:text-emerald-200">
+                        {matrix[0][0]}
                       </div>
-                      <div className="flex items-center space-x-2 text-[11px]">
-                        <span
-                          className={`font-semibold capitalize ${
-                            c.sentiment === 'positive'
-                              ? 'text-emerald-600 dark:text-emerald-400'
-                              : c.sentiment === 'negative'
-                              ? 'text-rose-600 dark:text-rose-400'
-                              : 'text-slate-500'
-                          }`}
-                        >
-                          {c.sentiment}
-                        </span>
-                        <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">
-                          {c.vibe}
-                        </span>
-                        {c.like_count > 0 && (
-                          <span className="flex items-center space-x-0.5 text-slate-400">
-                            <ThumbsUp className="w-3 h-3" />
-                            <span>{c.like_count}</span>
-                          </span>
-                        )}
+                      <div className="p-1.5 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                        {matrix[0][1]}
+                      </div>
+                      <div className="p-1.5 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                        {matrix[0][2]}
+                      </div>
+
+                      {/* Row 1: Neu */}
+                      <div className="font-bold text-blue-600 flex items-center justify-end pr-1">Neu</div>
+                      <div className="p-1.5 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                        {matrix[1][0]}
+                      </div>
+                      <div className="p-1.5 rounded bg-blue-50 dark:bg-blue-950/40 font-bold text-blue-800 dark:text-blue-200">
+                        {matrix[1][1]}
+                      </div>
+                      <div className="p-1.5 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                        {matrix[1][2]}
+                      </div>
+
+                      {/* Row 2: Neg */}
+                      <div className="font-bold text-rose-600 flex items-center justify-end pr-1">Neg</div>
+                      <div className="p-1.5 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                        {matrix[2][0]}
+                      </div>
+                      <div className="p-1.5 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                        {matrix[2][1]}
+                      </div>
+                      <div className="p-1.5 rounded bg-rose-50 dark:bg-rose-950/40 font-bold text-rose-800 dark:text-rose-200">
+                        {matrix[2][2]}
                       </div>
                     </div>
-                    <p className="text-xs text-[#1F2430] dark:text-[#E2E8F0] leading-relaxed">
-                      {c.text}
-                    </p>
                   </div>
-                ))
-              )}
+                );
+              })}
             </div>
-          </Card>
-        </div>
-      )}
-      </>
-      )}
-
-      {/* History SlideOver */}
-      <SlideOver
-        open={historyOpen}
-        onClose={() => setHistoryOpen(false)}
-        title="Previous VibeCheck Reports"
-      >
-        <div className="space-y-4">
-          <div className="text-xs text-[#5B6475] dark:text-[#94A3B8]">
-            Click any previous analysis to reload its metrics, recommendations, and comment explorer.
           </div>
-          {loadingHistory ? (
-            <div className="p-8 text-center text-xs text-slate-400">
-              <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2" />
-              Loading history...
-            </div>
-          ) : historyReports.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-400">
-              No previous reports saved yet. Run an analysis above!
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {historyReports.map((r) => (
-                <div
-                  key={r.report_id}
-                  onClick={() => loadReport(r)}
-                  className="p-3.5 rounded-xl bg-white dark:bg-[#171D2B] border border-[#E8E6DF] dark:border-[#232B3E] hover:border-[#5B5BD6] transition cursor-pointer space-y-1.5 group"
-                >
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-[#1F2430] dark:text-[#F1F5F9] truncate pr-2">
-                      {r.title}
-                    </span>
-                    <button
-                      onClick={(e) => deleteReport(r.report_id, e)}
-                      className="p-1 text-slate-400 hover:text-rose-500 transition opacity-0 group-hover:opacity-100"
-                      title="Delete report"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  <div className="flex items-center space-x-2 text-[11px] text-[#5B6475] dark:text-[#94A3B8]">
-                    <span className="capitalize font-semibold text-[#5B5BD6]">{r.platform}</span>
-                    <span>•</span>
-                    <span>Vibe: {r.vibe_score}/100</span>
-                    <span>•</span>
-                    <span>{r.comment_count} comments</span>
-                  </div>
-                  <div className="text-[11px] text-slate-400 truncate">
-                    {r.summary}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </SlideOver>
+        </>
+      )}
     </div>
   );
 }

@@ -6,7 +6,7 @@ Handles querying and persisting social posts, creator accounts, and metric snaps
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
-from sqlalchemy import select, desc, asc, func
+from sqlalchemy import select, desc, asc, func, delete
 from sqlalchemy.orm import Session, joinedload
 
 from ..models import (
@@ -287,3 +287,14 @@ def save_posts(
 
     session.flush()
     return saved_count
+
+
+def clear_uploaded_posts(session: Session, workspace_id: uuid.UUID = SYSTEM_DEMO_WORKSPACE_ID) -> int:
+    """Deletes all non-synthetic (uploaded CSV) posts for the given workspace before a new import."""
+    stmt = delete(SocialPost).where(
+        SocialPost.workspace_id == workspace_id,
+        SocialPost.is_synthetic == False
+    )
+    res = session.execute(stmt)
+    session.flush()
+    return res.rowcount

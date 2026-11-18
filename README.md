@@ -1,210 +1,132 @@
 # CreatorPulse AI ⚡
+## ML-Based Social Media Sentiment Analysis System (VibeCheck AI)
 
-> **CreatorPulse AI** is an intelligent, privacy-first decision studio and social media analytics web platform designed for content creators across YouTube, Instagram, X (formerly Twitter), and LinkedIn. Built around a closed optimization cycle—**Discover → Predict → Create → Publish → Learn**—the application unifies channel telemetry, forecasts calibrated breakout hit probabilities against creators' historical baselines, and generates audience-targeted, multi-lingual creative concepts.
+> **CreatorPulse AI** is a focused, academic Machine Learning application designed to analyze audience sentiment across **YouTube** and **X (Twitter)** using traditional Machine Learning algorithms.
 
----
-
-> ⚠️ **IMPORTANT NOTE ON DATA & RESULTS (SYNTHETIC PROTOTYPE)**  
-> All creator profiles, posts, engagement metrics, comment sentiment, and trend telemetry used in this prototype are **100% SYNTHETIC / MOCK DATA** generated strictly for system architecture demonstration, user interface testing, and machine learning pipeline benchmarking. The statistical outcomes, hit rates, and model performance scores reflect simulated mathematical distributions and **are not real empirical findings from commercial social media algorithms**.
-
----
-
-## 🌟 Key Features & Core Pillars
-
-CreatorPulse AI delivers four main pillars tailored specifically for modern creators:
-
-1. **Creator Intelligence (Dashboard, Trends & Audience Voice)**
-   - **Cross-Platform Dashboard**: Aggregated summary cards (followers, impressions, engagement rates, breakout count) and an interactive 30-day engagement trajectory area chart.
-   - **Data Provenance & Freshness**: Every card explicitly reports data origin (`Data source: mock data`) and a last-refreshed timestamp.
-   - **Trend Explorer**: Detect emerging conversation angles across platforms with interactive SVG Bubble Radar (bubble size = momentum, color = platform), map/grid view switcher, and 24-hour, 7-day, and 30-day velocity filters.
-   - **Audience Voice (Comment Insights)**: Community mood breakdown (positive, neutral, critiques) paired with repeated viewer questions that can be transformed into content ideas with a single click.
-
-2. **ViralScope Prediction Engine**
-   - **Calibrated Hit Probability**: Predicts the likelihood that a draft post achieves a "breakout" hit status (e.g., `"18% (usual baseline: 5%)"`), never promising certainty.
-   - **Contextual Anchoring & Diagnostics**: Displays realistic performance bounds (ranges), confidence ratings (low/medium/high), top algorithmic reasoning factors, and 3 comparable past posts.
-   - **Customizable Percentile Strictness**: Adjust performance thresholds (`Top 20%`, `Top 10%`, `Top 5%`, or `Top 1% rare breakout`).
-   - **Prediction Results & Mathematical Scoreboard**: Comprehensive historical audit table tracking past predictions against actual post views, featuring a mathematically sound Brier score comparison against naive baseline guessing ($B_{\text{baseline}} = p(1-p)$), sample size indicator ($N$), and low-sample warning banner when $N < 30$.
-
-3. **ReelGenius Content Studio & Operations**
-   - **Platform-Tailored Formats**:
-     - *YouTube*: 5 click-worthy title options, 30-second cold hook, script retention outline, video description, and search tags.
-     - *Instagram*: Reel concept, caption with CTA, hashtags, and a 5-slide carousel outline.
-     - *X (Twitter)*: Opening hook variants and 7-tweet thread drafts.
-     - *LinkedIn*: Narrative story post and actionable 5-point listicle.
-   - **Multi-Lingual Generation**: Seamlessly outputs scripts and copy in **English**, **Hindi (हिंदी)**, and **Marathi (मराठी)**.
-   - **Best Ideas Tournament**: Automatically generates 10 creative angles, scores each with the ViralScope prediction service, and ranks them by hit potential.
-   - **Calendar & Drafts**: Kanban-style board (`Idea`, `Writing`, `Scheduled`, `Published`) and calendar grid view with CSV export and reliable error states.
-   - **Model Tests (Imbalance Lab)**: Interactive benchmark comparison of 8 class-imbalance mitigation techniques (class weights, ROS, SMOTE, SMOTE-Tomek, Balanced Random Forest, XGBoost, and Threshold Tuning) across 4 extreme rarity ratios (80:20, 90:10, 95:5, 99:1).
-
-4. **VibeCheck AI (Community Sentiment & Emotional Analysis Engine)**
-   - **Multi-Source Ingestion**:
-     - *YouTube Data API v3*: Direct comment threads with API quota handling and sample data fallback.
-     - *Instagram & TikTok*: Public oEmbed metadata adapters with transparent policy disclosures.
-     - *Manual Ingestion*: Pasted raw comments, uploaded CSV comment files, and SRT/transcript parser.
-     - *Whisper Audio Guide*: Step-by-step instructions for local offline transcription using OpenAI Whisper.
-   - **VADER Sentiment Engine**: Compound, positive, neutral, and negative sentiment distribution with built-in sarcasm disclaimers.
-   - **8-Category Emotional Vibe Clustering**: Categorizes comments into *Enthusiastic*, *Curious & Inquiring*, *Critical & Skeptical*, *Humorous & Memeing*, *Supportive & Wholesome*, *Confused & Puzzled*, *Frustrated & Annoyed*, and *Neutral & Informative*.
-   - **Spam & Bot Detection**: Flags spam patterns (crypto scams, WhatsApp contacts, automated bot bots) with 1-click comment isolation.
-   - **Evidence-Backed Recommendations**: Concrete creator action items explicitly citing supporting comment volume (e.g., *"14 viewers asked about setup costs"*).
-   - **Persistent History & Export**: Saves full analysis reports and exports clean CSVs.
+The application contains **one central feature**: **VibeCheck AI – Social Media Sentiment Analysis**. Its purpose is to analyze audience reactions to YouTube videos and X posts and predict whether the overall sentiment is:
+- **Positive**
+- **Negative**
+- **Neutral**
 
 ---
 
-## 🛠️ Tech Stack
+## 🌟 Core Feature: VibeCheck AI
 
-* **Frontend**:
+### 1. Two-Platform Scope
+- **YouTube**: Ingests real video metadata and top-level viewer comments via the official **YouTube Data API v3**.
+- **X (Twitter)**: Validates post URLs and authenticates via official **X API v2** using Bearer Token credentials.
+- **Honest Error Handling**: If comments are disabled on a YouTube video or if X developer credits are depleted (HTTP 402 Payment Required), clear and transparent messages are displayed. Fake comments, imaginary engagement, and fabricated sentiment scores are strictly prohibited.
+- **Custom Feedback Fallback**: When official API comments cannot be retrieved, users can paste audience comments directly into the system for ML sentiment prediction.
+
+### 2. Traditional Machine Learning Implementation
+In accordance with academic Machine Learning standards, the system relies strictly on traditional ML algorithms:
+
+1. **Logistic Regression** (L-BFGS solver, regularized C=1.5)
+2. **Multinomial Naive Bayes** (Additive Laplace smoothing alpha=0.5)
+3. **Linear Support Vector Machine (Linear SVM)** (Calibrated probability classifier, C=1.0)
+
+**Strict Academic Safeguards**:
+- **Zero LLM or Generative AI**: No hallucinations, deep learning, or unnecessary neural networks.
+- **Zero Data Leakage**: Stratified 80% train / 20% test split with TF-IDF vectorizer fit strictly on training data.
+- **Comprehensive Evaluation**: Every algorithm is evaluated using Accuracy, Precision (Weighted & Macro), Recall (Weighted & Macro), F1-Score (Weighted & Macro), and a 3×3 Confusion Matrix.
+- **Automated Winner Selection**: The best-performing model based on F1-score (**Multinomial Naive Bayes**, F1: 96.26%) is persisted and loaded for live inference.
+
+### 3. Model Comparison Benchmark
+
+| Algorithm | Accuracy | Precision (Weighted) | Recall (Weighted) | F1-Score (Weighted) | Status |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Multinomial Naive Bayes** | **96.25%** | **96.35%** | **96.25%** | **96.26%** | **Active Winner** |
+| **Linear SVM** | 95.42% | 95.45% | 95.42% | 95.43% | Candidate |
+| **Logistic Regression** | 95.00% | 95.10% | 95.00% | 95.02% | Candidate |
+
+---
+
+## 📊 VibeCheck Results Interface
+
+After analyzing content, the application displays:
+
+1. **Overall Vibe**:
+   - `Positive`: Favorable, supportive, and enthusiastic audience reaction.
+   - `Negative`: Dissatisfied, critical, or concerned feedback.
+   - `Neutral`: Balanced, objective, or mixed commentary.
+2. **Sentiment Distribution**:
+   - Visual progress bar and cards showing Positive %, Neutral %, and Negative %.
+   - Calculated directly from actual predictions of the analyzed text samples.
+3. **Analysis Summary**:
+   - Concise explanation synthesizing the audience tone and discussion drivers.
+4. **Analysis Information**:
+   - Platform (YouTube / X)
+   - Source URL
+   - Number of text samples successfully analyzed
+   - Selected ML Model (e.g., `Multinomial Naive Bayes`)
+   - Analysis Status (`Completed successfully`)
+5. **Analyzed Comments Feed**:
+   - Cleaned text, predicted sentiment tag (`positive`, `negative`, `neutral`), and model confidence score.
+   - Interactive sentiment filter (All, Positive, Neutral, Negative).
+
+---
+
+## 🛠️ Architecture & Tech Stack
+
+- **Backend**:
+  - FastAPI (Python 3.12)
+  - Scikit-Learn (TF-IDF vectorization, MultinomialNB, LogisticRegression, LinearSVC, CalibratedClassifierCV)
+  - Joblib (Model persistence)
+  - HTTPX / Requests (Official YouTube Data API v3 and X API v2)
+  - Python-dotenv (Secure environment configuration)
+- **Frontend**:
   - React 19 + Vite 8
-  - Tailwind CSS v4 (with `@tailwindcss/vite`)
-  - Framer Motion (slide-over inspection panels, fluid tab indicators, page transitions)
-  - Lucide React (creator-focused iconography)
-  - Recharts (responsive trajectory area charts, calibration bar charts, and mood donut visualizations)
-  - React Router v7
-* **Backend & Analytics**:
-  - Python 3.10+ / 3.12
-  - FastAPI (REST API with CORS and modular routers)
-  - Pydantic v2 (data schema contracts)
-  - Uvicorn (high-performance ASGI web server)
-  - VADER Sentiment (`vaderSentiment` for rule-based text sentiment)
-  - scikit-learn (CalibratedClassifierCV, RandomForest, LogisticRegression, time-based splits)
-  - imbalanced-learn (SMOTE, SMOTE-Tomek, BalancedRandomForestClassifier, RandomOverSampler)
-  - XGBoost (gradient boosting with weighted loss)
-  - httpx (async HTTP requests for YouTube and oEmbed endpoints)
-* **Storage & Persistence**:
-  - Zero-database prototype using pure JSON flat files managed strictly through an isolated Data Access Layer (DAL). Supports real CSV post analytics ingestion.
+  - Tailwind CSS v4
+  - Framer Motion (Transitions & animations)
+  - Lucide React (Icons)
+- **Dataset**:
+  - 1,200 balanced social media sentiment samples (400 positive, 400 neutral, 400 negative).
 
 ---
 
-## 📂 Folder Structure
+## 🚀 Getting Started
 
-```
-creatorpulse-ai/
-├── backend/
-│   ├── main.py                     # FastAPI server entry point & CORS configuration
-│   ├── .env.example                # Example environment configuration (YouTube, LLM keys)
-│   ├── requirements.txt            # Python dependencies (FastAPI, scikit-learn, VADER, etc.)
-│   ├── ml/
-│   │   ├── generate_data.py        # Generates synthetic data across 4 platforms
-│   │   ├── train.py                # Time-based split training & imbalance benchmarking
-│   │   ├── model.pkl               # Calibrated inference model (recreatable via train.py)
-│   │   └── results.json            # Model benchmark results (recreatable via train.py)
-│   ├── services/
-│   │   ├── data_access.py          # EXCLUSIVE Data Access Layer (DAL) for all reads/writes
-│   │   ├── prediction.py           # Calibrated prediction inference & diagnostics
-│   │   ├── content_generator.py    # Multi-lingual templates & external LLM adapter
-│   │   └── vibecheck/              # VibeCheck AI engine & multi-platform adapters
-│   │       ├── base.py             # Data models & adapter interface
-│   │       ├── youtube_adapter.py  # YouTube Data API v3 & sample fallback
-│   │       ├── instagram_adapter.py# Instagram oEmbed adapter
-│   │       ├── tiktok_adapter.py   # TikTok oEmbed adapter
-│   │       ├── manual_adapter.py   # User paste, SRT transcripts & CSV parser
-│   │       └── analysis.py         # VADER sentiment, 8 vibes & spam detection
-│   ├── routers/                    # Feature routers (dashboard, trends, studio, vibecheck, etc.)
-│   └── data/                       # Mock data files (posts, creators, snapshots, drafts, reports)
-├── frontend/
-│   ├── src/
-│   │   ├── api/apiClient.js        # Centralized typed API client
-│   │   ├── context/                # ThemeContext, ToastContext, PlatformContext
-│   │   ├── utils/timeFormat.js     # Clean 12-hour/24-hour time & date formatting
-│   │   ├── components/             # Reusable UI cards, slide-overs, badges, navbar
-│   │   │   ├── ui/                 # Input, Select, Modal, Table, ErrorState, PageHeader, HowItWorks
-│   │   │   └── SocialIcons.jsx     # Official platform brand SVG icons
-│   │   ├── assets/illustrations/   # On-brand local SVG illustrations (no external deps)
-│   │   └── pages/                  # 10 creator feature pages (Dashboard, VibeCheck, Predictor, etc.)
-│   ├── package.json
-│   ├── vite.config.js              # Vite bundler configuration & backend API proxy
-│   └── eslint.config.js            # Code hygiene & undefined identifier rules
-├── tests/
-│   └── test_backend.py             # Pytest suite testing all routers & VibeCheck engine
-├── docs/                           # Project reports, whitepapers, and documentation
-├── AUDIT.md                        # Complete feature audit matrix & verification logs
-├── .gitignore                      # Safe multi-stack ignore rules
-└── README.md                       # Master project overview and documentation
+### 1. Environment Setup
+
+Create or verify `backend/.env`:
+```env
+PORT=8000
+HOST=127.0.0.1
+YOUTUBE_API_KEY=your_youtube_api_key_here
+TWITTER_BEARER_TOKEN=your_twitter_bearer_token_here
 ```
 
----
-
-## ⚡ Quickstart & Setup Guide
-
-### 1. Prerequisites
-- **Python**: Version 3.10, 3.11, or 3.12
-- **Node.js**: Version 18+ and `npm`
-
----
-
-### 2. Backend Setup & ML Data Generation
-
-Open a terminal in the project root:
+### 2. Backend Setup & Model Training
 
 ```bash
-# Navigate to the backend directory
+# Navigate to backend and install dependencies
 cd backend
-
-# (Optional but recommended) Create and activate a virtual environment
-python -m venv .venv
-# Windows (PowerShell):
-.venv\Scripts\Activate.ps1
-# macOS/Linux:
-source .venv/bin/activate
-
-# Install required Python dependencies
 pip install -r requirements.txt
 
-# Step A: Generate synthetic creator dataset (1,800 posts across YouTube, IG, X, LinkedIn)
-python -m backend.ml.generate_data
+# Train and compare the 3 traditional ML models
+python ml/trainer.py
 
-# Step B: Train the ViralScope model & produce benchmark metrics (saves model.pkl & results.json)
-python -m backend.ml.train
-
-# Step C: Start the FastAPI backend server
-uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
-
-# Step D: (Optional) Run the complete backend test suite
-python -m pytest tests/test_backend.py
+# Start the FastAPI server
+uvicorn backend.main:app --reload --port 8000
 ```
-
-* Backend will be active at: `http://127.0.0.1:8000`
-* Interactive OpenAPI Swagger docs: `http://127.0.0.1:8000/docs`
-* Environment variables: Copy `backend/.env.example` to `backend/.env` to configure optional `YOUTUBE_API_KEY` (for live YouTube comments) or `LLM_API_KEY`. Without keys, the app automatically runs in graceful mock/sample mode.
-
----
 
 ### 3. Frontend Setup
 
-Open a second terminal in the project root:
-
 ```bash
-# Navigate to the frontend directory
+# Navigate to frontend and install dependencies
 cd frontend
-
-# Install frontend dependencies
 npm install
 
-# Start the Vite development server (port 5173)
+# Start Vite development server
 npm run dev
 ```
 
-* Frontend application will be live at: **`http://localhost:5173`**
-* The Vite dev server includes automatic reverse-proxy routing for `/api` requests to `http://127.0.0.1:8000`.
+The application will be live at `http://localhost:5173`.
 
----
+### 4. Running Automated Tests
 
-## 🗺️ Roadmap & Future Architecture
-
-1. **Database Persistence Layer**:
-   - Seamlessly transition from JSON flat files to PostgreSQL / Supabase with SQLAlchemy ORM. Because **all** data reads and writes are strictly encapsulated inside [`backend/services/data_access.py`](file:///C:/Users/vaish/.gemini/antigravity/scratch/creatorpulse-ai/backend/services/data_access.py), no routers or frontend components require changes.
-2. **Direct Social Platform Integrations (OAuth 2.0)**:
-   - YouTube Data API v3 & YouTube Analytics API.
-   - Meta Graph API (Instagram Professional / Reels Insights).
-   - X (Twitter) API v2.
-   - LinkedIn Community Management & Analytics API.
-3. **Channel CSV Analytics Ingestion**:
-   - Zero-lock-in direct upload supporting native analytics exports from YouTube Studio and Meta Business Suite.
-4. **LLM Studio Expansion**:
-   - Connect live Gemini 1.5 Pro and Claude 3.5 Sonnet endpoints via [`backend/services/content_generator.py`](file:///C:/Users/vaish/.gemini/antigravity/scratch/creatorpulse-ai/backend/services/content_generator.py) for dynamic content rewriting and tone personalization.
-5. **Advanced Imbalance Experimentation**:
-   - Online adaptive learning adjusting decision thresholds dynamically based on shifts in individual creator baseline engagement rates.
-
----
-
-## 📄 License
-This project is open-source under the [MIT License](LICENSE).
+```bash
+# Run the 14-point test suite
+$env:PYTHONPATH="."
+pytest -v tests/test_vibecheck_ml.py
+```

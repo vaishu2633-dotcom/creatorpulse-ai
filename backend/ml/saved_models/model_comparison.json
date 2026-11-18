@@ -1,0 +1,185 @@
+{
+  "status": "success",
+  "dataset_info": {
+    "total_samples": 1200,
+    "train_samples": 960,
+    "test_samples": 240,
+    "features_extracted": 814,
+    "labels": [
+      "positive",
+      "neutral",
+      "negative"
+    ]
+  },
+  "best_model": "Multinomial Naive Bayes",
+  "models": {
+    "Logistic Regression": {
+      "model_name": "Logistic Regression",
+      "accuracy": 0.95,
+      "precision_weighted": 0.951,
+      "recall_weighted": 0.95,
+      "f1_score_weighted": 0.9502,
+      "precision_macro": 0.951,
+      "recall_macro": 0.95,
+      "f1_score_macro": 0.9502,
+      "confusion_matrix": {
+        "labels": [
+          "positive",
+          "neutral",
+          "negative"
+        ],
+        "matrix": [
+          [
+            74,
+            0,
+            6
+          ],
+          [
+            0,
+            78,
+            2
+          ],
+          [
+            3,
+            1,
+            76
+          ]
+        ]
+      },
+      "per_class_metrics": {
+        "positive": {
+          "precision": 0.961,
+          "recall": 0.925,
+          "f1_score": 0.9427,
+          "support": 80
+        },
+        "neutral": {
+          "precision": 0.9873,
+          "recall": 0.975,
+          "f1_score": 0.9811,
+          "support": 80
+        },
+        "negative": {
+          "precision": 0.9048,
+          "recall": 0.95,
+          "f1_score": 0.9268,
+          "support": 80
+        }
+      }
+    },
+    "Multinomial Naive Bayes": {
+      "model_name": "Multinomial Naive Bayes",
+      "accuracy": 0.9625,
+      "precision_weighted": 0.9635,
+      "recall_weighted": 0.9625,
+      "f1_score_weighted": 0.9626,
+      "precision_macro": 0.9635,
+      "recall_macro": 0.9625,
+      "f1_score_macro": 0.9626,
+      "confusion_matrix": {
+        "labels": [
+          "positive",
+          "neutral",
+          "negative"
+        ],
+        "matrix": [
+          [
+            75,
+            1,
+            4
+          ],
+          [
+            0,
+            78,
+            2
+          ],
+          [
+            1,
+            1,
+            78
+          ]
+        ]
+      },
+      "per_class_metrics": {
+        "positive": {
+          "precision": 0.9868,
+          "recall": 0.9375,
+          "f1_score": 0.9615,
+          "support": 80
+        },
+        "neutral": {
+          "precision": 0.975,
+          "recall": 0.975,
+          "f1_score": 0.975,
+          "support": 80
+        },
+        "negative": {
+          "precision": 0.9286,
+          "recall": 0.975,
+          "f1_score": 0.9512,
+          "support": 80
+        }
+      }
+    },
+    "Linear SVM": {
+      "model_name": "Linear SVM",
+      "accuracy": 0.9542,
+      "precision_weighted": 0.9545,
+      "recall_weighted": 0.9542,
+      "f1_score_weighted": 0.9543,
+      "precision_macro": 0.9545,
+      "recall_macro": 0.9542,
+      "f1_score_macro": 0.9543,
+      "confusion_matrix": {
+        "labels": [
+          "positive",
+          "neutral",
+          "negative"
+        ],
+        "matrix": [
+          [
+            75,
+            1,
+            4
+          ],
+          [
+            0,
+            78,
+            2
+          ],
+          [
+            4,
+            0,
+            76
+          ]
+        ]
+      },
+      "per_class_metrics": {
+        "positive": {
+          "precision": 0.9494,
+          "recall": 0.9375,
+          "f1_score": 0.9434,
+          "support": 80
+        },
+        "neutral": {
+          "precision": 0.9873,
+          "recall": 0.975,
+          "f1_score": 0.9811,
+          "support": 80
+        },
+        "negative": {
+          "precision": 0.9268,
+          "recall": 0.95,
+          "f1_score": 0.9383,
+          "support": 80
+        }
+      }
+    }
+  },
+  "pipeline_details": {
+    "vectorizer": "TfidfVectorizer(ngram_range=(1,2), max_features=5000, sublinear_tf=True)",
+    "preprocessing": "clean_text (URLs, mentions, contractions, emoticons, noise normalization)",
+    "test_split_ratio": 0.2,
+    "random_state": 42
+  }
+}
