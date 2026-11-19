@@ -10,11 +10,25 @@ Applies standard NLP cleaning and normalization for social media comments:
 """
 
 import re
+import html
 from typing import List
 
 CONTRACTIONS = {
+    "don't": "do not",
+    "doesn't": "does not",
+    "didn't": "did not",
     "can't": "cannot",
     "won't": "will not",
+    "isn't": "is not",
+    "aren't": "are not",
+    "wasn't": "was not",
+    "weren't": "were not",
+    "haven't": "have not",
+    "hasn't": "has not",
+    "hadn't": "had not",
+    "couldn't": "could not",
+    "shouldn't": "should not",
+    "wouldn't": "would not",
     "n't": " not",
     "'re": " are",
     "'s": " is",
@@ -83,7 +97,8 @@ def clean_text(text: str) -> str:
     if not text or not isinstance(text, str):
         return ""
 
-    text = text.lower()
+    # 0. Unescape HTML entities (e.g. &#39; -> ', &quot; -> ", &amp; -> &)
+    text = html.unescape(text).lower()
 
     # 1. Remove URLs first so emoticons like ":/" don't corrupt "https://"
     text = re.sub(r"https?://\S+|www\.\S+", " ", text)

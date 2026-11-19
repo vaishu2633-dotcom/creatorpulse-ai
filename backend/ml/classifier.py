@@ -73,16 +73,33 @@ def classify_single_text(text: str) -> Dict[str, Any]:
 
     vec, model, _ = load_ml_assets()
     tfidf_vec = vec.transform([cleaned])
-    pred = model.predict(tfidf_vec)[0]
+
+    # If the text has no matching features in the vocabulary,
+    # it carries no positive or negative sentiment evidence; classify as neutral.
+    if tfidf_vec.nnz == 0:
+        return {
+            "sentiment": "neutral",
+            "confidence": 0.333,
+            "clean_text": cleaned
+        }
 
     confidence = 0.85
     if hasattr(model, "predict_proba"):
         probas = model.predict_proba(tfidf_vec)[0]
-        # Find index for pred
         classes = list(model.classes_)
+        # If probabilities are completely flat/tied (total uncertainty), classify as neutral
+        if max(probas) - min(probas) < 0.02:
+            return {
+                "sentiment": "neutral",
+                "confidence": round(float(1.0 / len(classes)), 3),
+                "clean_text": cleaned
+            }
+        pred = model.predict(tfidf_vec)[0]
         if pred in classes:
             idx = classes.index(pred)
             confidence = round(float(probas[idx]), 3)
+    else:
+        pred = model.predict(tfidf_vec)[0]
 
     return {
         "sentiment": str(pred),
@@ -112,18 +129,26 @@ def classify_comments(texts: List[str]) -> List[Dict[str, Any]]:
     if non_empty_cleaned:
         tfidf_mat = vec.transform(non_empty_cleaned)
         preds = model.predict(tfidf_mat)
+        has_probas = hasattr(model, "predict_proba")
+        probas = model.predict_proba(tfidf_mat) if has_probas else None
+        classes = list(model.classes_) if has_probas else []
 
-        if hasattr(model, "predict_proba"):
-            probas = model.predict_proba(tfidf_mat)
-            classes = list(model.classes_)
-            for p, prob_row in zip(preds, probas):
-                predictions.append(str(p))
-                idx = classes.index(p) if p in classes else 0
-                confidences.append(round(float(prob_row[idx]), 3))
-        else:
-            for p in preds:
-                predictions.append(str(p))
-                confidences.append(0.85)
+        for row_idx in range(len(non_empty_cleaned)):
+            row_nnz = tfidf_mat[row_idx].nnz
+            prob_row = probas[row_idx] if has_probas else None
+
+            # If zero features matched or probabilities are flat (uncertainty), classify as neutral
+            if row_nnz == 0 or (has_probas and (max(prob_row) - min(prob_row) < 0.02)):
+                predictions.append("neutral")
+                confidences.append(0.333)
+            else:
+                p = str(preds[row_idx])
+                predictions.append(p)
+                if has_probas:
+                    idx = classes.index(p) if p in classes else 0
+                    confidences.append(round(float(prob_row[idx]), 3))
+                else:
+                    confidences.append(0.85)
 
     pred_map = {idx: (p, c) for idx, p, c in zip(non_empty_indices, predictions, confidences)}
 

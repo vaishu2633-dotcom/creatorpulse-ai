@@ -4,24 +4,24 @@
     "total_samples": 1200,
     "train_samples": 960,
     "test_samples": 240,
-    "features_extracted": 814,
+    "features_extracted": 1092,
     "labels": [
       "positive",
       "neutral",
       "negative"
     ]
   },
-  "best_model": "Multinomial Naive Bayes",
+  "best_model": "Linear SVM",
   "models": {
     "Multinomial Naive Bayes": {
       "model_name": "Multinomial Naive Bayes",
-      "accuracy": 0.9625,
-      "precision_weighted": 0.9635,
-      "recall_weighted": 0.9625,
-      "f1_score_weighted": 0.9626,
-      "precision_macro": 0.9635,
-      "recall_macro": 0.9625,
-      "f1_score_macro": 0.9626,
+      "accuracy": 0.9667,
+      "precision_weighted": 0.9667,
+      "recall_weighted": 0.9667,
+      "f1_score_weighted": 0.9666,
+      "precision_macro": 0.9667,
+      "recall_macro": 0.9667,
+      "f1_score_macro": 0.9666,
       "confusion_matrix": {
         "labels": [
           "positive",
@@ -30,189 +30,27 @@
         ],
         "matrix": [
           [
-            75,
-            1,
-            4
-          ],
-          [
-            0,
             78,
-            2
-          ],
-          [
             1,
-            1,
-            78
-          ]
-        ]
-      },
-      "per_class_metrics": {
-        "positive": {
-          "precision": 0.9868,
-          "recall": 0.9375,
-          "f1_score": 0.9615,
-          "support": 80
-        },
-        "neutral": {
-          "precision": 0.975,
-          "recall": 0.975,
-          "f1_score": 0.975,
-          "support": 80
-        },
-        "negative": {
-          "precision": 0.9286,
-          "recall": 0.975,
-          "f1_score": 0.9512,
-          "support": 80
-        }
-      }
-    },
-    "Logistic Regression": {
-      "model_name": "Logistic Regression",
-      "accuracy": 0.95,
-      "precision_weighted": 0.951,
-      "recall_weighted": 0.95,
-      "f1_score_weighted": 0.9502,
-      "precision_macro": 0.951,
-      "recall_macro": 0.95,
-      "f1_score_macro": 0.9502,
-      "confusion_matrix": {
-        "labels": [
-          "positive",
-          "neutral",
-          "negative"
-        ],
-        "matrix": [
-          [
-            74,
-            0,
-            6
-          ],
-          [
-            0,
-            78,
-            2
-          ],
-          [
-            3,
-            1,
-            76
-          ]
-        ]
-      },
-      "per_class_metrics": {
-        "positive": {
-          "precision": 0.961,
-          "recall": 0.925,
-          "f1_score": 0.9427,
-          "support": 80
-        },
-        "neutral": {
-          "precision": 0.9873,
-          "recall": 0.975,
-          "f1_score": 0.9811,
-          "support": 80
-        },
-        "negative": {
-          "precision": 0.9048,
-          "recall": 0.95,
-          "f1_score": 0.9268,
-          "support": 80
-        }
-      }
-    },
-    "Linear SVM": {
-      "model_name": "Linear SVM",
-      "accuracy": 0.9542,
-      "precision_weighted": 0.9545,
-      "recall_weighted": 0.9542,
-      "f1_score_weighted": 0.9543,
-      "precision_macro": 0.9545,
-      "recall_macro": 0.9542,
-      "f1_score_macro": 0.9543,
-      "confusion_matrix": {
-        "labels": [
-          "positive",
-          "neutral",
-          "negative"
-        ],
-        "matrix": [
-          [
-            75,
-            1,
-            4
-          ],
-          [
-            0,
-            78,
-            2
-          ],
-          [
-            4,
-            0,
-            76
-          ]
-        ]
-      },
-      "per_class_metrics": {
-        "positive": {
-          "precision": 0.9494,
-          "recall": 0.9375,
-          "f1_score": 0.9434,
-          "support": 80
-        },
-        "neutral": {
-          "precision": 0.9873,
-          "recall": 0.975,
-          "f1_score": 0.9811,
-          "support": 80
-        },
-        "negative": {
-          "precision": 0.9268,
-          "recall": 0.95,
-          "f1_score": 0.9383,
-          "support": 80
-        }
-      }
-    },
-    "Random Forest": {
-      "model_name": "Random Forest",
-      "accuracy": 0.9417,
-      "precision_weighted": 0.942,
-      "recall_weighted": 0.9417,
-      "f1_score_weighted": 0.9415,
-      "precision_macro": 0.942,
-      "recall_macro": 0.9417,
-      "f1_score_macro": 0.9415,
-      "confusion_matrix": {
-        "labels": [
-          "positive",
-          "neutral",
-          "negative"
-        ],
-        "matrix": [
-          [
-            72,
-            2,
-            6
-          ],
-          [
-            1,
-            78,
             1
           ],
           [
-            3,
-            1,
+            0,
+            78,
+            2
+          ],
+          [
+            2,
+            2,
             76
           ]
         ]
       },
       "per_class_metrics": {
         "positive": {
-          "precision": 0.9474,
-          "recall": 0.9,
-          "f1_score": 0.9231,
+          "precision": 0.975,
+          "recall": 0.975,
+          "f1_score": 0.975,
           "support": 80
         },
         "neutral": {
@@ -222,9 +60,171 @@
           "support": 80
         },
         "negative": {
-          "precision": 0.9157,
+          "precision": 0.962,
           "recall": 0.95,
-          "f1_score": 0.9325,
+          "f1_score": 0.956,
+          "support": 80
+        }
+      }
+    },
+    "Logistic Regression": {
+      "model_name": "Logistic Regression",
+      "accuracy": 0.9667,
+      "precision_weighted": 0.9667,
+      "recall_weighted": 0.9667,
+      "f1_score_weighted": 0.9666,
+      "precision_macro": 0.9667,
+      "recall_macro": 0.9667,
+      "f1_score_macro": 0.9666,
+      "confusion_matrix": {
+        "labels": [
+          "positive",
+          "neutral",
+          "negative"
+        ],
+        "matrix": [
+          [
+            78,
+            1,
+            1
+          ],
+          [
+            0,
+            78,
+            2
+          ],
+          [
+            2,
+            2,
+            76
+          ]
+        ]
+      },
+      "per_class_metrics": {
+        "positive": {
+          "precision": 0.975,
+          "recall": 0.975,
+          "f1_score": 0.975,
+          "support": 80
+        },
+        "neutral": {
+          "precision": 0.963,
+          "recall": 0.975,
+          "f1_score": 0.9689,
+          "support": 80
+        },
+        "negative": {
+          "precision": 0.962,
+          "recall": 0.95,
+          "f1_score": 0.956,
+          "support": 80
+        }
+      }
+    },
+    "Linear SVM": {
+      "model_name": "Linear SVM",
+      "accuracy": 0.9708,
+      "precision_weighted": 0.9709,
+      "recall_weighted": 0.9708,
+      "f1_score_weighted": 0.9708,
+      "precision_macro": 0.9709,
+      "recall_macro": 0.9708,
+      "f1_score_macro": 0.9708,
+      "confusion_matrix": {
+        "labels": [
+          "positive",
+          "neutral",
+          "negative"
+        ],
+        "matrix": [
+          [
+            78,
+            1,
+            1
+          ],
+          [
+            0,
+            79,
+            1
+          ],
+          [
+            2,
+            2,
+            76
+          ]
+        ]
+      },
+      "per_class_metrics": {
+        "positive": {
+          "precision": 0.975,
+          "recall": 0.975,
+          "f1_score": 0.975,
+          "support": 80
+        },
+        "neutral": {
+          "precision": 0.9634,
+          "recall": 0.9875,
+          "f1_score": 0.9753,
+          "support": 80
+        },
+        "negative": {
+          "precision": 0.9744,
+          "recall": 0.95,
+          "f1_score": 0.962,
+          "support": 80
+        }
+      }
+    },
+    "Random Forest": {
+      "model_name": "Random Forest",
+      "accuracy": 0.9542,
+      "precision_weighted": 0.9563,
+      "recall_weighted": 0.9542,
+      "f1_score_weighted": 0.9542,
+      "precision_macro": 0.9563,
+      "recall_macro": 0.9542,
+      "f1_score_macro": 0.9542,
+      "confusion_matrix": {
+        "labels": [
+          "positive",
+          "neutral",
+          "negative"
+        ],
+        "matrix": [
+          [
+            78,
+            2,
+            0
+          ],
+          [
+            2,
+            78,
+            0
+          ],
+          [
+            5,
+            2,
+            73
+          ]
+        ]
+      },
+      "per_class_metrics": {
+        "positive": {
+          "precision": 0.9176,
+          "recall": 0.975,
+          "f1_score": 0.9455,
+          "support": 80
+        },
+        "neutral": {
+          "precision": 0.9512,
+          "recall": 0.975,
+          "f1_score": 0.963,
+          "support": 80
+        },
+        "negative": {
+          "precision": 1.0,
+          "recall": 0.9125,
+          "f1_score": 0.9542,
           "support": 80
         }
       }

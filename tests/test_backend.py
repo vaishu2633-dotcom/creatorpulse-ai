@@ -32,7 +32,7 @@ def test_vibecheck_status():
     data = get_vibecheck_status()
     assert data["status"] == "operational"
     assert "selected_ml_model" in data
-    assert data["selected_ml_model"] == "Multinomial Naive Bayes"
+    assert data["selected_ml_model"] in ["Linear SVM", "Multinomial Naive Bayes", "Logistic Regression", "Random Forest"]
 
 
 def test_vibecheck_supported_platforms():

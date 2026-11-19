@@ -29,16 +29,16 @@ In accordance with academic Machine Learning syllabus requirements, the system r
 - **Zero LLM or Generative AI**: No hallucinations, deep learning, or unnecessary neural networks.
 - **Zero Data Leakage**: Stratified 80% train / 20% test split with TF-IDF vectorizer fit strictly on training data.
 - **Comprehensive Evaluation**: Every algorithm is evaluated using Accuracy, Precision (Weighted & Macro), Recall (Weighted & Macro), F1-Score (Weighted & Macro), and a 3×3 Confusion Matrix.
-- **Automated Winner Selection**: The best-performing model based on weighted F1-score (**Multinomial Naive Bayes**, F1: 96.26%) is persisted and loaded for live inference.
+- **Automated Winner Selection**: The best-performing model based on weighted F1-score (**Linear SVM**, F1: 97.08%) is persisted and loaded for live inference.
 
 ### 3. Model Comparison Benchmark (Unseen Test Set: 240 Samples)
 
 | Algorithm | Accuracy | Precision (Weighted) | Recall (Weighted) | F1-Score (Weighted) | Status |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Multinomial Naive Bayes** | **96.25%** | **96.35%** | **96.25%** | **96.26%** | **Active Winner** |
-| **Linear SVM** | 95.42% | 95.45% | 95.42% | 95.43% | Candidate |
-| **Logistic Regression** | 95.00% | 95.10% | 95.00% | 95.02% | Candidate |
-| **Random Forest** | 94.17% | 94.20% | 94.17% | 94.15% | Candidate |
+| **Linear SVM** | **97.08%** | **97.09%** | **97.08%** | **97.08%** | 🏆 **Active Winner** |
+| **Multinomial Naive Bayes** | 96.67% | 96.67% | 96.67% | 96.66% | Candidate |
+| **Logistic Regression** | 96.67% | 96.67% | 96.67% | 96.66% | Candidate |
+| **Random Forest** | 95.42% | 95.63% | 95.42% | 95.42% | Candidate |
 
 ---
 

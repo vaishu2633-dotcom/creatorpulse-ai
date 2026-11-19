@@ -22,11 +22,17 @@ Pipeline:
 """
 
 import os
+import sys
 import json
 import joblib
 import pandas as pd
 import numpy as np
 from typing import Dict, Any, Tuple
+
+# Ensure project root is in sys.path when running as a standalone script
+_project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
 
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer

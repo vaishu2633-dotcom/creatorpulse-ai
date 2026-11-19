@@ -12,6 +12,7 @@ Follows official API quota management:
 
 import os
 import re
+import html
 from typing import Dict, Any, Optional, List
 import httpx
 from .base import PlatformAdapter, AnalysisPayload, CommentItem, CoverageReport
@@ -146,11 +147,13 @@ class YouTubeAdapter(PlatformAdapter):
                         c_json = comments_resp.json()
                         for c_item in c_json.get("items", []):
                             c_snip = c_item.get("snippet", {}).get("topLevelComment", {}).get("snippet", {})
+                            raw_comment_text = c_snip.get("textOriginal") or c_snip.get("textDisplay", "")
+                            clean_comment_text = html.unescape(raw_comment_text).strip()
                             comments_list.append(
                                 CommentItem(
                                     comment_id=c_item.get("id", ""),
                                     author=c_snip.get("authorDisplayName", "Anonymous"),
-                                    text=c_snip.get("textDisplay", ""),
+                                    text=clean_comment_text,
                                     like_count=int(c_snip.get("likeCount", 0)),
                                     published_at=c_snip.get("publishedAt"),
                                     is_reply=False

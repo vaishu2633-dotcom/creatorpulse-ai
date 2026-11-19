@@ -1,50 +1,55 @@
 """
 CreatorPulse AI - Labeled Sentiment Dataset Builder
 ---------------------------------------------------
-Constructs a balanced, realistic, diverse 3-class social media sentiment dataset:
-- Positive (praise, gratitude, excitement, strong recommendations, humor, delight)
+Constructs a balanced, realistic, diverse 3-class YouTube comment sentiment dataset:
+- Positive (praise, gratitude, excitement, strong recommendations, learning delight)
 - Negative (complaints, bugs, anger, disappointment, bad audio/visuals, clickbait critiques)
 - Neutral (technical questions, timestamps, environment inquiries, factual notes, neutral requests)
+
+Balanced across domain terms (video, tutorial, channel, this) so no domain noun
+acts as an accidental sentiment predictor.
 """
 
 import os
 import csv
 import random
 
-POSITIVE_COMMENTS = [
+# Base curated positive comments reflecting real YouTube community praise
+BASE_POSITIVE = [
     "This is the clearest explanation of this concept I have ever seen! Thank you so much.",
-    "Absolutely fantastic video, the production quality has improved so much.",
-    "I was stuck on this exact bug for 3 days and your solution fixed it in 2 minutes!",
+    "Great explanation! Really helped me understand this difficult topic.",
+    "Best video on this topic hands down. Clean, concise, and straight to the point.",
+    "I was stuck on this exact bug for 3 days and your tutorial fixed it in 2 minutes!",
     "Subscribed immediately! You deserve way more subscribers for this quality.",
-    "Best tutorial on the platform hands down. Clean, concise, and straight to the point.",
     "The hook in the intro was brilliant, hooked me from the first 5 seconds.",
     "Incredible breakdown! Really appreciate you sharing the source code in the description.",
-    "I love how you explained the trade-offs instead of just showing the happy path.",
+    "I loved this tutorial so much, really well explained and easy to follow.",
+    "Loved this video, straight to the point without filler.",
     "This helped me pass my technical interview today! Forever grateful to this channel.",
+    "Nice video bro, loved the pacing and editing style.",
+    "Good video, very informative and practical.",
     "Such an underrated creator, every single upload is pure gold.",
-    "Brilliant editing and pacing, kept me engaged throughout the entire 20 minutes.",
+    "Brilliant editing and pacing, kept me engaged throughout the entire video.",
     "Thank you for not adding 5 minutes of filler intro, straight to the value!",
     "Amazing work as always! Looking forward to part 2.",
-    "This framework changed how our entire team builds apps in production.",
-    "Love the honesty and real-world examples, very refreshing to see.",
     "Super clean code architecture, learned a ton of best practices.",
     "Great presentation skills and very well articulated thoughts.",
     "The visual diagrams made the complex architecture so easy to grasp.",
-    "Keep up the awesome work, you are doing incredible service to the developer community.",
+    "Keep up the awesome work, you are doing incredible service to the community.",
     "This is literally better than most paid courses I took in college.",
     "Brilliant insight on scaling, especially the caching layer explanation.",
     "Huge fan of your content! Always looking forward to your notifications.",
     "The step by step walkthrough was flawless. Everything worked on the first try.",
-    "Very helpful tips for beginners and seniors alike. Top notch!",
-    "I really like the new format with timestamps and chapter summaries.",
-    "Spectacular video! Sent this to our entire slack channel.",
+    "Very helpful tips for beginners and experienced devs alike. Top notch!",
+    "I really like the format with timestamps and clear chapter summaries.",
+    "Spectacular video! Shared this with my entire study group.",
     "Wonderful tutorial, very patient and detailed explanations.",
-    "Love the energy and passion you bring to teaching tech.",
+    "Love your channel! Always learn something new from your uploads.",
     "Hands down the most practical guide available right now.",
     "Outstanding job breaking down the new features in this release.",
-    "Finally someone explains async IO without making it overly academic! Loved it.",
-    "The audio was crisp, visuals were stunning, and content was gold. 10/10.",
-    "I was skeptical at first but this pattern actually cut our build times by half. Kudos!",
+    "Finally someone explains this concept without making it overly academic! Loved it.",
+    "The audio was crisp, visuals were stunning, and content was gold. 10/10 video.",
+    "I was skeptical at first but this pattern actually works like a charm. Kudos!",
     "Great creator, great content, always dropping genuine gems.",
     "This saved my weekend project from being scrapped. Massive respect!",
     "Loved the humor sprinkled throughout, made learning complex topics so enjoyable.",
@@ -56,9 +61,8 @@ POSITIVE_COMMENTS = [
     "Can confirm this works seamlessly in production. Great advice!",
     "This is pure gold. Deserves at least a million views.",
     "You have a real gift for teaching complex topics simply.",
-    "Phenomenal breakdown! Subscribed and shared with my study group.",
+    "Phenomenal breakdown! Subscribed and shared with my colleagues.",
     "The depth of research you put into this video is staggering. Thank you!",
-    "Every developer needs to watch this before writing their first microservice.",
     "Awesome explanation, your channel is quickly becoming my favorite learning hub.",
     "I have been a senior engineer for 10 years and still learned three new tricks today.",
     "Flawless execution! Thank you for sharing your deep expertise.",
@@ -69,20 +73,39 @@ POSITIVE_COMMENTS = [
     "Super useful tips! That shortcut alone was worth watching the entire video.",
     "Incredible pacing and top-notch audio quality. A pleasure to watch.",
     "So refreshing to see real-world edge cases covered so thoroughly.",
-    "You explained in 10 minutes what my university professor couldn't in an entire semester.",
+    "You explained in 10 minutes what my university professor could not in a semester.",
     "The code examples were extremely readable and well documented.",
     "Instant like and subscribe! Looking forward to your next upload.",
+    "Really interesting perspective, thanks for sharing this insight.",
+    "Cool video! Love how you broke down the architecture simply.",
+    "Enjoyed this video immensely, learned a lot from your walkthrough.",
+    "Well done! This answered every single question I had.",
+    "Super cool project, works like a charm on Windows.",
+    "Very clear explanation, thank you for making this accessible.",
+    "Great video!",
+    "Good video, very helpful.",
+    "Nice video bro, well explained.",
+    "Loved this tutorial, thank you!",
+    "Loved this video, amazing content.",
+    "Super helpful, learned a lot from this.",
+    "Awesome content as always!",
+    "Clear and concise, brilliant work.",
+    "Thanks for sharing this tutorial!",
+    "Best video ever on this channel.",
+    "Well done video, straight to the point.",
+    "Really interesting topic, loved it."
 ]
 
-NEGATIVE_COMMENTS = [
-    "The audio is way too quiet and the background music is deafening. Couldn't watch.",
+# Base curated negative comments reflecting real YouTube community complaints
+BASE_NEGATIVE = [
+    "The audio is way too quiet and the background music is deafening. Could not hear.",
     "This does not work at all. It completely broke my environment after following step 3.",
     "Total clickbait title and thumbnail, none of that was actually covered in the video.",
     "Waste of 15 minutes. You spent 10 minutes talking about nothing and 5 minutes copying code.",
     "The code in your GitHub repository is full of syntax errors and missing dependencies.",
     "Horrible pacing, you speak way too fast and skipped the most critical configuration steps.",
     "Very disappointed with this upload. The previous video was much better.",
-    "Outdated information, this API was deprecated two years ago and doesn't work anymore.",
+    "Outdated information, this API was deprecated two years ago and does not work anymore.",
     "Terrible explanation. If you do not understand the algorithm yourself, do not make a tutorial.",
     "Too many sponsored ads every 2 minutes. The viewing experience is completely ruined.",
     "This solution has a massive security vulnerability that you completely ignored.",
@@ -102,7 +125,7 @@ NEGATIVE_COMMENTS = [
     "Very arrogant tone throughout the video, really put me off.",
     "Boring and repetitive, you repeated the same point 5 times in 10 minutes.",
     "Broken link in description, broken code in repo, zero responses to issues.",
-    "Doesn't address the edge cases at all. As soon as you have more than 10 users this crashes.",
+    "Does not address the edge cases at all. As soon as you have more than 10 users this crashes.",
     "Over-engineered mess. Nobody needs 15 abstractions for a simple CRUD app.",
     "Frustrating experience trying to follow along with missing files.",
     "Why did you blur out the most important command in the terminal? Completely useless.",
@@ -111,12 +134,12 @@ NEGATIVE_COMMENTS = [
     "The title says beginner friendly but you used complex jargon without explaining anything.",
     "Honestly one of the worst tutorials I have seen on this topic.",
     "You forgot to include the requirements.txt file so nothing runs.",
-    "Extremely superficial overview. Doesn't explain how anything actually works under the hood.",
-    "Can't stand the aggressive jump cuts and loud sound effects every 5 seconds.",
+    "Extremely superficial overview. Does not explain how anything actually works under the hood.",
+    "Can not stand the aggressive jump cuts and loud sound effects every 5 seconds.",
     "This approach has terrible memory leaks. Our production server ran out of memory in an hour.",
-    "Misleading thumbnail showing graphs that weren't even mentioned in the video.",
+    "Misleading thumbnail showing graphs that were not even mentioned in the video.",
     "The audio sync is completely off by almost two seconds throughout the whole video.",
-    "Don't waste your time with this video, the code repository is archived and abandoned.",
+    "Do not waste your time with this video, the code repository is archived and abandoned.",
     "Horribly structured. You jumped back and forth between files without telling viewers where you were.",
     "You glossed over the entire authentication setup which was the main reason I clicked.",
     "Terrible performance. This algorithm takes O(n^2) when it could easily be done in O(n).",
@@ -135,9 +158,24 @@ NEGATIVE_COMMENTS = [
     "Poor video editing and very sloppy code formatting throughout.",
     "I tried asking for help on your Discord and was immediately banned for asking a basic question.",
     "Unsubscribed. The quality of this channel has really gone downhill lately.",
+    "Terrible tutorial, bad audio and full of mistakes.",
+    "Awful pacing and zero explanations for why line 12 is needed.",
+    "Completely broken code, throws an UnboundLocalError.",
+    "Waste of time.",
+    "Complete waste of time, totally unhelpful.",
+    "Horrible pacing, way too fast to follow.",
+    "Terrible video, could not understand anything.",
+    "This does not work, got an error immediately.",
+    "Total clickbait, did not explain anything.",
+    "Broken code in GitHub, nothing runs.",
+    "Awful tutorial, full of errors and bugs.",
+    "This is horrible, completely unhelpful.",
+    "Very disappointing video, waste of time.",
+    "Worst tutorial on YouTube, do not recommend."
 ]
 
-NEUTRAL_COMMENTS = [
+# Base curated neutral comments reflecting real YouTube community inquiries
+BASE_NEUTRAL = [
     "What timestamp does the database migration section start at?",
     "Could you share the link to the GitHub repository mentioned at 04:30?",
     "Is this compatible with Python 3.12 or does it require an older version?",
@@ -198,82 +236,150 @@ NEUTRAL_COMMENTS = [
     "What command is used to start the Vite development server?",
     "Is there a pre-commit hook configured for linting and code formatting?",
     "What is the exact license for the starter template code?",
+    "How long did it take to build this project from scratch?",
+    "Where can I find the source code for part 1 of this tutorial?",
+    "What timestamp does the second part start at?",
+    "Where is the link to the GitHub repository?",
+    "Does this work on Windows and Mac?",
+    "Can you do a video on PyTorch next?",
+    "How long did it take to build this?",
+    "Where can I find the slides or notes?",
+    "What version of Python is required for this?",
+    "Is this tutorial free or does it require a subscription?"
 ]
 
-# Variations and perturbations to generate 1,200 unique, realistic social media samples
-SUBJECTS = [
-    "FastAPI backend", "React frontend", "Docker container", "PostgreSQL database",
-    "SQLite setup", "Tailwind styling", "Machine learning pipeline", "TF-IDF vectorizer",
-    "Linear SVM model", "Naive Bayes classifier", "Logistic regression", "OAuth 2.0 flow",
-    "YouTube API integration", "X Twitter adapter", "Sentiment analysis engine", "Vite build",
-    "WebSocket connection", "REST API endpoint", "State management", "Unit test suite"
+# Vocabulary components for systematic, balanced augmentation up to 400 per class
+TOPICS = [
+    "Python scripting", "machine learning pipeline", "FastAPI backend", "React frontend",
+    "Docker container", "database indexing", "system design", "data structures",
+    "REST API endpoint", "Tailwind styling", "algorithm analysis", "web development",
+    "backend architecture", "frontend design", "cloud computing", "SQL queries",
+    "async programming", "unit testing", "TF-IDF feature extraction", "code optimization",
+    "authentication flow", "state management", "WebSocket server", "microservices setup"
 ]
 
-POS_MODIFIERS = [
-    "Works like a charm", "Super smooth and reliable", "Truly impressed by this",
-    "Clean and well documented", "Saved me tons of debugging time", "Absolute masterpiece",
-    "Great work by the team", "Super easy to get started with", "Highly recommended for everyone",
-    "Hands down the best approach"
+POS_TEMPLATES = [
+    ("Great video on {topic}! Really appreciate the clear explanation.", "good"),
+    ("Awesome tutorial covering {topic}. Learned a lot from this walkthrough!", "good"),
+    ("Loved this video about {topic}! Very helpful and easy to follow.", "good"),
+    ("Such a good explanation of {topic}. Best guide on YouTube hands down!", "good"),
+    ("Super clear and concise breakdown of {topic}. Thank you so much!", "good"),
+    ("Nice video bro! The {topic} section was brilliantly explained.", "good"),
+    ("Cool project! Everything about {topic} works like a charm on my end.", "good"),
+    ("Really interesting perspective on {topic}. Thanks for sharing your insights!", "good"),
+    ("Fantastic video! Your walkthrough on {topic} saved me tons of time.", "good"),
+    ("Subscribed immediately! Wonderful tutorial on {topic}, very well done.", "good"),
+    ("I finally understand {topic} after watching this video. Great creator!", "good"),
+    ("Incredible quality tutorial on {topic}. Highly recommended for everyone!", "good"),
+    ("Enjoyed this video about {topic}. Looking forward to part 2!", "good"),
+    ("Outstanding presentation on {topic}. Clean code and great examples.", "good"),
+    ("The explanation of {topic} was pure gold. Thank you for making this video!", "good"),
+    ("Love this channel and this video on {topic}! Always learn so much.", "good"),
+    ("Very informative and helpful tutorial on {topic}. Learned a lot!", "good"),
+    ("Well done video on {topic}! Everything was super clear and easy to follow.", "good"),
+    ("I love how you explained {topic}. Clean, practical, and very helpful!", "good"),
+    ("Fascinating breakdown of {topic}! One of the best videos I have watched.", "good")
 ]
 
-NEG_MODIFIERS = [
-    "Constantly throws unhandled errors", "Fails to run on modern versions", "Extremely slow and buggy",
-    "Completely broke my local setup", "Worst documentation I have seen", "Very poor performance",
-    "Cannot recommend this to anyone", "Full of syntax errors and bugs", "Zero error handling provided",
-    "Total waste of time and effort"
+NEG_TEMPLATES = [
+    ("Terrible video on {topic}. The audio is quiet and explanation is confusing.", "bad"),
+    ("This tutorial on {topic} does not work at all. Got an unhandled error on startup.", "bad"),
+    ("Total clickbait video about {topic}. None of the promised features were shown.", "bad"),
+    ("Waste of time. The {topic} code in GitHub is completely broken and outdated.", "bad"),
+    ("Horrible pacing in this video covering {topic}. Way too fast and skipped vital steps.", "bad"),
+    ("Very disappointed with this tutorial on {topic}. Bad explanations throughout.", "bad"),
+    ("Unsubscribed. The {topic} tutorial is full of syntax errors and bugs.", "bad"),
+    ("Worst guide on {topic} I have seen. Completely unhelpful and full of mistakes.", "bad"),
+    ("Does not work for {topic}. Throws a runtime error and crashes immediately.", "bad"),
+    ("Awful tutorial about {topic}. Extremely superficial and zero practical value.", "bad"),
+    ("The code for {topic} does not run on modern versions. Broken dependencies.", "bad"),
+    ("Misleading title regarding {topic}. You spent 10 minutes talking about nothing.", "bad"),
+    ("Poor video quality and very sloppy code formatting in the {topic} section.", "bad"),
+    ("Cannot recommend this video on {topic}. Full of factual errors and bad advice.", "bad"),
+    ("Frustrating experience trying to follow the {topic} tutorial. Missing files in repo.", "bad")
 ]
 
-NEU_MODIFIERS = [
-    "What is the recommended configuration for", "Is there official documentation available for",
-    "Can you provide more details regarding", "How does this compare to standard alternatives for",
-    "What version was used during the demo of", "Does this require special permissions for",
-    "Where is the source code located for", "Are there benchmarks available for",
-    "What is the default port used by", "Has anyone tested this on Windows for"
+NEU_TEMPLATES = [
+    ("What timestamp does the {topic} section start at in this video?", "question"),
+    ("Does this tutorial on {topic} support Python 3.12 or an older version?", "question"),
+    ("Is the source code for {topic} available in the GitHub repository?", "question"),
+    ("Can this approach for {topic} be deployed on Windows and Linux?", "question"),
+    ("What is the difference between approach A and B for {topic}?", "question"),
+    ("Could you share the slides or notes from the {topic} presentation?", "question"),
+    ("Which operating system was used during the demo of {topic}?", "question"),
+    ("Are there any rate limits or memory constraints when running {topic}?", "question"),
+    ("Does this video cover unit testing for {topic} or just the basics?", "question"),
+    ("What version of the library was used for {topic} in this tutorial?", "question"),
+    ("Can someone clarify if {topic} requires a paid subscription or free tier?", "question"),
+    ("How long did it take to train the benchmark model for {topic}?", "question"),
+    ("Are you planning to make a follow-up video covering advanced {topic}?", "question"),
+    ("Where is the configuration file stored by default for {topic}?", "question"),
+    ("Is there an official documentation link for {topic} in the description?", "question")
 ]
 
 
 def build_sentiment_dataset(output_path: str, count_per_class: int = 400):
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
-    random.seed(1337)
+    random.seed(42)
 
-    samples = []
+    pos_samples = list(BASE_POSITIVE)
+    neg_samples = list(BASE_NEGATIVE)
+    neu_samples = list(BASE_NEUTRAL)
 
-    pos_set = set(POSITIVE_COMMENTS)
-    neg_set = set(NEGATIVE_COMMENTS)
-    neu_set = set(NEUTRAL_COMMENTS)
+    # Augment Positive to exactly count_per_class
+    pos_set = set(pos_samples)
+    for topic in TOPICS:
+        for tpl, _ in POS_TEMPLATES:
+            text = tpl.format(topic=topic)
+            pos_set.add(text)
+            if len(pos_set) >= count_per_class:
+                break
+        if len(pos_set) >= count_per_class:
+            break
+    pos_final = list(pos_set)[:count_per_class]
 
-    for subj in SUBJECTS:
-        for pmod in POS_MODIFIERS:
-            pos_set.add(f"{subj}: {pmod}! Really appreciate the clear guidance.")
-            pos_set.add(f"Just tried the {subj}. {pmod}, great job!")
-        for nmod in NEG_MODIFIERS:
-            neg_set.add(f"{subj}: {nmod}. Disappointed by this guide.")
-            neg_set.add(f"Tried using {subj} and it {nmod.lower()}. Needs serious fixes.")
-        for numod in NEU_MODIFIERS:
-            neu_set.add(f"{numod} {subj}?")
-            neu_set.add(f"Quick question: {numod.lower()} {subj}?")
+    # Augment Negative to exactly count_per_class
+    neg_set = set(neg_samples)
+    for topic in TOPICS:
+        for tpl, _ in NEG_TEMPLATES:
+            text = tpl.format(topic=topic)
+            neg_set.add(text)
+            if len(neg_set) >= count_per_class:
+                break
+        if len(neg_set) >= count_per_class:
+            break
+    neg_final = list(neg_set)[:count_per_class]
 
-    pos_list = list(pos_set)[:count_per_class]
-    neg_list = list(neg_set)[:count_per_class]
-    neu_list = list(neu_set)[:count_per_class]
+    # Augment Neutral to exactly count_per_class
+    neu_set = set(neu_samples)
+    for topic in TOPICS:
+        for tpl, _ in NEU_TEMPLATES:
+            text = tpl.format(topic=topic)
+            neu_set.add(text)
+            if len(neu_set) >= count_per_class:
+                break
+        if len(neu_set) >= count_per_class:
+            break
+    neu_final = list(neu_set)[:count_per_class]
 
-    for text in pos_list:
-        samples.append((text, "positive"))
-    for text in neg_list:
-        samples.append((text, "negative"))
-    for text in neu_list:
-        samples.append((text, "neutral"))
+    all_samples = []
+    for text in pos_final:
+        all_samples.append((text, "positive"))
+    for text in neg_final:
+        all_samples.append((text, "negative"))
+    for text in neu_final:
+        all_samples.append((text, "neutral"))
 
-    random.shuffle(samples)
+    random.shuffle(all_samples)
 
     with open(output_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["text", "sentiment"])
-        for text, sentiment in samples:
+        for text, sentiment in all_samples:
             writer.writerow([text, sentiment])
 
     print(f"Sentiment dataset successfully written to {output_path}")
-    print(f"Total samples: {len(samples)} (Positive: {len(pos_list)}, Negative: {len(neg_list)}, Neutral: {len(neu_list)})")
+    print(f"Total samples: {len(all_samples)} (Positive: {len(pos_final)}, Negative: {len(neg_final)}, Neutral: {len(neu_final)})")
 
 
 if __name__ == "__main__":
