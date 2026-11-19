@@ -1,7 +1,7 @@
 """
 CreatorPulse AI - VibeCheck AI Analysis Pipeline
 ------------------------------------------------
-Analyzes audience sentiment of YouTube videos and X (Twitter) posts
+Analyzes audience sentiment of YouTube video comments
 using traditional Machine Learning algorithms (TF-IDF + Best ML Model).
 
 Strictly adheres to academic Machine Learning principles:
@@ -230,7 +230,7 @@ class VibeAnalyzer:
                 },
                 "analysis_summary": analysis_summary,
                 "analysis_information": {
-                    "platform": "YouTube" if payload.platform == "youtube" else "X (Twitter)",
+                    "platform": "YouTube",
                     "url": payload.post_url,
                     "samples_analyzed": total_analyzed,
                     "selected_ml_model": selected_model,
@@ -278,7 +278,7 @@ class VibeAnalyzer:
                 },
                 "analysis_summary": "No usable text was retrieved for sentiment analysis. " + notice,
                 "analysis_information": {
-                    "platform": "YouTube" if payload.platform == "youtube" else "X (Twitter)",
+                    "platform": "YouTube",
                     "url": payload.post_url,
                     "samples_analyzed": 0,
                     "selected_ml_model": selected_model,

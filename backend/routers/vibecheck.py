@@ -1,8 +1,8 @@
 """
 CreatorPulse AI - VibeCheck AI Router
 -------------------------------------
-Social media sentiment analysis endpoints for YouTube and X (Twitter).
-Connects official platform adapters to the traditional ML sentiment pipeline.
+YouTube comment sentiment analysis endpoints.
+Connects official YouTube Data API v3 adapter to the traditional ML sentiment pipeline.
 """
 
 from fastapi import APIRouter, HTTPException, Query
@@ -13,7 +13,6 @@ import os
 from backend.services import data_access
 from backend.services.vibecheck import (
     YouTubeAdapter,
-    TwitterAdapter,
     ManualAdapter,
     VibeAnalyzer
 )
@@ -21,17 +20,15 @@ from backend.ml.classifier import get_model_metadata
 
 router = APIRouter(prefix="/api/vibecheck", tags=["VibeCheck AI"])
 
-# Initialize platform adapters (YouTube, X, and direct text input)
+# Initialize platform adapters (YouTube and direct comments text input)
 yt_adapter = YouTubeAdapter()
-tw_adapter = TwitterAdapter()
 manual_adapter = ManualAdapter()
 
 
 @router.get("/status")
 def get_vibecheck_status():
-    """Returns platform API configuration status and winning ML model."""
+    """Returns YouTube API configuration status and winning ML model."""
     yt_key = os.getenv("YOUTUBE_API_KEY", "").strip()
-    x_token = os.getenv("TWITTER_BEARER_TOKEN", "").strip()
     model_name = VibeAnalyzer.get_selected_model_name()
 
     return {
@@ -39,23 +36,23 @@ def get_vibecheck_status():
         "feature": "VibeCheck AI",
         "selected_ml_model": model_name,
         "youtube_api_configured": bool(yt_key and not yt_key.startswith("your_")),
-        "x_api_configured": bool(x_token and not x_token.startswith("your_")),
-        "supported_platforms": ["youtube", "twitter"],
-        "message": f"VibeCheck AI active with {model_name}."
+        "supported_platforms": ["youtube"],
+        "message": f"VibeCheck AI active with {model_name} for YouTube comments."
     }
 
 
 @router.get("/models")
 def get_ml_models_comparison():
     """
-    Returns the rigorous evaluation and comparison metrics of the 3 traditional ML algorithms:
-    1. Logistic Regression
-    2. Multinomial Naive Bayes
+    Returns the rigorous evaluation and comparison metrics of the 4 traditional ML algorithms:
+    1. Multinomial Naive Bayes
+    2. Logistic Regression
     3. Linear Support Vector Machine (Linear SVM)
+    4. Random Forest Classifier
     Includes Accuracy, Precision, Recall, F1-score, and Confusion Matrices.
     """
     meta = get_model_metadata()
-    if not meta or "models" not in meta:
+    if not meta or "models" not in meta or "Random Forest" not in meta.get("models", {}):
         from backend.ml.trainer import train_and_evaluate_models
         meta = train_and_evaluate_models()
     return meta
@@ -63,7 +60,7 @@ def get_ml_models_comparison():
 
 @router.get("/supported-platforms")
 def get_supported_platforms():
-    """Returns capabilities and guidelines for the two supported platforms."""
+    """Returns capabilities and guidelines for YouTube comment sentiment analysis."""
     return {
         "supported_platforms": [
             {
@@ -76,39 +73,27 @@ def get_supported_platforms():
                     "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
                     "https://youtu.be/dQw4w9WgXcQ"
                 ],
-                "notes": "Retrieves real top-level video comments through the official YouTube API v3."
-            },
-            {
-                "id": "twitter",
-                "name": "X (Twitter)",
-                "icon": "Twitter",
-                "status": "Active (Official X API v2)",
-                "capabilities": ["Post Validation", "Public Preview", "Audience Replies / Post Text Sentiment"],
-                "url_examples": [
-                    "https://x.com/username/status/1234567890",
-                    "https://twitter.com/username/status/1234567890"
-                ],
-                "notes": "Authenticates using official X API v2 Bearer Token. If developer credits are depleted (HTTP 402), users can paste comments directly for ML sentiment prediction."
+                "notes": "Retrieves real top-level video comments through the official YouTube Data API v3."
             }
         ]
     }
 
 
 class AnalyzeRequest(BaseModel):
-    target: Optional[str] = Field(None, description="URL of the YouTube video or X post")
+    target: Optional[str] = Field(None, description="URL of the YouTube video")
     input_type: str = Field("url", description="'url' or 'pasted_comments'")
-    platform: Optional[str] = Field("youtube", description="Platform identifier: youtube or twitter")
+    platform: Optional[str] = Field("youtube", description="Platform identifier: youtube")
     title: Optional[str] = Field(None, description="Optional custom title")
-    raw_text: Optional[str] = Field(None, description="Optional audience comments or post text")
+    raw_text: Optional[str] = Field(None, description="Optional audience comments text fallback")
     save_to_history: bool = Field(True, description="Whether to persist report in history")
 
 
 @router.post("/analyze")
 def analyze_content(req: AnalyzeRequest):
     """
-    Main VibeCheck AI analysis endpoint.
-    Retrieves content from YouTube or X (Twitter), extracts text, runs preprocessing,
-    and applies the trained traditional Machine Learning model for sentiment prediction.
+    Main VibeCheck AI analysis endpoint for YouTube.
+    Retrieves video details and top comments via official YouTube Data API v3,
+    runs preprocessing, and applies the trained traditional Machine Learning model.
     """
     target = (req.target or "").strip()
     input_type = req.input_type.strip().lower()
@@ -117,54 +102,53 @@ def analyze_content(req: AnalyzeRequest):
         if input_type == "url" and target:
             lower_target = target.lower()
 
-            # Reject unsupported platforms
+            # Reject unsupported platforms with clear messaging
+            if "twitter.com" in lower_target or "x.com" in lower_target:
+                raise HTTPException(
+                    status_code=400,
+                    detail="X (Twitter) is not supported. CreatorPulse AI focuses exclusively on YouTube video comment sentiment analysis."
+                )
             if "instagram.com" in lower_target:
                 raise HTTPException(
                     status_code=400,
-                    detail="CreatorPulse AI supports YouTube and X (Twitter) only. Instagram is not supported."
+                    detail="Instagram is not supported. CreatorPulse AI focuses exclusively on YouTube video comment sentiment analysis."
                 )
             if "tiktok.com" in lower_target:
                 raise HTTPException(
                     status_code=400,
-                    detail="CreatorPulse AI supports YouTube and X (Twitter) only. TikTok is not supported."
+                    detail="TikTok is not supported. CreatorPulse AI focuses exclusively on YouTube video comment sentiment analysis."
                 )
             if "linkedin.com" in lower_target:
                 raise HTTPException(
                     status_code=400,
-                    detail="CreatorPulse AI supports YouTube and X (Twitter) only. LinkedIn is not supported."
+                    detail="LinkedIn is not supported. CreatorPulse AI focuses exclusively on YouTube video comment sentiment analysis."
                 )
 
             if yt_adapter.can_handle(target):
                 payload = yt_adapter.fetch_data({"url": target})
-            elif tw_adapter.can_handle(target):
-                payload = tw_adapter.fetch_data({"url": target, "comments_text": req.raw_text})
             else:
                 raise HTTPException(
                     status_code=400,
                     detail=(
-                        "Invalid URL. Please enter a valid YouTube URL (e.g., https://www.youtube.com/watch?v=...) "
-                        "or X post URL (e.g., https://x.com/username/status/...)."
+                        "Invalid URL. Please enter a valid YouTube video URL "
+                        "(e.g., https://www.youtube.com/watch?v=... or https://youtu.be/...)."
                     )
                 )
         else:
-            # Direct text or pasted comments
+            # Direct text or pasted comments fallback
             raw_text = (req.raw_text or "").strip()
             if not raw_text:
                 raise HTTPException(
                     status_code=400,
-                    detail="No text or comments provided. Please enter a URL or paste text to analyze."
+                    detail="No text or comments provided. Please enter a YouTube video URL or paste comments to analyze."
                 )
-
-            platform_choice = (req.platform or "youtube").lower()
-            if platform_choice not in ("youtube", "twitter", "x"):
-                platform_choice = "youtube"
 
             payload = manual_adapter.fetch_data({
                 "input_type": "pasted_comments",
                 "raw_text": raw_text,
-                "platform": "twitter" if platform_choice in ("twitter", "x") else "youtube",
-                "title": req.title or "Audience Feedback",
-                "author": "Audience"
+                "platform": "youtube",
+                "title": req.title or "YouTube Video Comments",
+                "author": "YouTube Audience"
             })
     except HTTPException:
         raise
@@ -181,7 +165,7 @@ def analyze_content(req: AnalyzeRequest):
         res = analysis["vibecheck_results"]
         saved_record = {
             "title": analysis["metadata"]["title"],
-            "platform": analysis["metadata"]["platform"],
+            "platform": "youtube",
             "overall_sentiment": res["overall_vibe"],
             "overall_score": res["sentiment_distribution"]["positive_percentage"],
             "dominant_vibe": res["overall_vibe"],

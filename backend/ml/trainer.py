@@ -1,23 +1,24 @@
 """
 CreatorPulse AI - ML Trainer & Model Comparison Engine
 ------------------------------------------------------
-Trains and rigorously compares three traditional Machine Learning algorithms for sentiment classification:
-1. Logistic Regression
-2. Multinomial Naive Bayes
+Trains and compares four traditional Machine Learning algorithms for YouTube comment sentiment classification:
+1. Multinomial Naive Bayes
+2. Logistic Regression
 3. Linear Support Vector Machine (Linear SVM)
+4. Random Forest Classifier
 
 Pipeline:
 - Text Preprocessing & Cleaning (preprocessor.py)
 - Train-Test Split (80% Train, 20% Test, stratified, random_state=42) - ZERO data leakage
 - TF-IDF Feature Extraction (unigrams & bigrams, sublinear TF)
-- Model Training & Hyperparameter tuning
+- Model Training with Scikit-learn
 - Full Evaluation:
   * Accuracy
   * Precision (Weighted & Macro)
   * Recall (Weighted & Macro)
   * F1-score (Weighted & Macro)
   * Confusion Matrix (Positive, Neutral, Negative)
-- Selection and persistence of the best-performing model.
+- Selection and persistence of the best-performing model based on weighted F1-score.
 """
 
 import os
@@ -33,6 +34,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.svm import LinearSVC
 from sklearn.calibration import CalibratedClassifierCV
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score,
     precision_score,
@@ -52,8 +54,8 @@ def train_and_evaluate_models(
     save_dir: str = None
 ) -> Dict[str, Any]:
     """
-    Loads labeled dataset, trains 3 traditional ML algorithms, evaluates them,
-    selects the winner, and saves the artifacts to disk.
+    Loads labeled dataset, trains 4 traditional ML algorithms, evaluates them,
+    selects the winner based on weighted F1-score, and saves the artifacts to disk.
     """
     base_dir = os.path.dirname(os.path.abspath(__file__))
     if dataset_path is None:
@@ -96,19 +98,25 @@ def train_and_evaluate_models(
     X_train_tfidf = vectorizer.fit_transform(X_train)
     X_test_tfidf = vectorizer.transform(X_test)
 
-    # 4. Define candidate models
+    # 4. Define candidate models (4 traditional ML algorithms)
     candidate_models = {
+        "Multinomial Naive Bayes": MultinomialNB(
+            alpha=0.5
+        ),
         "Logistic Regression": LogisticRegression(
             C=1.5,
             max_iter=1000,
             solver="lbfgs",
             random_state=42
         ),
-        "Multinomial Naive Bayes": MultinomialNB(
-            alpha=0.5
-        ),
         "Linear SVM": CalibratedClassifierCV(
             LinearSVC(C=1.0, random_state=42, dual="auto")
+        ),
+        "Random Forest": RandomForestClassifier(
+            n_estimators=100,
+            max_depth=30,
+            random_state=42,
+            n_jobs=-1
         )
     }
 
@@ -117,7 +125,7 @@ def train_and_evaluate_models(
     best_f1 = -1.0
 
     print("\n[ML Trainer] Starting model training & evaluation:")
-    print("=" * 70)
+    print("=" * 75)
 
     for name, model in candidate_models.items():
         # Train model
@@ -172,10 +180,10 @@ def train_and_evaluate_models(
             best_f1 = f1_weighted
             best_model_name = name
 
-    print("=" * 70)
-    print(f"[ML Trainer] BEST PERFORMING MODEL: {best_model_name} (F1: {best_f1*100:.2f}%)\n")
+    print("=" * 75)
+    print(f"[ML Trainer] BEST PERFORMING MODEL: {best_model_name} (Weighted F1: {best_f1*100:.2f}%)\n")
 
-    # 5. Persist Best Model and TF-IDF Vectorizer
+    # 5. Persist Best Model and matching TF-IDF Vectorizer
     best_model = candidate_models[best_model_name]
     vectorizer_path = os.path.join(save_dir, "tfidf_vectorizer.joblib")
     best_model_path = os.path.join(save_dir, "best_model.joblib")
@@ -197,7 +205,7 @@ def train_and_evaluate_models(
         "models": results,
         "pipeline_details": {
             "vectorizer": "TfidfVectorizer(ngram_range=(1,2), max_features=5000, sublinear_tf=True)",
-            "preprocessing": "clean_text (URLs, mentions, contractions, emoticons, noise normalization)",
+            "preprocessing": "clean_text (lowercase, URLs, mentions, contractions, emoticons, noise normalization, negations preserved)",
             "test_split_ratio": 0.20,
             "random_state": 42
         }

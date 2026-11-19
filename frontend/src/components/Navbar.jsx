@@ -22,7 +22,7 @@ export default function Navbar({ activeTab, onTabChange }) {
             </span>
           </div>
           <p className="hidden sm:block text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-            Social Media Sentiment Analysis System
+            YouTube Comment Sentiment Analysis System
           </p>
         </div>
       </div>

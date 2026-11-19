@@ -16,15 +16,15 @@ from backend.routers.vibecheck import (
 
 
 def test_root_and_health():
-    """Verify root and health endpoints return status."""
+    """Verify root and health endpoints return status with YouTube-only platform support."""
     data = root()
     assert data["status"] == "operational"
     assert "supported_platforms" in data
-    assert "youtube" in data["supported_platforms"]
-    assert "twitter" in data["supported_platforms"]
+    assert data["supported_platforms"] == ["youtube"]
 
     h = health()
     assert h["status"] == "healthy"
+    assert h["supported_platforms"] == ["youtube"]
 
 
 def test_vibecheck_status():
@@ -32,22 +32,25 @@ def test_vibecheck_status():
     data = get_vibecheck_status()
     assert data["status"] == "operational"
     assert "selected_ml_model" in data
+    assert data["selected_ml_model"] == "Multinomial Naive Bayes"
 
 
 def test_vibecheck_supported_platforms():
-    """Verify only YouTube and X (Twitter) are supported."""
+    """Verify only YouTube is supported."""
     data = get_supported_platforms()
     platforms = [p["id"] for p in data["supported_platforms"]]
-    assert platforms == ["youtube", "twitter"]
+    assert platforms == ["youtube"]
 
 
 def test_vibecheck_ml_models():
-    """Verify ML model comparison endpoint returns the 3 algorithms."""
+    """Verify ML model comparison endpoint returns all 4 algorithms."""
     data = get_ml_models_comparison()
     assert "best_model" in data
     assert "Logistic Regression" in data["models"]
     assert "Multinomial Naive Bayes" in data["models"]
     assert "Linear SVM" in data["models"]
+    assert "Random Forest" in data["models"]
+    assert len(data["models"]) == 4
 
 
 def test_vibecheck_analyze_pasted_comments():

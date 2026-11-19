@@ -1,9 +1,9 @@
 """
 CreatorPulse AI - VibeCheck AI Server
 -------------------------------------
-FastAPI application for ML-Based Social Media Sentiment Analysis (VibeCheck AI).
-Supports YouTube and X (Twitter) using official platform APIs and traditional
-Machine Learning models (Logistic Regression, Multinomial Naive Bayes, Linear SVM).
+FastAPI application for ML-Based YouTube Comment Sentiment Analysis (VibeCheck AI).
+Supports YouTube using the official YouTube Data API v3 and traditional
+Machine Learning models (Multinomial Naive Bayes, Logistic Regression, Linear SVM, Random Forest).
 """
 
 import os
@@ -22,9 +22,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.routers import vibecheck
 
 app = FastAPI(
-    title="CreatorPulse AI - VibeCheck AI",
-    description="ML-Based Social Media Sentiment Analysis System for YouTube and X (Twitter)",
-    version="2.0.0"
+    title="CreatorPulse AI - YouTube Comment Sentiment Analysis",
+    description="ML-Based YouTube Comment Sentiment Analysis System using Traditional Machine Learning",
+    version="2.1.0"
 )
 
 # Configure CORS: Allow local development origins and configurable production domains
@@ -57,9 +57,9 @@ app.include_router(vibecheck.router)
 def root():
     return {
         "app": "CreatorPulse AI",
-        "feature": "VibeCheck AI – Social Media Sentiment Analysis",
+        "feature": "YouTube Comment Sentiment Analysis Using Machine Learning",
         "status": "operational",
-        "supported_platforms": ["youtube", "twitter"],
+        "supported_platforms": ["youtube"],
         "endpoints": [
             "/api/vibecheck/status",
             "/api/vibecheck/supported-platforms",
@@ -75,6 +75,6 @@ def root():
 def health():
     return {
         "status": "healthy",
-        "service": "CreatorPulse AI - VibeCheck AI",
-        "supported_platforms": ["youtube", "twitter"]
+        "service": "CreatorPulse AI - YouTube Comment Sentiment Analysis",
+        "supported_platforms": ["youtube"]
     }

@@ -4,7 +4,6 @@ const PlatformContext = createContext();
 
 export const PLATFORMS = [
   { id: 'youtube', label: 'YouTube', icon: 'Youtube', color: '#EF4444' },
-  { id: 'twitter', label: 'X (Twitter)', icon: 'Twitter', color: '#38BDF8' },
 ];
 
 export function PlatformProvider({ children }) {

@@ -2,7 +2,7 @@
 CreatorPulse AI - ML Sentiment Classifier
 -----------------------------------------
 Loads the trained TF-IDF vectorizer and best-performing ML model.
-Performs real-time text classification for YouTube and X (Twitter) comments.
+Performs real-time text classification for YouTube comments.
 """
 
 import os

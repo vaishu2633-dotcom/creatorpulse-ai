@@ -1,20 +1,20 @@
 """
 CreatorPulse AI - VibeCheck AI & Machine Learning Test Suite
 ------------------------------------------------------------
-Directly tests all 14 academic and functional requirements:
+Directly tests all academic, functional, and ML requirements:
 1. YouTube URL validation
-2. X post URL validation
-3. YouTube API retrieval
-4. X API retrieval
-5. Text preprocessing
-6. ML model prediction
+2. YouTube-only platform enforcement & X rejection
+3. YouTube API retrieval (video details + commentThreads)
+4. Text preprocessing (noise cleaning, negations preserved)
+5. ML model prediction pipeline across 4 algorithms
+6. Random Forest classifier evaluation and inference
 7. Positive sentiment prediction
 8. Negative sentiment prediction
 9. Neutral sentiment prediction
 10. Sentiment percentage calculations
 11. API failure handling
-12. Empty content handling
-13. Frontend and backend integration
+12. Empty content handling (no prediction displayed)
+13. Frontend and backend integration endpoints
 14. Responsive UI & Build verification
 """
 
@@ -26,7 +26,6 @@ from backend.main import root, health
 from backend.ml.preprocessor import clean_text
 from backend.ml.classifier import classify_comments, classify_single_text, get_model_metadata
 from backend.services.vibecheck.youtube_adapter import YouTubeAdapter
-from backend.services.vibecheck.twitter_adapter import TwitterAdapter
 from backend.services.vibecheck.analysis import VibeAnalyzer
 from backend.services.vibecheck.base import AnalysisPayload, CommentItem, CoverageReport
 from backend.routers.vibecheck import (
@@ -36,6 +35,7 @@ from backend.routers.vibecheck import (
     get_ml_models_comparison,
     get_supported_platforms
 )
+from fastapi import HTTPException
 
 
 # -------------------------------------------------------------
@@ -62,30 +62,39 @@ def test_youtube_url_validation():
 
 
 # -------------------------------------------------------------
-# 2. X post URL validation
+# 2. YouTube-only platform enforcement & X rejection
 # -------------------------------------------------------------
-def test_x_post_url_validation():
-    adapter = TwitterAdapter()
+def test_youtube_only_platform_enforcement():
+    # Only YouTube is in supported platforms
+    p_data = get_supported_platforms()
+    platform_ids = [p["id"] for p in p_data["supported_platforms"]]
+    assert platform_ids == ["youtube"]
+    assert "twitter" not in platform_ids
+    assert "instagram" not in platform_ids
+    assert "tiktok" not in platform_ids
 
-    # Valid URLs
-    assert adapter.can_handle("https://x.com/username/status/1234567890123456789") is True
-    assert adapter.can_handle("https://twitter.com/creator/status/9876543210") is True
+    # X (Twitter) URL is rejected with clear 400 error
+    with pytest.raises(HTTPException) as excinfo:
+        analyze_content(AnalyzeRequest(
+            target="https://x.com/creator/status/1234567890",
+            input_type="url",
+            platform="youtube"
+        ))
+    assert excinfo.value.status_code == 400
+    assert "X (Twitter) is not supported" in excinfo.value.detail
 
-    user, post_id = adapter.extract_post_info("https://x.com/deepmind/status/1234567890")
-    assert user == "deepmind"
-    assert post_id == "1234567890"
-
-    # Invalid URLs
-    assert adapter.can_handle("https://facebook.com/post/123") is False
-    assert adapter.can_handle("https://x.com/home") is False
-
-    with pytest.raises(ValueError) as excinfo:
-        adapter.fetch_data({"url": "https://x.com/invalid_link"})
-    assert "Invalid X (Twitter) URL" in str(excinfo.value)
+    # Unsupported platform string is rejected
+    with pytest.raises(HTTPException) as excinfo:
+        analyze_content(AnalyzeRequest(
+            target="https://example.com",
+            input_type="url",
+            platform="twitter"
+        ))
+    assert excinfo.value.status_code == 400
 
 
 # -------------------------------------------------------------
-# 3. YouTube API retrieval
+# 3. YouTube API retrieval (video details + comments)
 # -------------------------------------------------------------
 def test_youtube_api_retrieval_mocked():
     adapter = YouTubeAdapter(api_key="AIzaFakeTestKey")
@@ -154,30 +163,7 @@ def test_youtube_api_retrieval_mocked():
 
 
 # -------------------------------------------------------------
-# 4. X API retrieval (Handling credit limits honestly)
-# -------------------------------------------------------------
-def test_x_api_retrieval_and_credit_handling():
-    adapter = TwitterAdapter()
-
-    # Simulate X API v2 returning 402 Payment Required (credit limit reached)
-    mock_resp_402 = MagicMock(status_code=402)
-    mock_resp_oembed = MagicMock(
-        status_code=200,
-        json=lambda: {"author_name": "TechCreator", "text": "Testing our new model today on X!"}
-    )
-
-    with patch("httpx.Client.get") as mock_get:
-        mock_get.side_effect = [mock_resp_402, mock_resp_oembed]
-
-        payload = adapter.fetch_data({"url": "https://x.com/creator/status/1234567890"})
-
-        assert payload.platform == "twitter"
-        assert "402" in payload.coverage.notice or "oEmbed" in payload.coverage.notice
-        assert len(payload.comments) == 0
-
-
-# -------------------------------------------------------------
-# 5. Text preprocessing
+# 4. Text preprocessing
 # -------------------------------------------------------------
 def test_text_preprocessing():
     # 1. URL removal
@@ -188,10 +174,10 @@ def test_text_preprocessing():
     raw_with_mention = "Hey @johndoe that was super clear!"
     assert "@johndoe" not in clean_text(raw_with_mention)
 
-    # 3. Contraction expansion
+    # 3. Contraction expansion (preserving negation 'not')
     raw_with_contraction = "I don't think it's working"
     cleaned = clean_text(raw_with_contraction)
-    assert "do not" in cleaned or "is" in cleaned
+    assert "not" in cleaned
 
     # 4. Emoticon mapping
     raw_emoji = "Awesome content! ❤️ 🔥"
@@ -205,26 +191,47 @@ def test_text_preprocessing():
 
 
 # -------------------------------------------------------------
-# 6. ML model prediction (Pipeline verification)
+# 5. ML model prediction pipeline across all 4 algorithms
 # -------------------------------------------------------------
 def test_ml_model_prediction_pipeline():
     meta = get_model_metadata()
     assert meta["status"] == "success"
     assert "best_model" in meta
-    assert meta["best_model"] in ["Multinomial Naive Bayes", "Logistic Regression", "Linear SVM"]
+    assert meta["best_model"] == "Multinomial Naive Bayes"
 
     models = meta["models"]
-    assert "Logistic Regression" in models
+    # All 4 traditional ML algorithms must be present
     assert "Multinomial Naive Bayes" in models
     assert "Linear SVM" in models
+    assert "Logistic Regression" in models
+    assert "Random Forest" in models
+    assert len(models) == 4
 
-    for name in ["Logistic Regression", "Multinomial Naive Bayes", "Linear SVM"]:
+    for name in ["Multinomial Naive Bayes", "Linear SVM", "Logistic Regression", "Random Forest"]:
         m = models[name]
-        assert "accuracy" in m
-        assert "precision_weighted" in m
-        assert "recall_weighted" in m
-        assert "f1_score_weighted" in m
+        assert m["accuracy"] >= 0.90
+        assert m["precision_weighted"] >= 0.90
+        assert m["recall_weighted"] >= 0.90
+        assert m["f1_score_weighted"] >= 0.90
         assert "confusion_matrix" in m
+        assert len(m["confusion_matrix"]["matrix"]) == 3
+
+
+# -------------------------------------------------------------
+# 6. Random Forest Classifier explicit evaluation
+# -------------------------------------------------------------
+def test_random_forest_classifier_metrics():
+    meta = get_model_metadata()
+    rf = meta["models"]["Random Forest"]
+    assert rf["model_name"] == "Random Forest"
+    assert rf["accuracy"] == 0.9417
+    assert rf["f1_score_weighted"] == 0.9415
+    matrix = rf["confusion_matrix"]["matrix"]
+    assert len(matrix) == 3
+    # Verify non-trivial positive diagonal (true positives)
+    assert matrix[0][0] > 0
+    assert matrix[1][1] > 0
+    assert matrix[2][2] > 0
 
 
 # -------------------------------------------------------------
@@ -348,27 +355,27 @@ def test_frontend_backend_integration_endpoints():
     # 1. Health check
     h = health()
     assert h["status"] == "healthy"
-    assert "youtube" in h["supported_platforms"]
+    assert h["supported_platforms"] == ["youtube"]
 
     # 2. VibeCheck status
     s = get_vibecheck_status()
     assert s["status"] == "operational"
-    assert "selected_ml_model" in s
+    assert s["selected_ml_model"] == "Multinomial Naive Bayes"
 
-    # 3. Supported platforms (only YouTube and Twitter)
+    # 3. Supported platforms (only YouTube)
     p_data = get_supported_platforms()
     platform_ids = [p["id"] for p in p_data["supported_platforms"]]
-    assert "youtube" in platform_ids
-    assert "twitter" in platform_ids
-    assert "instagram" not in platform_ids
-    assert "tiktok" not in platform_ids
+    assert platform_ids == ["youtube"]
+    assert "twitter" not in platform_ids
 
-    # 4. ML Models Comparison endpoint
+    # 4. ML Models Comparison endpoint (all 4 models)
     m_data = get_ml_models_comparison()
     assert "models" in m_data
-    assert "Logistic Regression" in m_data["models"]
+    assert len(m_data["models"]) == 4
     assert "Multinomial Naive Bayes" in m_data["models"]
     assert "Linear SVM" in m_data["models"]
+    assert "Logistic Regression" in m_data["models"]
+    assert "Random Forest" in m_data["models"]
 
     # 5. Direct Analyze invocation
     sample_res = analyze_content(AnalyzeRequest(

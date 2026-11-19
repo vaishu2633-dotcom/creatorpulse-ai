@@ -22,7 +22,7 @@ import {
   Layers,
   ArrowRight
 } from 'lucide-react';
-import { YoutubeIcon, TwitterIcon } from '../components/SocialIcons';
+import { YoutubeIcon } from '../components/SocialIcons';
 import { analyzeVibe, getVibeCheckStatus, getMlModelsComparison } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 
@@ -43,8 +43,8 @@ export default function VibeCheck({ initialTab = 'analyze', onTabChange }) {
     if (onTabChange) onTabChange(tab);
   };
 
-  // Platform selection: 'youtube' or 'twitter'
-  const [selectedPlatform, setSelectedPlatform] = useState('youtube');
+  // Platform is strictly YouTube
+  const selectedPlatform = 'youtube';
 
   // Input states
   const [urlInput, setUrlInput] = useState('');
@@ -92,19 +92,15 @@ export default function VibeCheck({ initialTab = 'analyze', onTabChange }) {
     const trimmedPasted = pastedText.trim();
 
     if (!trimmedUrl && !trimmedPasted) {
-      setError('Please provide a video or post URL (or paste text directly).');
+      setError('Please provide a YouTube video URL (or paste comments directly).');
       return;
     }
 
-    // Client-side quick check
+    // Client-side YouTube URL validation
     if (trimmedUrl) {
       const lower = trimmedUrl.toLowerCase();
-      if (selectedPlatform === 'youtube' && !lower.includes('youtube.com') && !lower.includes('youtu.be')) {
-        setError('The entered URL does not appear to be a YouTube link. Please check the URL or select X (Twitter).');
-        return;
-      }
-      if (selectedPlatform === 'twitter' && !lower.includes('x.com') && !lower.includes('twitter.com')) {
-        setError('The entered URL does not appear to be an X (Twitter) link. Please check the URL or select YouTube.');
+      if (!lower.includes('youtube.com') && !lower.includes('youtu.be')) {
+        setError('Please enter a valid YouTube video URL (e.g., https://www.youtube.com/watch?v=... or https://youtu.be/...).');
         return;
       }
     }
@@ -118,7 +114,7 @@ export default function VibeCheck({ initialTab = 'analyze', onTabChange }) {
 
     try {
       const payload = {
-        platform: selectedPlatform,
+        platform: 'youtube',
         save_to_history: true,
       };
 
@@ -140,7 +136,7 @@ export default function VibeCheck({ initialTab = 'analyze', onTabChange }) {
       if (res?.vibecheck_results?.has_prediction) {
         addToast(`Sentiment analysis completed using ${res.vibecheck_results.analysis_information.selected_ml_model}!`, 'success');
       } else {
-        addToast('Content retrieved, but no comments available to analyze.', 'info');
+        addToast('Video information retrieved, but no comments available to analyze.', 'info');
       }
     } catch (err) {
       clearInterval(stepInterval);
@@ -207,7 +203,7 @@ export default function VibeCheck({ initialTab = 'analyze', onTabChange }) {
               VibeCheck <span className="text-violet-600 dark:text-violet-400">AI</span>
             </h1>
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              Analyze audience sentiment for any YouTube video or X post. Predicts whether the overall reaction is{' '}
+              Analyze audience sentiment for any YouTube video. Predicts whether the overall audience reaction is{' '}
               <span className="font-semibold text-emerald-600 dark:text-emerald-400">Positive</span>,{' '}
               <span className="font-semibold text-blue-600 dark:text-blue-400">Neutral</span>, or{' '}
               <span className="font-semibold text-rose-600 dark:text-rose-400">Negative</span> using traditional Machine Learning.
@@ -216,37 +212,14 @@ export default function VibeCheck({ initialTab = 'analyze', onTabChange }) {
 
           {/* Main Input Card */}
           <div className="bg-white dark:bg-[#131927] rounded-2xl border border-[#EAE7F5] dark:border-[#1F293D] shadow-sm p-5 sm:p-7 space-y-6">
-            {/* 1. Platform Selection */}
+            {/* 1. Platform Indicator */}
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2.5">
-                1. Select Platform
+                Target Platform
               </label>
-              <div className="grid grid-cols-2 gap-3 max-w-md">
-                <button
-                  type="button"
-                  onClick={() => setSelectedPlatform('youtube')}
-                  className={`flex items-center justify-center space-x-2.5 p-3 rounded-xl border text-sm font-semibold transition ${
-                    selectedPlatform === 'youtube'
-                      ? 'bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-700 shadow-xs'
-                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
-                  }`}
-                >
-                  <YoutubeIcon className="w-5 h-5 text-[#FF0000]" />
-                  <span>YouTube</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedPlatform('twitter')}
-                  className={`flex items-center justify-center space-x-2.5 p-3 rounded-xl border text-sm font-semibold transition ${
-                    selectedPlatform === 'twitter'
-                      ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white border-slate-400 dark:border-slate-600 shadow-xs'
-                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
-                  }`}
-                >
-                  <TwitterIcon className="w-4 h-4 text-slate-900 dark:text-white" />
-                  <span>X (Twitter)</span>
-                </button>
+              <div className="inline-flex items-center space-x-2.5 px-3.5 py-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/80 text-rose-700 dark:text-rose-300 font-semibold text-sm shadow-xs">
+                <YoutubeIcon className="w-5 h-5 text-[#FF0000]" />
+                <span>YouTube Video Comments</span>
               </div>
             </div>
 
@@ -254,7 +227,7 @@ export default function VibeCheck({ initialTab = 'analyze', onTabChange }) {
             <form onSubmit={handleAnalyze} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
-                  2. Paste {selectedPlatform === 'youtube' ? 'YouTube Video' : 'X Post'} URL
+                  Paste YouTube Video URL
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -264,27 +237,21 @@ export default function VibeCheck({ initialTab = 'analyze', onTabChange }) {
                     type="url"
                     value={urlInput}
                     onChange={(e) => setUrlInput(e.target.value)}
-                    placeholder={
-                      selectedPlatform === 'youtube'
-                        ? 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
-                        : 'https://x.com/username/status/1234567890'
-                    }
+                    placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ or https://youtu.be/..."
                     disabled={loading}
                     className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-[#0B0F19] border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-slate-900 dark:text-white placeholder-slate-400"
                   />
                 </div>
                 <div className="flex items-center justify-between mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
                   <span>
-                    {selectedPlatform === 'youtube'
-                      ? 'Official YouTube Data API v3 retrieves real audience comments.'
-                      : 'Official X API v2 Bearer Token integration.'}
+                    Official YouTube Data API v3 retrieves real audience comments from the video.
                   </span>
                   <button
                     type="button"
                     onClick={() => setShowOptionalTextInput(!showOptionalTextInput)}
                     className="text-violet-600 dark:text-violet-400 hover:underline inline-flex items-center space-x-1"
                   >
-                    <span>{showOptionalTextInput ? 'Hide custom text' : 'Paste custom replies/comments'}</span>
+                    <span>{showOptionalTextInput ? 'Hide custom text' : 'Paste custom comments'}</span>
                     {showOptionalTextInput ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                   </button>
                 </div>
@@ -295,7 +262,7 @@ export default function VibeCheck({ initialTab = 'analyze', onTabChange }) {
                 <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#0B0F19] border border-slate-200 dark:border-slate-800 space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Optional: Custom Audience Comments or Post Text
+                      Optional: Custom Audience Comments
                     </label>
                     <span className="text-[10px] text-slate-500">1 comment per line</span>
                   </div>
@@ -307,7 +274,7 @@ export default function VibeCheck({ initialTab = 'analyze', onTabChange }) {
                     className="w-full p-2.5 bg-white dark:bg-[#131927] border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
                   />
                   <p className="text-[11px] text-slate-500">
-                    Useful if comments on YouTube are disabled or if X developer credits are exhausted (HTTP 402).
+                    Useful if comments on YouTube are disabled or you want to evaluate custom feedback.
                   </p>
                 </div>
               )}
@@ -387,7 +354,7 @@ export default function VibeCheck({ initialTab = 'analyze', onTabChange }) {
                 <div className="space-y-1">
                   <div className="flex items-center space-x-2">
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                      {metadata?.platform === 'youtube' ? 'YouTube Video' : 'X (Twitter) Post'}
+                      YouTube Video
                     </span>
                     {metadata?.post_url && (
                       <a
@@ -396,13 +363,13 @@ export default function VibeCheck({ initialTab = 'analyze', onTabChange }) {
                         rel="noopener noreferrer"
                         className="text-xs text-violet-600 dark:text-violet-400 hover:underline inline-flex items-center space-x-1"
                       >
-                        <span>View Source</span>
+                        <span>View on YouTube</span>
                         <ExternalLink className="w-3 h-3" />
                       </a>
                     )}
                   </div>
                   <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white line-clamp-1">
-                    {metadata?.title || 'Analyzed Content'}
+                    {metadata?.title || 'Analyzed YouTube Video'}
                   </h2>
                   <div className="text-xs text-slate-500">
                     By <span className="font-semibold text-slate-700 dark:text-slate-300">{metadata?.author || 'Creator'}</span>
@@ -413,7 +380,7 @@ export default function VibeCheck({ initialTab = 'analyze', onTabChange }) {
 
                 <div className="shrink-0 flex items-center space-x-2">
                   <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                    {results?.analysis_information?.samples_analyzed || 0} samples analyzed
+                    {results?.analysis_information?.samples_analyzed || 0} comments analyzed
                   </span>
                 </div>
               </div>
@@ -551,7 +518,7 @@ export default function VibeCheck({ initialTab = 'analyze', onTabChange }) {
                       <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                         <div>
                           <dt className="text-slate-500">Platform</dt>
-                          <dd className="font-bold text-slate-900 dark:text-white">
+                          <dd className="font-bold text-slate-900 dark:text-white capitalize">
                             {results.analysis_information.platform}
                           </dd>
                         </div>
@@ -562,7 +529,7 @@ export default function VibeCheck({ initialTab = 'analyze', onTabChange }) {
                           </dd>
                         </div>
                         <div>
-                          <dt className="text-slate-500">Analyzed Samples</dt>
+                          <dt className="text-slate-500">Analyzed Comments</dt>
                           <dd className="font-bold text-slate-900 dark:text-white">
                             {results.analysis_information.samples_analyzed}
                           </dd>
@@ -661,22 +628,13 @@ export default function VibeCheck({ initialTab = 'analyze', onTabChange }) {
                   </div>
                   <p className="text-sm leading-relaxed">
                     {coverage?.notice ||
-                      'No usable comments or text content could be retrieved from the target URL. In accordance with honest evaluation requirements, no fabricated sentiment prediction is shown.'}
+                      'No usable comments or text content could be retrieved from the target YouTube video. In accordance with honest evaluation requirements, no fabricated sentiment prediction is shown.'}
                   </p>
                   <div className="text-xs text-amber-800/80 dark:text-amber-300/80 bg-white/60 dark:bg-[#131927]/60 p-3 rounded-xl border border-amber-200/50 dark:border-amber-800/50 space-y-1">
                     <div className="font-semibold">Why did this happen?</div>
                     <ul className="list-disc pl-4 space-y-0.5">
-                      {metadata?.platform === 'youtube' ? (
-                        <>
-                          <li>The video creator may have disabled comments on this video.</li>
-                          <li>The video is newly uploaded and currently has 0 comments.</li>
-                        </>
-                      ) : (
-                        <>
-                          <li>The official X API v2 returned HTTP 402 (Payment Required: credits depleted).</li>
-                          <li>Per project policy, no additional paid credits are purchased.</li>
-                        </>
-                      )}
+                      <li>The video creator may have disabled comments on this video.</li>
+                      <li>The video is newly uploaded and currently has 0 comments.</li>
                     </ul>
                   </div>
                   <div className="pt-2">
@@ -704,6 +662,14 @@ function MLModelBenchmarkView({ mlModels, loading, onBack }) {
   const bestModelName = mlModels?.best_model || 'Multinomial Naive Bayes';
 
   const modelKeys = Object.keys(models);
+
+  // Model-specific color accents
+  const getModelColor = (name, isWinner) => {
+    if (isWinner) return 'text-violet-600 dark:text-violet-400 bg-violet-600';
+    if (name.includes('SVM')) return 'text-sky-600 dark:text-sky-400 bg-sky-600';
+    if (name.includes('Logistic')) return 'text-indigo-600 dark:text-indigo-400 bg-indigo-600';
+    return 'text-emerald-600 dark:text-emerald-400 bg-emerald-600';
+  };
 
   return (
     <div className="space-y-6">
@@ -743,7 +709,7 @@ function MLModelBenchmarkView({ mlModels, loading, onBack }) {
             <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center space-x-2">
                 <BarChart2 className="w-4 h-4 text-violet-600" />
-                <span>Evaluation Metrics Table (Traditional ML)</span>
+                <span>Evaluation Metrics Table (4 Traditional ML Algorithms)</span>
               </h3>
               <span className="text-[11px] text-slate-400">Zero Data Leakage • TF-IDF (1,2 n-grams)</span>
             </div>
@@ -807,14 +773,166 @@ function MLModelBenchmarkView({ mlModels, loading, onBack }) {
             </div>
           </div>
 
-          {/* Confusion Matrices Grid */}
+          {/* Visual Performance Benchmark Charts */}
+          <div className="bg-white dark:bg-[#131927] rounded-2xl border border-[#EAE7F5] dark:border-[#1F293D] shadow-sm p-5 sm:p-6 space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                  <BarChart2 className="w-4 h-4 text-violet-600" />
+                  <span>Visual Comparison Across Evaluation Metrics</span>
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Comparison of all 4 traditional Scikit-learn classifiers on the 240 unseen test samples.
+                </p>
+              </div>
+              <span className="text-xs font-bold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/40 px-2.5 py-1 rounded-lg border border-violet-200 dark:border-violet-800">
+                Metric Range: 90% - 100%
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Metric 1: Accuracy */}
+              <div className="space-y-2.5 p-3.5 rounded-xl bg-slate-50/70 dark:bg-[#0B0F19] border border-slate-100 dark:border-slate-800/80">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
+                  <span>Accuracy</span>
+                  <span className="text-[10px] text-slate-500 font-normal">Overall correctness</span>
+                </div>
+                <div className="space-y-2">
+                  {modelKeys.map((key) => {
+                    const m = models[key];
+                    const isWinner = m.model_name === bestModelName;
+                    const pct = (m.accuracy * 100).toFixed(2);
+                    return (
+                      <div key={key} className="space-y-1">
+                        <div className="flex justify-between text-[11px]">
+                          <span className={isWinner ? 'font-bold text-violet-600 dark:text-violet-400' : 'text-slate-600 dark:text-slate-400'}>
+                            {m.model_name}
+                          </span>
+                          <span className="font-semibold text-slate-900 dark:text-white">{pct}%</span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                          <div
+                            style={{ width: `${pct}%` }}
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              isWinner ? 'bg-violet-600' : 'bg-slate-400 dark:bg-slate-500'
+                            }`}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Metric 2: Weighted F1-Score */}
+              <div className="space-y-2.5 p-3.5 rounded-xl bg-slate-50/70 dark:bg-[#0B0F19] border border-slate-100 dark:border-slate-800/80">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
+                  <span>F1-Score (Weighted)</span>
+                  <span className="text-[10px] text-slate-500 font-normal">Harmonic mean of precision & recall</span>
+                </div>
+                <div className="space-y-2">
+                  {modelKeys.map((key) => {
+                    const m = models[key];
+                    const isWinner = m.model_name === bestModelName;
+                    const pct = (m.f1_score_weighted * 100).toFixed(2);
+                    return (
+                      <div key={key} className="space-y-1">
+                        <div className="flex justify-between text-[11px]">
+                          <span className={isWinner ? 'font-bold text-violet-600 dark:text-violet-400' : 'text-slate-600 dark:text-slate-400'}>
+                            {m.model_name}
+                          </span>
+                          <span className="font-semibold text-slate-900 dark:text-white">{pct}%</span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                          <div
+                            style={{ width: `${pct}%` }}
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              isWinner ? 'bg-emerald-600' : 'bg-slate-400 dark:bg-slate-500'
+                            }`}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Metric 3: Precision */}
+              <div className="space-y-2.5 p-3.5 rounded-xl bg-slate-50/70 dark:bg-[#0B0F19] border border-slate-100 dark:border-slate-800/80">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
+                  <span>Precision (Weighted)</span>
+                  <span className="text-[10px] text-slate-500 font-normal">Minimization of false positives</span>
+                </div>
+                <div className="space-y-2">
+                  {modelKeys.map((key) => {
+                    const m = models[key];
+                    const isWinner = m.model_name === bestModelName;
+                    const pct = (m.precision_weighted * 100).toFixed(2);
+                    return (
+                      <div key={key} className="space-y-1">
+                        <div className="flex justify-between text-[11px]">
+                          <span className={isWinner ? 'font-bold text-violet-600 dark:text-violet-400' : 'text-slate-600 dark:text-slate-400'}>
+                            {m.model_name}
+                          </span>
+                          <span className="font-semibold text-slate-900 dark:text-white">{pct}%</span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                          <div
+                            style={{ width: `${pct}%` }}
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              isWinner ? 'bg-sky-600' : 'bg-slate-400 dark:bg-slate-500'
+                            }`}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Metric 4: Recall */}
+              <div className="space-y-2.5 p-3.5 rounded-xl bg-slate-50/70 dark:bg-[#0B0F19] border border-slate-100 dark:border-slate-800/80">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
+                  <span>Recall (Weighted)</span>
+                  <span className="text-[10px] text-slate-500 font-normal">Coverage of true positives</span>
+                </div>
+                <div className="space-y-2">
+                  {modelKeys.map((key) => {
+                    const m = models[key];
+                    const isWinner = m.model_name === bestModelName;
+                    const pct = (m.recall_weighted * 100).toFixed(2);
+                    return (
+                      <div key={key} className="space-y-1">
+                        <div className="flex justify-between text-[11px]">
+                          <span className={isWinner ? 'font-bold text-violet-600 dark:text-violet-400' : 'text-slate-600 dark:text-slate-400'}>
+                            {m.model_name}
+                          </span>
+                          <span className="font-semibold text-slate-900 dark:text-white">{pct}%</span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                          <div
+                            style={{ width: `${pct}%` }}
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              isWinner ? 'bg-indigo-600' : 'bg-slate-400 dark:bg-slate-500'
+                            }`}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Confusion Matrices Grid for All 4 Models */}
           <div className="space-y-3">
             <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center space-x-2">
               <Cpu className="w-4 h-4 text-violet-600" />
-              <span>Confusion Matrices on Test Set (240 Holdout Samples)</span>
+              <span>Confusion Matrices on Test Set (240 Holdout Samples across 4 Models)</span>
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {modelKeys.map((key) => {
                 const m = models[key];
                 const matrix = m.confusion_matrix?.matrix || [
@@ -822,7 +940,6 @@ function MLModelBenchmarkView({ mlModels, loading, onBack }) {
                   [0, 0, 0],
                   [0, 0, 0],
                 ];
-                const labels = m.confusion_matrix?.labels || ['positive', 'neutral', 'negative'];
                 const isWinner = m.model_name === bestModelName;
 
                 return (
@@ -832,59 +949,68 @@ function MLModelBenchmarkView({ mlModels, loading, onBack }) {
                       isWinner
                         ? 'border-violet-400 dark:border-violet-600 ring-2 ring-violet-400/20'
                         : 'border-[#EAE7F5] dark:border-[#1F293D]'
-                    } space-y-3`}
+                    } space-y-3 flex flex-col justify-between`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs text-slate-900 dark:text-white">{m.model_name}</span>
-                      {isWinner && (
-                        <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400">Winner</span>
-                      )}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold text-xs text-slate-900 dark:text-white">{m.model_name}</span>
+                        {isWinner && (
+                          <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400">Winner</span>
+                        )}
+                      </div>
+
+                      <div className="text-[10.5px] text-slate-500 font-medium mb-3">
+                        Rows: Actual • Cols: Predicted
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-1 text-center text-[10px]">
+                        {/* Header */}
+                        <div className="text-slate-400"></div>
+                        <div className="font-bold text-emerald-600">Pos</div>
+                        <div className="font-bold text-blue-600">Neu</div>
+                        <div className="font-bold text-rose-600">Neg</div>
+
+                        {/* Row 0: Pos */}
+                        <div className="font-bold text-emerald-600 flex items-center justify-end pr-1">Pos</div>
+                        <div className="p-1 rounded bg-emerald-50 dark:bg-emerald-950/40 font-bold text-emerald-800 dark:text-emerald-200">
+                          {matrix[0][0]}
+                        </div>
+                        <div className="p-1 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                          {matrix[0][1]}
+                        </div>
+                        <div className="p-1 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                          {matrix[0][2]}
+                        </div>
+
+                        {/* Row 1: Neu */}
+                        <div className="font-bold text-blue-600 flex items-center justify-end pr-1">Neu</div>
+                        <div className="p-1 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                          {matrix[1][0]}
+                        </div>
+                        <div className="p-1 rounded bg-blue-50 dark:bg-blue-950/40 font-bold text-blue-800 dark:text-blue-200">
+                          {matrix[1][1]}
+                        </div>
+                        <div className="p-1 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                          {matrix[1][2]}
+                        </div>
+
+                        {/* Row 2: Neg */}
+                        <div className="font-bold text-rose-600 flex items-center justify-end pr-1">Neg</div>
+                        <div className="p-1 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                          {matrix[2][0]}
+                        </div>
+                        <div className="p-1 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                          {matrix[2][1]}
+                        </div>
+                        <div className="p-1 rounded bg-rose-50 dark:bg-rose-950/40 font-bold text-rose-800 dark:text-rose-200">
+                          {matrix[2][2]}
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="text-[11px] text-slate-500 font-medium">Rows = Actual, Columns = Predicted</div>
-
-                    <div className="grid grid-cols-4 gap-1 text-center text-[10.5px]">
-                      {/* Header */}
-                      <div className="text-slate-400"></div>
-                      <div className="font-bold text-emerald-600">Pos</div>
-                      <div className="font-bold text-blue-600">Neu</div>
-                      <div className="font-bold text-rose-600">Neg</div>
-
-                      {/* Row 0: Pos */}
-                      <div className="font-bold text-emerald-600 flex items-center justify-end pr-1">Pos</div>
-                      <div className="p-1.5 rounded bg-emerald-50 dark:bg-emerald-950/40 font-bold text-emerald-800 dark:text-emerald-200">
-                        {matrix[0][0]}
-                      </div>
-                      <div className="p-1.5 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                        {matrix[0][1]}
-                      </div>
-                      <div className="p-1.5 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                        {matrix[0][2]}
-                      </div>
-
-                      {/* Row 1: Neu */}
-                      <div className="font-bold text-blue-600 flex items-center justify-end pr-1">Neu</div>
-                      <div className="p-1.5 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                        {matrix[1][0]}
-                      </div>
-                      <div className="p-1.5 rounded bg-blue-50 dark:bg-blue-950/40 font-bold text-blue-800 dark:text-blue-200">
-                        {matrix[1][1]}
-                      </div>
-                      <div className="p-1.5 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                        {matrix[1][2]}
-                      </div>
-
-                      {/* Row 2: Neg */}
-                      <div className="font-bold text-rose-600 flex items-center justify-end pr-1">Neg</div>
-                      <div className="p-1.5 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                        {matrix[2][0]}
-                      </div>
-                      <div className="p-1.5 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                        {matrix[2][1]}
-                      </div>
-                      <div className="p-1.5 rounded bg-rose-50 dark:bg-rose-950/40 font-bold text-rose-800 dark:text-rose-200">
-                        {matrix[2][2]}
-                      </div>
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between text-[10px] text-slate-500">
+                      <span>F1: {(m.f1_score_weighted * 100).toFixed(1)}%</span>
+                      <span>Acc: {(m.accuracy * 100).toFixed(1)}%</span>
                     </div>
                   </div>
                 );

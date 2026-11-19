@@ -4,7 +4,7 @@ CreatorPulse AI - Integrations & Secrets Manager
 Single source of truth for:
 1. Safe retrieval and storage of external API keys.
 2. Key masking (raw secrets are never exposed).
-3. Support strictly for YouTube and X (Twitter).
+3. Support strictly for YouTube Data API v3.
 """
 
 import os

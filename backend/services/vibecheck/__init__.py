@@ -1,11 +1,12 @@
 """
-VibeCheck AI - Social Media Content and Sentiment Analyzer Service
-Two-Platform Scope: YouTube and X (Twitter)
+CreatorPulse AI - YouTube Comment Sentiment Analyzer Service
+------------------------------------------------------------
+Dedicated to YouTube comment analysis via official YouTube Data API v3
+and traditional Machine Learning algorithms.
 """
 
 from .base import PlatformAdapter, AnalysisPayload, CommentItem, CoverageReport
 from .youtube_adapter import YouTubeAdapter
-from .twitter_adapter import TwitterAdapter
 from .manual_adapter import ManualAdapter
 from .analysis import VibeAnalyzer
 
@@ -15,7 +16,6 @@ __all__ = [
     "CommentItem",
     "CoverageReport",
     "YouTubeAdapter",
-    "TwitterAdapter",
     "ManualAdapter",
     "VibeAnalyzer"
 ]
