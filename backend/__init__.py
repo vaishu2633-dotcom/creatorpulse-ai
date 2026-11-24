@@ -1,0 +1,4 @@
+"""
+CreatorPulse AI - Backend Package
+---------------------------------
+"""

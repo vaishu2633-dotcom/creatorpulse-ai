@@ -7,11 +7,19 @@ Machine Learning models (Multinomial Naive Bayes, Logistic Regression, Linear SV
 """
 
 import os
+import sys
 from dotenv import load_dotenv
 
+# Ensure project root is in sys.path so 'backend' is always importable
+# regardless of whether running from project root or inside backend/
+_backend_dir = os.path.dirname(os.path.abspath(__file__))
+_project_root = os.path.abspath(os.path.join(_backend_dir, ".."))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
 # Ensure environment configuration from backend/.env and root .env is loaded
-_backend_env = os.path.abspath(os.path.join(os.path.dirname(__file__), ".env"))
-_root_env = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
+_backend_env = os.path.join(_backend_dir, ".env")
+_root_env = os.path.join(_project_root, ".env")
 if os.path.exists(_backend_env):
     load_dotenv(_backend_env)
 if os.path.exists(_root_env):

@@ -6,9 +6,16 @@ Performs real-time text classification for YouTube comments.
 """
 
 import os
+import sys
 import json
 import joblib
 from typing import Dict, Any, List, Optional
+
+# Ensure project root is in sys.path
+_project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
 from backend.ml.preprocessor import clean_text
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

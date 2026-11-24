@@ -12,9 +12,15 @@ Endpoints:
 """
 
 import os
+import sys
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+
+# Ensure project root is in sys.path
+_project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
 
 from backend.services import data_access
 from backend.services.vibecheck import (
