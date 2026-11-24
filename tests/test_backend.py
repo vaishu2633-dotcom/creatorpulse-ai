@@ -11,8 +11,11 @@ from backend.routers.vibecheck import (
     get_supported_platforms,
     get_ml_models_comparison,
     analyze_content,
+    get_vibecheck_history,
+    delete_report,
     AnalyzeRequest
 )
+from backend.services.data_access import save_vibecheck_report
 
 
 def test_root_and_health():
@@ -67,3 +70,32 @@ def test_vibecheck_analyze_pasted_comments():
     assert results["overall_vibe"] in ["Positive", "Negative", "Neutral"]
     assert results["counts"]["total"] == 3
     assert len(data["comments"]) == 3
+
+
+def test_vibecheck_history_lifecycle():
+    """Verify saving, retrieving, and deleting sentiment reports in history."""
+    test_report = {
+        "title": "History Test Video",
+        "platform": "youtube",
+        "overall_sentiment": "Positive",
+        "overall_score": 85.0,
+        "dominant_vibe": "Positive",
+        "total_comments": 10,
+        "data_source": "url",
+        "summary": "Audience response is predominantly Positive."
+    }
+    saved = save_vibecheck_report(test_report)
+    assert "report_id" in saved
+    report_id = saved["report_id"]
+
+    history = get_vibecheck_history()
+    assert history["total_reports"] >= 1
+    assert any(r.get("report_id") == report_id for r in history["reports"])
+
+    del_res = delete_report(report_id)
+    assert del_res["success"] is True
+
+    # Verify report is no longer present
+    history_after = get_vibecheck_history()
+    assert not any(r.get("report_id") == report_id for r in history_after["reports"])
+

@@ -1,14 +1,20 @@
 """
 CreatorPulse AI - VibeCheck AI Router
 -------------------------------------
-YouTube comment sentiment analysis endpoints.
-Connects official YouTube Data API v3 adapter to the traditional ML sentiment pipeline.
+FastAPI router for ML-based YouTube comment sentiment analysis.
+Endpoints:
+1. GET  /api/vibecheck/status              - Service operational status & active ML model
+2. GET  /api/vibecheck/models              - Evaluation benchmark for all 4 ML models
+3. GET  /api/vibecheck/supported-platforms - Explicitly confirms YouTube-only support
+4. POST /api/vibecheck/analyze             - Performs sentiment analysis on URL or pasted text
+5. GET  /api/vibecheck/history             - Retrieves historical sentiment analysis reports
+6. DEL  /api/vibecheck/history/{report_id} - Deletes a report from history
 """
 
-from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, List
 import os
+from typing import Optional, Dict, Any
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 
 from backend.services import data_access
 from backend.services.vibecheck import (
@@ -20,14 +26,45 @@ from backend.ml.classifier import get_model_metadata
 
 router = APIRouter(prefix="/api/vibecheck", tags=["VibeCheck AI"])
 
-# Initialize platform adapters (YouTube and direct comments text input)
+# Adapters: YouTube Data API v3 adapter and direct user text/pasted comments adapter
 yt_adapter = YouTubeAdapter()
 manual_adapter = ManualAdapter()
+
+UNSUPPORTED_DOMAINS = {
+    "twitter.com": "X (Twitter)",
+    "x.com": "X (Twitter)",
+    "instagram.com": "Instagram",
+    "tiktok.com": "TikTok",
+    "linkedin.com": "LinkedIn"
+}
+
+
+def _validate_url_target(target: str) -> None:
+    """
+    Validates URL input and rejects unsupported social media platforms
+    with clear, explanatory error messages.
+    """
+    lower = target.lower()
+    for domain, platform_name in UNSUPPORTED_DOMAINS.items():
+        if domain in lower:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{platform_name} is not supported. CreatorPulse AI focuses exclusively on YouTube video comment sentiment analysis."
+            )
+
+    if not yt_adapter.can_handle(target):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Invalid URL. Please enter a valid YouTube video URL "
+                "(e.g., https://www.youtube.com/watch?v=... or https://youtu.be/...)."
+            )
+        )
 
 
 @router.get("/status")
 def get_vibecheck_status():
-    """Returns YouTube API configuration status and winning ML model."""
+    """Returns YouTube Data API configuration status and the selected best ML model."""
     yt_key = os.getenv("YOUTUBE_API_KEY", "").strip()
     model_name = VibeAnalyzer.get_selected_model_name()
 
@@ -44,12 +81,12 @@ def get_vibecheck_status():
 @router.get("/models")
 def get_ml_models_comparison():
     """
-    Returns the rigorous evaluation and comparison metrics of the 4 traditional ML algorithms:
+    Returns comparative evaluation metrics of all four traditional Machine Learning models:
     1. Multinomial Naive Bayes
     2. Logistic Regression
     3. Linear Support Vector Machine (Linear SVM)
     4. Random Forest Classifier
-    Includes Accuracy, Precision, Recall, F1-score, and Confusion Matrices.
+    Reports Accuracy, Precision, Recall, F1-score, and Confusion Matrices.
     """
     meta = get_model_metadata()
     if not meta or "models" not in meta or "Random Forest" not in meta.get("models", {}):
@@ -60,7 +97,7 @@ def get_ml_models_comparison():
 
 @router.get("/supported-platforms")
 def get_supported_platforms():
-    """Returns capabilities and guidelines for YouTube comment sentiment analysis."""
+    """Returns metadata and guidelines confirming YouTube-only platform support."""
     return {
         "supported_platforms": [
             {
@@ -91,51 +128,21 @@ class AnalyzeRequest(BaseModel):
 @router.post("/analyze")
 def analyze_content(req: AnalyzeRequest):
     """
-    Main VibeCheck AI analysis endpoint for YouTube.
-    Retrieves video details and top comments via official YouTube Data API v3,
-    runs preprocessing, and applies the trained traditional Machine Learning model.
+    Main sentiment analysis endpoint:
+    1. Accepts a YouTube video URL or pasted comment text.
+    2. Retrieves video comments through YouTube Data API v3 or parses pasted text.
+    3. Cleans comments and extracts TF-IDF feature vectors.
+    4. Performs classification using the best-performing trained ML model.
+    5. Returns overall reaction, sentiment distribution, and key themes.
     """
     target = (req.target or "").strip()
     input_type = req.input_type.strip().lower()
 
     try:
         if input_type == "url" and target:
-            lower_target = target.lower()
-
-            # Reject unsupported platforms with clear messaging
-            if "twitter.com" in lower_target or "x.com" in lower_target:
-                raise HTTPException(
-                    status_code=400,
-                    detail="X (Twitter) is not supported. CreatorPulse AI focuses exclusively on YouTube video comment sentiment analysis."
-                )
-            if "instagram.com" in lower_target:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Instagram is not supported. CreatorPulse AI focuses exclusively on YouTube video comment sentiment analysis."
-                )
-            if "tiktok.com" in lower_target:
-                raise HTTPException(
-                    status_code=400,
-                    detail="TikTok is not supported. CreatorPulse AI focuses exclusively on YouTube video comment sentiment analysis."
-                )
-            if "linkedin.com" in lower_target:
-                raise HTTPException(
-                    status_code=400,
-                    detail="LinkedIn is not supported. CreatorPulse AI focuses exclusively on YouTube video comment sentiment analysis."
-                )
-
-            if yt_adapter.can_handle(target):
-                payload = yt_adapter.fetch_data({"url": target})
-            else:
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        "Invalid URL. Please enter a valid YouTube video URL "
-                        "(e.g., https://www.youtube.com/watch?v=... or https://youtu.be/...)."
-                    )
-                )
+            _validate_url_target(target)
+            payload = yt_adapter.fetch_data({"url": target})
         else:
-            # Direct text or pasted comments fallback
             raw_text = (req.raw_text or "").strip()
             if not raw_text:
                 raise HTTPException(
@@ -157,10 +164,10 @@ def analyze_content(req: AnalyzeRequest):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(exc)}")
 
-    # Run ML analysis pipeline
+    # Run ML sentiment analysis pipeline
     analysis = VibeAnalyzer.analyze(payload)
 
-    # Save to history if requested and if analysis was successful
+    # Persist report to history when requested and prediction exists
     if req.save_to_history and analysis.get("vibecheck_results", {}).get("has_prediction"):
         res = analysis["vibecheck_results"]
         saved_record = {
@@ -184,7 +191,7 @@ def analyze_content(req: AnalyzeRequest):
 
 @router.get("/history")
 def get_vibecheck_history():
-    """Returns saved analysis reports."""
+    """Returns past sentiment analysis reports from persistent storage."""
     try:
         history = data_access.get_vibecheck_history()
     except Exception:
@@ -197,7 +204,7 @@ def get_vibecheck_history():
 
 @router.delete("/history/{report_id}")
 def delete_report(report_id: str):
-    """Deletes an analysis report from history."""
+    """Deletes an analysis report from persistent storage by ID."""
     try:
         success = data_access.delete_vibecheck_report(report_id)
         return {"success": success, "report_id": report_id}
