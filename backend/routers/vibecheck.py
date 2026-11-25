@@ -1,6 +1,6 @@
 """
-CreatorPulse AI - VibeCheck AI Router
--------------------------------------
+creatorPulse - VibeCheck Router
+-------------------------------
 FastAPI router for ML-based YouTube comment sentiment analysis.
 Endpoints:
 1. GET  /api/vibecheck/status              - Service operational status & active ML model
@@ -55,7 +55,7 @@ def _validate_url_target(target: str) -> None:
         if domain in lower:
             raise HTTPException(
                 status_code=400,
-                detail=f"{platform_name} is not supported. CreatorPulse AI focuses exclusively on YouTube video comment sentiment analysis."
+                detail=f"{platform_name} is not supported. creatorPulse focuses exclusively on YouTube video comment sentiment analysis."
             )
 
     if not yt_adapter.can_handle(target):

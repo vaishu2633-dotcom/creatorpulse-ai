@@ -5,7 +5,7 @@ import Button from './Button';
 
 const TOUR_STEPS = [
   {
-    title: 'Welcome to CreatorPulse AI',
+    title: 'Welcome to creatorPulse',
     desc: 'Your friendly studio for YouTube, Instagram, X, and LinkedIn. We help you create with confidence instead of guessing.',
     icon: Sparkles,
     color: 'text-brand-500 bg-brand-50 dark:bg-brand-950/50',

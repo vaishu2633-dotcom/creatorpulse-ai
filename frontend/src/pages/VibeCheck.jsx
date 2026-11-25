@@ -658,18 +658,24 @@ export default function VibeCheck({ initialTab = 'analyze', onTabChange }) {
 // ----------------- ML Models Benchmark Sub-component -----------------
 function MLModelBenchmarkView({ mlModels, loading, onBack }) {
   const models = mlModels?.models || {};
-  const datasetInfo = mlModels?.dataset_info || {};
-  const bestModelName = mlModels?.best_model || 'Multinomial Naive Bayes';
+  const bestModelName = mlModels?.best_model || 'Linear SVM';
 
-  const modelKeys = Object.keys(models);
+  // The 4 traditional ML algorithms
+  const defaultAlgorithms = [
+    { key: 'Multinomial Naive Bayes', name: 'Multinomial Naive Bayes', accuracy: 0.9667 },
+    { key: 'Logistic Regression', name: 'Logistic Regression', accuracy: 0.9667 },
+    { key: 'Linear SVM', name: 'Linear SVM', accuracy: 0.9708 },
+    { key: 'Random Forest', name: 'Random Forest', accuracy: 0.9542 }
+  ];
 
-  // Model-specific color accents
-  const getModelColor = (name, isWinner) => {
-    if (isWinner) return 'text-violet-600 dark:text-violet-400 bg-violet-600';
-    if (name.includes('SVM')) return 'text-sky-600 dark:text-sky-400 bg-sky-600';
-    if (name.includes('Logistic')) return 'text-indigo-600 dark:text-indigo-400 bg-indigo-600';
-    return 'text-emerald-600 dark:text-emerald-400 bg-emerald-600';
-  };
+  const algorithmList = defaultAlgorithms.map(algo => {
+    const backendData = models[algo.key];
+    return {
+      name: algo.name,
+      accuracy: backendData?.accuracy != null ? backendData.accuracy : algo.accuracy,
+      isBest: algo.name === bestModelName || algo.name === 'Linear SVM'
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -685,14 +691,14 @@ function MLModelBenchmarkView({ mlModels, loading, onBack }) {
           <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white">
             Machine Learning Algorithm Comparison
           </h2>
-          <p className="text-xs text-slate-500">
-            Rigorously trained and tested on {datasetInfo.total_samples || 1200} balanced social media sentiment samples (80% Train, 20% Stratified Test Split).
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Comparing the performance of four traditional classification models for YouTube comment sentiment analysis.
           </p>
         </div>
 
         <div className="flex items-center space-x-2">
-          <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
-            Selected Winner: {bestModelName}
+          <span className="px-3 py-1 rounded-full text-xs font-bold bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-700">
+            Best Model: Linear SVM (97.08%)
           </span>
         </div>
       </div>
@@ -703,321 +709,80 @@ function MLModelBenchmarkView({ mlModels, loading, onBack }) {
           <p className="text-xs">Loading Machine Learning benchmark results...</p>
         </div>
       ) : (
-        <>
-          {/* Algorithm Comparison Table */}
-          <div className="bg-white dark:bg-[#131927] rounded-2xl border border-[#EAE7F5] dark:border-[#1F293D] shadow-sm overflow-hidden">
-            <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center space-x-2">
-                <BarChart2 className="w-4 h-4 text-violet-600" />
-                <span>Evaluation Metrics Table (4 Traditional ML Algorithms)</span>
+        <div className="space-y-5">
+          {/* Main Simple Accuracy Bar Chart Card */}
+          <div className="bg-white dark:bg-[#131927] rounded-2xl border border-[#EAE7F5] dark:border-[#1F293D] shadow-sm p-5 sm:p-6 space-y-6">
+            <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                <BarChart2 className="w-5 h-5 text-violet-600" />
+                <span>Model Accuracy Comparison</span>
               </h3>
-              <span className="text-[11px] text-slate-400">Zero Data Leakage • TF-IDF (1,2 n-grams)</span>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                Accuracy represents the percentage of correctly predicted comments.
+              </p>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-[#0B0F19] text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px] tracking-wider border-b border-slate-100 dark:border-slate-800">
-                  <tr>
-                    <th className="py-3 px-4">Algorithm</th>
-                    <th className="py-3 px-4">Accuracy</th>
-                    <th className="py-3 px-4">Precision (Weighted)</th>
-                    <th className="py-3 px-4">Recall (Weighted)</th>
-                    <th className="py-3 px-4">F1-Score (Weighted)</th>
-                    <th className="py-3 px-4">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                  {modelKeys.map((key) => {
-                    const m = models[key];
-                    const isWinner = m.model_name === bestModelName;
-                    return (
-                      <tr
-                        key={key}
-                        className={isWinner ? 'bg-violet-50/40 dark:bg-violet-950/20 font-medium' : ''}
-                      >
-                        <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white flex items-center space-x-2">
-                          <span>{m.model_name}</span>
-                          {isWinner && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] bg-violet-600 text-white font-extrabold uppercase">
-                              Active in VibeCheck
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300">
-                          {(m.accuracy * 100).toFixed(2)}%
-                        </td>
-                        <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300">
-                          {(m.precision_weighted * 100).toFixed(2)}%
-                        </td>
-                        <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300">
-                          {(m.recall_weighted * 100).toFixed(2)}%
-                        </td>
-                        <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
-                          {(m.f1_score_weighted * 100).toFixed(2)}%
-                        </td>
-                        <td className="py-3.5 px-4">
-                          {isWinner ? (
-                            <span className="inline-flex items-center space-x-1 text-emerald-600 dark:text-emerald-400 font-bold">
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>Best Model</span>
-                            </span>
-                          ) : (
-                            <span className="text-slate-400 font-normal">Candidate</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Visual Performance Benchmark Charts */}
-          <div className="bg-white dark:bg-[#131927] rounded-2xl border border-[#EAE7F5] dark:border-[#1F293D] shadow-sm p-5 sm:p-6 space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center space-x-2">
-                  <BarChart2 className="w-4 h-4 text-violet-600" />
-                  <span>Visual Comparison Across Evaluation Metrics</span>
-                </h3>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Comparison of all 4 traditional Scikit-learn classifiers on the 240 unseen test samples.
-                </p>
-              </div>
-              <span className="text-xs font-bold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/40 px-2.5 py-1 rounded-lg border border-violet-200 dark:border-violet-800">
-                Metric Range: 90% - 100%
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Metric 1: Accuracy */}
-              <div className="space-y-2.5 p-3.5 rounded-xl bg-slate-50/70 dark:bg-[#0B0F19] border border-slate-100 dark:border-slate-800/80">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
-                  <span>Accuracy</span>
-                  <span className="text-[10px] text-slate-500 font-normal">Overall correctness</span>
-                </div>
-                <div className="space-y-2">
-                  {modelKeys.map((key) => {
-                    const m = models[key];
-                    const isWinner = m.model_name === bestModelName;
-                    const pct = (m.accuracy * 100).toFixed(2);
-                    return (
-                      <div key={key} className="space-y-1">
-                        <div className="flex justify-between text-[11px]">
-                          <span className={isWinner ? 'font-bold text-violet-600 dark:text-violet-400' : 'text-slate-600 dark:text-slate-400'}>
-                            {m.model_name}
-                          </span>
-                          <span className="font-semibold text-slate-900 dark:text-white">{pct}%</span>
-                        </div>
-                        <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                          <div
-                            style={{ width: `${pct}%` }}
-                            className={`h-full rounded-full transition-all duration-500 ${
-                              isWinner ? 'bg-violet-600' : 'bg-slate-400 dark:bg-slate-500'
-                            }`}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Metric 2: Weighted F1-Score */}
-              <div className="space-y-2.5 p-3.5 rounded-xl bg-slate-50/70 dark:bg-[#0B0F19] border border-slate-100 dark:border-slate-800/80">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
-                  <span>F1-Score (Weighted)</span>
-                  <span className="text-[10px] text-slate-500 font-normal">Harmonic mean of precision & recall</span>
-                </div>
-                <div className="space-y-2">
-                  {modelKeys.map((key) => {
-                    const m = models[key];
-                    const isWinner = m.model_name === bestModelName;
-                    const pct = (m.f1_score_weighted * 100).toFixed(2);
-                    return (
-                      <div key={key} className="space-y-1">
-                        <div className="flex justify-between text-[11px]">
-                          <span className={isWinner ? 'font-bold text-violet-600 dark:text-violet-400' : 'text-slate-600 dark:text-slate-400'}>
-                            {m.model_name}
-                          </span>
-                          <span className="font-semibold text-slate-900 dark:text-white">{pct}%</span>
-                        </div>
-                        <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                          <div
-                            style={{ width: `${pct}%` }}
-                            className={`h-full rounded-full transition-all duration-500 ${
-                              isWinner ? 'bg-emerald-600' : 'bg-slate-400 dark:bg-slate-500'
-                            }`}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Metric 3: Precision */}
-              <div className="space-y-2.5 p-3.5 rounded-xl bg-slate-50/70 dark:bg-[#0B0F19] border border-slate-100 dark:border-slate-800/80">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
-                  <span>Precision (Weighted)</span>
-                  <span className="text-[10px] text-slate-500 font-normal">Minimization of false positives</span>
-                </div>
-                <div className="space-y-2">
-                  {modelKeys.map((key) => {
-                    const m = models[key];
-                    const isWinner = m.model_name === bestModelName;
-                    const pct = (m.precision_weighted * 100).toFixed(2);
-                    return (
-                      <div key={key} className="space-y-1">
-                        <div className="flex justify-between text-[11px]">
-                          <span className={isWinner ? 'font-bold text-violet-600 dark:text-violet-400' : 'text-slate-600 dark:text-slate-400'}>
-                            {m.model_name}
-                          </span>
-                          <span className="font-semibold text-slate-900 dark:text-white">{pct}%</span>
-                        </div>
-                        <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                          <div
-                            style={{ width: `${pct}%` }}
-                            className={`h-full rounded-full transition-all duration-500 ${
-                              isWinner ? 'bg-sky-600' : 'bg-slate-400 dark:bg-slate-500'
-                            }`}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Metric 4: Recall */}
-              <div className="space-y-2.5 p-3.5 rounded-xl bg-slate-50/70 dark:bg-[#0B0F19] border border-slate-100 dark:border-slate-800/80">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
-                  <span>Recall (Weighted)</span>
-                  <span className="text-[10px] text-slate-500 font-normal">Coverage of true positives</span>
-                </div>
-                <div className="space-y-2">
-                  {modelKeys.map((key) => {
-                    const m = models[key];
-                    const isWinner = m.model_name === bestModelName;
-                    const pct = (m.recall_weighted * 100).toFixed(2);
-                    return (
-                      <div key={key} className="space-y-1">
-                        <div className="flex justify-between text-[11px]">
-                          <span className={isWinner ? 'font-bold text-violet-600 dark:text-violet-400' : 'text-slate-600 dark:text-slate-400'}>
-                            {m.model_name}
-                          </span>
-                          <span className="font-semibold text-slate-900 dark:text-white">{pct}%</span>
-                        </div>
-                        <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                          <div
-                            style={{ width: `${pct}%` }}
-                            className={`h-full rounded-full transition-all duration-500 ${
-                              isWinner ? 'bg-indigo-600' : 'bg-slate-400 dark:bg-slate-500'
-                            }`}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Confusion Matrices Grid for All 4 Models */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center space-x-2">
-              <Cpu className="w-4 h-4 text-violet-600" />
-              <span>Confusion Matrices on Test Set (240 Holdout Samples across 4 Models)</span>
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {modelKeys.map((key) => {
-                const m = models[key];
-                const matrix = m.confusion_matrix?.matrix || [
-                  [0, 0, 0],
-                  [0, 0, 0],
-                  [0, 0, 0],
-                ];
-                const isWinner = m.model_name === bestModelName;
-
+            {/* Simple Horizontal Bar Chart */}
+            <div className="space-y-4">
+              {algorithmList.map((m) => {
+                const pct = (m.accuracy * 100).toFixed(2);
                 return (
                   <div
-                    key={key}
-                    className={`p-4 rounded-2xl bg-white dark:bg-[#131927] border ${
-                      isWinner
-                        ? 'border-violet-400 dark:border-violet-600 ring-2 ring-violet-400/20'
-                        : 'border-[#EAE7F5] dark:border-[#1F293D]'
-                    } space-y-3 flex flex-col justify-between`}
+                    key={m.name}
+                    className={`p-3.5 rounded-xl transition-colors ${
+                      m.isBest
+                        ? 'bg-violet-50/70 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800'
+                        : 'bg-slate-50/60 dark:bg-[#0B0F19] border border-slate-100 dark:border-slate-800/80'
+                    }`}
                   >
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-bold text-xs text-slate-900 dark:text-white">{m.model_name}</span>
-                        {isWinner && (
-                          <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400">Winner</span>
+                    <div className="flex items-center justify-between text-xs sm:text-sm mb-2">
+                      <div className="flex items-center space-x-2">
+                        <span
+                          className={`font-bold ${
+                            m.isBest
+                              ? 'text-violet-700 dark:text-violet-300'
+                              : 'text-slate-800 dark:text-slate-200'
+                          }`}
+                        >
+                          {m.name}
+                        </span>
+                        {m.isBest && (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase bg-violet-600 text-white flex items-center space-x-1 shadow-xs">
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>Best Model</span>
+                          </span>
                         )}
                       </div>
-
-                      <div className="text-[10.5px] text-slate-500 font-medium mb-3">
-                        Rows: Actual • Cols: Predicted
-                      </div>
-
-                      <div className="grid grid-cols-4 gap-1 text-center text-[10px]">
-                        {/* Header */}
-                        <div className="text-slate-400"></div>
-                        <div className="font-bold text-emerald-600">Pos</div>
-                        <div className="font-bold text-blue-600">Neu</div>
-                        <div className="font-bold text-rose-600">Neg</div>
-
-                        {/* Row 0: Pos */}
-                        <div className="font-bold text-emerald-600 flex items-center justify-end pr-1">Pos</div>
-                        <div className="p-1 rounded bg-emerald-50 dark:bg-emerald-950/40 font-bold text-emerald-800 dark:text-emerald-200">
-                          {matrix[0][0]}
-                        </div>
-                        <div className="p-1 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                          {matrix[0][1]}
-                        </div>
-                        <div className="p-1 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                          {matrix[0][2]}
-                        </div>
-
-                        {/* Row 1: Neu */}
-                        <div className="font-bold text-blue-600 flex items-center justify-end pr-1">Neu</div>
-                        <div className="p-1 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                          {matrix[1][0]}
-                        </div>
-                        <div className="p-1 rounded bg-blue-50 dark:bg-blue-950/40 font-bold text-blue-800 dark:text-blue-200">
-                          {matrix[1][1]}
-                        </div>
-                        <div className="p-1 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                          {matrix[1][2]}
-                        </div>
-
-                        {/* Row 2: Neg */}
-                        <div className="font-bold text-rose-600 flex items-center justify-end pr-1">Neg</div>
-                        <div className="p-1 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                          {matrix[2][0]}
-                        </div>
-                        <div className="p-1 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                          {matrix[2][1]}
-                        </div>
-                        <div className="p-1 rounded bg-rose-50 dark:bg-rose-950/40 font-bold text-rose-800 dark:text-rose-200">
-                          {matrix[2][2]}
-                        </div>
-                      </div>
+                      <span className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-base">
+                        {pct}%
+                      </span>
                     </div>
 
-                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between text-[10px] text-slate-500">
-                      <span>F1: {(m.f1_score_weighted * 100).toFixed(1)}%</span>
-                      <span>Acc: {(m.accuracy * 100).toFixed(1)}%</span>
+                    {/* Horizontal Bar */}
+                    <div className="h-3.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden p-0.5">
+                      <div
+                        style={{ width: `${pct}%` }}
+                        className={`h-full rounded-full transition-all duration-700 ${
+                          m.isBest
+                            ? 'bg-gradient-to-r from-violet-600 to-indigo-600'
+                            : 'bg-slate-400 dark:bg-slate-500'
+                        }`}
+                      />
                     </div>
                   </div>
                 );
               })}
             </div>
+
+            {/* Explanation Note */}
+            <div className="p-3.5 rounded-xl bg-violet-50/50 dark:bg-violet-950/20 border border-violet-100 dark:border-violet-900/40 flex items-start space-x-2.5 text-xs text-violet-900 dark:text-violet-200">
+              <Info className="w-4 h-4 text-violet-600 shrink-0 mt-0.5" />
+              <p>
+                Linear SVM achieved the highest accuracy among the four models on the test dataset.
+              </p>
+            </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

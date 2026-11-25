@@ -7,7 +7,7 @@ export default function Navbar({ activeTab, onTabChange }) {
 
   return (
     <header className="h-16 bg-white/95 dark:bg-[#131927]/95 backdrop-blur-md border-b border-[#EAE7F5] dark:border-[#1F293D] sticky top-0 z-30 px-4 sm:px-6 flex items-center justify-between transition-colors shadow-2xs">
-      {/* Left: CreatorPulse AI Brand */}
+      {/* Left: creatorPulse Brand */}
       <div className="flex items-center space-x-3">
         <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-violet-500/20">
           <Sparkles className="w-5 h-5 text-white" />
@@ -15,7 +15,7 @@ export default function Navbar({ activeTab, onTabChange }) {
         <div>
           <div className="flex items-center space-x-2">
             <span className="text-base sm:text-lg font-bold text-[#1E1B4B] dark:text-[#F8FAFC] tracking-tight">
-              CreatorPulse <span className="text-violet-600 dark:text-violet-400">AI</span>
+              creatorPulse
             </span>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-violet-100 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800">
               VibeCheck AI

@@ -9,7 +9,7 @@ export default function Layout({ activeTab = 'analyze', onTabChange, children })
         {children}
       </main>
       <footer className="py-6 border-t border-[#EAE7F5] dark:border-[#1F293D] text-center text-xs text-slate-500 dark:text-slate-400">
-        CreatorPulse AI • Academic Machine Learning YouTube Comment Sentiment Analysis
+        creatorPulse • Academic Machine Learning YouTube Comment Sentiment Analysis
       </footer>
     </div>
   );

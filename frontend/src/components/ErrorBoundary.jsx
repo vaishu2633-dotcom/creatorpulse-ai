@@ -12,7 +12,7 @@ export default class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error('CreatorPulse AI React Error Boundary caught:', error, errorInfo);
+    console.error('creatorPulse React Error Boundary caught:', error, errorInfo);
     this.setState({ errorInfo });
   }
 
@@ -35,7 +35,7 @@ export default class ErrorBoundary extends React.Component {
                 Something went slightly off track
               </h1>
               <p className="text-sm text-[#5B6475] dark:text-[#94A3B8] leading-relaxed">
-                CreatorPulse encountered an unexpected rendering error. Your data and settings are safe.
+                creatorPulse encountered an unexpected rendering error. Your data and settings are safe.
               </p>
             </div>
 

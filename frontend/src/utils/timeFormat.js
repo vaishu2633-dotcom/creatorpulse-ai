@@ -1,5 +1,5 @@
 /**
- * CreatorPulse AI - Time Formatting Utilities
+ * creatorPulse - Time Formatting Utilities
  * Standardizes time displays across all features and eliminates "17:00 PM" bugs.
  */
 

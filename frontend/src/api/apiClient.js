@@ -1,5 +1,5 @@
 /**
- * CreatorPulse AI - Centralized Frontend API Client
+ * creatorPulse - Centralized Frontend API Client
  * ---------------------------------------------------
  * Focused strictly on VibeCheck AI – Social Media Sentiment Analysis
  * and Machine Learning Model Evaluation.
