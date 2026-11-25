@@ -88,14 +88,19 @@ class ManualAdapter(PlatformAdapter):
         items: List[CommentItem] = []
 
         for idx, line in enumerate(lines):
-            # Check for patterns like "Username: comment text" or "@user - comment text"
-            match = re.match(r"^@?([a-zA-Z0-9_.\s]{2,25})[:\-]\s*(.+)$", line)
-            if match:
-                author_name = match.group(1).strip()
-                comment_body = match.group(2).strip()
-            else:
+            # Avoid mistaking timestamps like "15:06 comment" as "Author: comment"
+            if re.match(r"^\d{1,2}:\d{2}", line):
                 author_name = f"Audience #{idx + 1}"
                 comment_body = line
+            else:
+                # Check for patterns like "Username: comment text" or "@user - comment text"
+                match = re.match(r"^@?([a-zA-Z0-9_.\s]{2,25})[:\-]\s*(.+)$", line)
+                if match and not match.group(1).strip().isdigit():
+                    author_name = match.group(1).strip()
+                    comment_body = match.group(2).strip()
+                else:
+                    author_name = f"Audience #{idx + 1}"
+                    comment_body = line
 
             items.append(
                 CommentItem(

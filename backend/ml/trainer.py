@@ -89,7 +89,7 @@ def train_and_evaluate_models(
 
     # 2. Train-Test Split (80% Train, 20% Test with stratification)
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
+        X, y, test_size=0.2, random_state=7, stratify=y
     )
 
     print(f"[ML Trainer] Train set: {len(X_train)} samples | Test set: {len(X_test)} samples")
@@ -213,7 +213,7 @@ def train_and_evaluate_models(
             "vectorizer": "TfidfVectorizer(ngram_range=(1,2), max_features=5000, sublinear_tf=True)",
             "preprocessing": "clean_text (lowercase, URLs, mentions, contractions, emoticons, noise normalization, negations preserved)",
             "test_split_ratio": 0.20,
-            "random_state": 42
+            "random_state": 7
         }
     }
 

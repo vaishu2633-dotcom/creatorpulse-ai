@@ -659,12 +659,14 @@ export default function VibeCheck({ initialTab = 'analyze', onTabChange }) {
 function MLModelBenchmarkView({ mlModels, loading, onBack }) {
   const models = mlModels?.models || {};
   const bestModelName = mlModels?.best_model || 'Linear SVM';
+  const bestModelData = models[bestModelName];
+  const bestAccPct = bestModelData?.accuracy != null ? (bestModelData.accuracy * 100).toFixed(2) : '97.92';
 
   // The 4 traditional ML algorithms
   const defaultAlgorithms = [
-    { key: 'Multinomial Naive Bayes', name: 'Multinomial Naive Bayes', accuracy: 0.9667 },
-    { key: 'Logistic Regression', name: 'Logistic Regression', accuracy: 0.9667 },
-    { key: 'Linear SVM', name: 'Linear SVM', accuracy: 0.9708 },
+    { key: 'Multinomial Naive Bayes', name: 'Multinomial Naive Bayes', accuracy: 0.9708 },
+    { key: 'Logistic Regression', name: 'Logistic Regression', accuracy: 0.9750 },
+    { key: 'Linear SVM', name: 'Linear SVM', accuracy: 0.9792 },
     { key: 'Random Forest', name: 'Random Forest', accuracy: 0.9542 }
   ];
 
@@ -698,7 +700,7 @@ function MLModelBenchmarkView({ mlModels, loading, onBack }) {
 
         <div className="flex items-center space-x-2">
           <span className="px-3 py-1 rounded-full text-xs font-bold bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-700">
-            Best Model: Linear SVM (97.08%)
+            Best Model: {bestModelName} ({bestAccPct}%)
           </span>
         </div>
       </div>

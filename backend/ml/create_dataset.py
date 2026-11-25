@@ -14,7 +14,7 @@ import os
 import csv
 import random
 
-# Base curated positive comments reflecting real YouTube community praise
+# Base curated positive comments reflecting real YouTube community praise, humor, and appreciation
 BASE_POSITIVE = [
     "This is the clearest explanation of this concept I have ever seen! Thank you so much.",
     "Great explanation! Really helped me understand this difficult topic.",
@@ -93,7 +93,41 @@ BASE_POSITIVE = [
     "Thanks for sharing this tutorial!",
     "Best video ever on this channel.",
     "Well done video, straight to the point.",
-    "Really interesting topic, loved it."
+    "Really interesting topic, loved it.",
+    # Natural YouTube social, Hinglish, humor, and moment appreciation comments
+    "kon kon khanaa khate time dekhte hai 😛😛🤣🤣",
+    "who all watch this while having dinner, so relatable and funny 🤣🤣😂",
+    "watching this in 2024 too bcoz akhir mai this show never fails to make u smile",
+    "this show never fails to make me smile, pure nostalgia and wholesome vibes ❤️",
+    "4:36 that epic scene, loved it so much! pure goosebumps 🔥",
+    "what an epic scene at the climax, absolute masterpiece 10/10",
+    "1:45 protective and caring son❤😂 so heartwarming and sweet",
+    "such a protective and caring brother, wholesome family moment 🥰",
+    "15:06 run out hai khiladi 🤣🤣😂 brilliant reaction and epic play",
+    "khiladi move, brilliant shot and awesome performance 🔥",
+    "shandar video bhai, maza aa gaya dekh ke ❤️",
+    "bahut hi badhiya video, zabardast content as always!",
+    "zabardast acting and dialogue delivery, dil khush ho gaya ❤️",
+    "kamaal ka scene hai bhai, super hit movie",
+    "gazab comedy timing, could not stop laughing 🤣🤣",
+    "wholesome video, put a big smile on my face 😊",
+    "pure gold, best creator on YouTube hands down",
+    "nostalgic vibes, watching again in 2026 and still loving every second",
+    "bcoz of this creator my mood instantly gets 100 times better 😊",
+    "akhir mai this creator always delivers the best content",
+    "comedy timing is top notch, laughed so hard 😂",
+    "hilarious video, pure entertainment from start to finish 🤣🤣",
+    "protective and caring parents, god bless them ❤️",
+    "epic scene at the end, totally unexpected and amazing 👏",
+    "such a wholesome creator, always spreading smiles and joy ✨",
+    "caring and protective nature, this won my heart ❤️",
+    "laughter therapy at its best! thank you for making us smile 🤣",
+    "bhai kya mast scene tha, epic entertainment!",
+    "superb acting by the whole cast, thoroughly enjoyed it",
+    "one of the funniest moments on this channel 🤣🤣",
+    "loved the background music and the epic scene transition",
+    "khiladi log hai sab, awesome teamwork 👏",
+    "watching again bcoz this video always makes my day brighter"
 ]
 
 # Base curated negative comments reflecting real YouTube community complaints
@@ -171,7 +205,28 @@ BASE_NEGATIVE = [
     "Awful tutorial, full of errors and bugs.",
     "This is horrible, completely unhelpful.",
     "Very disappointing video, waste of time.",
-    "Worst tutorial on YouTube, do not recommend."
+    "Worst tutorial on YouTube, do not recommend.",
+    # Natural YouTube critiques, Hinglish complaints, and negative reactions
+    "bakwas video, total waste of time and internet",
+    "bekar content, completely boring and useless",
+    "faltu video, misleading title and clickbait thumbnail",
+    "kachra acting and horrible editing throughout",
+    "so annoying, stopped watching after 2 minutes",
+    "terrible storyline, makes zero sense whatsoever",
+    "cringe scene, could not even watch the whole thing 🤮",
+    "very bad audio quality and loud screeching noise",
+    "total disaster of an episode, ruined the entire show",
+    "boring scene, nothing interesting happens here",
+    "the run out was clearly fake, staged nonsense 👎",
+    "disappointed with this creator, content quality has degraded",
+    "horrible acting and worst dialogue delivery ever",
+    "waste of time, do not recommend this to anyone",
+    "clickbait title, nothing shown in the thumbnail is in the video",
+    "not funny at all, cringe jokes and loud sound effects",
+    "annoying pacing and worst camera work",
+    "disliked! stop making such low effort content",
+    "boring execution, nothing happens for 10 minutes",
+    "fake drama and scripted reactions, totally ruined"
 ]
 
 # Base curated neutral comments reflecting real YouTube community inquiries
@@ -245,7 +300,31 @@ BASE_NEUTRAL = [
     "How long did it take to build this?",
     "Where can I find the slides or notes?",
     "What version of Python is required for this?",
-    "Is this tutorial free or does it require a subscription?"
+    "Is this tutorial free or does it require a subscription?",
+    # Natural YouTube timestamp references, factual questions, and neutral inquiries
+    "15:06 run out hai khiladi, check the replay at 15:10",
+    "timestamp at 04:36 that scene starts",
+    "at 01:45 the background music changed",
+    "what is the background song played at 04:36?",
+    "who is the actor playing the role at 02:15?",
+    "what timestamp does the main match start at?",
+    "kon kon se episode mai ye scene aata hai?",
+    "which movie or show is this clip taken from?",
+    "is this from season 1 or season 2?",
+    "the video is 20 minutes long and uploaded yesterday",
+    "video contains chapters and subtitles in English and Hindi",
+    "match score was 150 at the time of run out",
+    "khana khate waqt dekhne ke liye koi aur list hai kya?",
+    "what is the name of the player who got run out?",
+    "can someone clarify the timeline of events shown here?",
+    "video uploaded on Monday at 6 PM",
+    "check the timestamp in the description for each chapter",
+    "the scene was shot in Mumbai back in 2018",
+    "is there any official link or source for this scene?",
+    "which camera was used to film this scene?",
+    "what is the title of the background track used at 03:20?",
+    "what year was this video originally released?",
+    "does this episode continue into part two?"
 ]
 
 # Vocabulary components for systematic, balanced augmentation up to 400 per class
@@ -255,48 +334,60 @@ TOPICS = [
     "REST API endpoint", "Tailwind styling", "algorithm analysis", "web development",
     "backend architecture", "frontend design", "cloud computing", "SQL queries",
     "async programming", "unit testing", "TF-IDF feature extraction", "code optimization",
-    "authentication flow", "state management", "WebSocket server", "microservices setup"
+    "this show", "this episode", "that epic scene", "the comedy timing",
+    "this cricket match", "the background music", "this movie climax",
+    "the storyline", "this creator", "this dialogue"
 ]
 
 POS_TEMPLATES = [
-    ("Great video on {topic}! Really appreciate the clear explanation.", "good"),
-    ("Awesome tutorial covering {topic}. Learned a lot from this walkthrough!", "good"),
-    ("Loved this video about {topic}! Very helpful and easy to follow.", "good"),
-    ("Such a good explanation of {topic}. Best guide on YouTube hands down!", "good"),
-    ("Super clear and concise breakdown of {topic}. Thank you so much!", "good"),
-    ("Nice video bro! The {topic} section was brilliantly explained.", "good"),
-    ("Cool project! Everything about {topic} works like a charm on my end.", "good"),
+    ("Great video on {topic}! Really appreciate the clear explanation. ❤️", "good"),
+    ("Awesome tutorial covering {topic}. Learned a lot from this walkthrough! 🔥", "good"),
+    ("Loved this video about {topic}! Very helpful and easy to follow. ✨", "good"),
+    ("Such a good explanation of {topic}. Best guide on YouTube hands down! 👏", "good"),
+    ("Super clear and concise breakdown of {topic}. Thank you so much! 😊", "good"),
+    ("Nice video bro! The {topic} section was brilliantly explained. 👍", "good"),
+    ("Cool project! Everything about {topic} works like a charm on my end. 🚀", "good"),
     ("Really interesting perspective on {topic}. Thanks for sharing your insights!", "good"),
-    ("Fantastic video! Your walkthrough on {topic} saved me tons of time.", "good"),
-    ("Subscribed immediately! Wonderful tutorial on {topic}, very well done.", "good"),
-    ("I finally understand {topic} after watching this video. Great creator!", "good"),
+    ("Fantastic video! Your walkthrough on {topic} saved me tons of time. 💯", "good"),
+    ("Subscribed immediately! Wonderful tutorial on {topic}, very well done. 🥰", "good"),
+    ("I finally understand {topic} after watching this video. Great creator! 👑", "good"),
     ("Incredible quality tutorial on {topic}. Highly recommended for everyone!", "good"),
-    ("Enjoyed this video about {topic}. Looking forward to part 2!", "good"),
-    ("Outstanding presentation on {topic}. Clean code and great examples.", "good"),
+    ("Enjoyed this video about {topic}. Looking forward to part 2! 🎉", "good"),
+    ("Outstanding presentation on {topic}. Clean code and great examples. 🙌", "good"),
     ("The explanation of {topic} was pure gold. Thank you for making this video!", "good"),
-    ("Love this channel and this video on {topic}! Always learn so much.", "good"),
-    ("Very informative and helpful tutorial on {topic}. Learned a lot!", "good"),
+    ("Love this channel and this video on {topic}! Always learn so much. ❤️", "good"),
+    ("Very informative and helpful tutorial on {topic}. Learned a lot! 🌟", "good"),
     ("Well done video on {topic}! Everything was super clear and easy to follow.", "good"),
-    ("I love how you explained {topic}. Clean, practical, and very helpful!", "good"),
-    ("Fascinating breakdown of {topic}! One of the best videos I have watched.", "good")
+    ("I love how you explained {topic}. Clean, practical, and very helpful! 😊", "good"),
+    ("Fascinating breakdown of {topic}! One of the best videos I have watched. 🔥", "good"),
+    ("That epic scene in {topic} made me smile so much! Hilarious comedy timing 🤣🤣", "good"),
+    ("Protective and caring portrayal in {topic}, so wholesome and lovely ❤️😂", "good"),
+    ("Superb performance in {topic}! Never fails to entertain and make us happy ✨", "good"),
+    ("Maza aa gaya bhai! The {topic} part was zabardast and shandar 🔥", "good"),
+    ("Laughed so hard during {topic}! Truly a khiladi performance 🤣👏", "good")
 ]
 
 NEG_TEMPLATES = [
-    ("Terrible video on {topic}. The audio is quiet and explanation is confusing.", "bad"),
-    ("This tutorial on {topic} does not work at all. Got an unhandled error on startup.", "bad"),
-    ("Total clickbait video about {topic}. None of the promised features were shown.", "bad"),
+    ("Terrible video on {topic}. The audio is quiet and explanation is confusing. 👎", "bad"),
+    ("This tutorial on {topic} does not work at all. Got an unhandled error on startup. 😡", "bad"),
+    ("Total clickbait video about {topic}. None of the promised features were shown. 🤡", "bad"),
     ("Waste of time. The {topic} code in GitHub is completely broken and outdated.", "bad"),
-    ("Horrible pacing in this video covering {topic}. Way too fast and skipped vital steps.", "bad"),
-    ("Very disappointed with this tutorial on {topic}. Bad explanations throughout.", "bad"),
-    ("Unsubscribed. The {topic} tutorial is full of syntax errors and bugs.", "bad"),
+    ("Horrible pacing in this video covering {topic}. Way too fast and skipped vital steps. 🤦", "bad"),
+    ("Very disappointed with this tutorial on {topic}. Bad explanations throughout. 😒", "bad"),
+    ("Unsubscribed. The {topic} tutorial is full of syntax errors and bugs. 🗑️", "bad"),
     ("Worst guide on {topic} I have seen. Completely unhelpful and full of mistakes.", "bad"),
     ("Does not work for {topic}. Throws a runtime error and crashes immediately.", "bad"),
-    ("Awful tutorial about {topic}. Extremely superficial and zero practical value.", "bad"),
-    ("The code for {topic} does not run on modern versions. Broken dependencies.", "bad"),
+    ("Awful tutorial about {topic}. Extremely superficial and zero practical value. 🤮", "bad"),
+    ("The code for {topic} does not run on modern versions. Broken dependencies. 💩", "bad"),
     ("Misleading title regarding {topic}. You spent 10 minutes talking about nothing.", "bad"),
-    ("Poor video quality and very sloppy code formatting in the {topic} section.", "bad"),
+    ("Poor video quality and very sloppy code formatting in the {topic} section. 👎", "bad"),
     ("Cannot recommend this video on {topic}. Full of factual errors and bad advice.", "bad"),
-    ("Frustrating experience trying to follow the {topic} tutorial. Missing files in repo.", "bad")
+    ("Frustrating experience trying to follow the {topic} tutorial. Missing files in repo.", "bad"),
+    ("Bakwas video on {topic}, completely faltu and useless content.", "bad"),
+    ("Boring scene in {topic}, nothing happens and completely uninteresting. 😴", "bad"),
+    ("Cringe dialogue and terrible acting in {topic}, total disaster.", "bad"),
+    ("The run out during {topic} was clearly scripted and fake nonsense. 👎", "bad"),
+    ("Very bad execution of {topic}. Regret wasting my time on this upload.", "bad")
 ]
 
 NEU_TEMPLATES = [
@@ -314,7 +405,12 @@ NEU_TEMPLATES = [
     ("How long did it take to train the benchmark model for {topic}?", "question"),
     ("Are you planning to make a follow-up video covering advanced {topic}?", "question"),
     ("Where is the configuration file stored by default for {topic}?", "question"),
-    ("Is there an official documentation link for {topic} in the description?", "question")
+    ("Is there an official documentation link for {topic} in the description?", "question"),
+    ("Timestamp 15:06 shows the {topic} sequence in the episode.", "statement"),
+    ("At timestamp 04:36 the discussion moves to {topic}.", "statement"),
+    ("Check the timestamp at 01:45 for details on {topic}.", "statement"),
+    ("What is the background music name used during {topic}?", "question"),
+    ("Which episode or match covers {topic}?", "question")
 ]
 
 
