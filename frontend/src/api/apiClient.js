@@ -5,7 +5,8 @@
  * and Machine Learning Model Evaluation.
  */
 
-const BASE_URL = import.meta.env.VITE_API_URL || '';
+const rawBaseUrl = import.meta.env.VITE_API_URL || '';
+const BASE_URL = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
 
 async function request(endpoint, options = {}) {
   const url = `${BASE_URL}${endpoint}`;

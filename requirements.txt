@@ -1,0 +1,4 @@
+# CreatorPulse AI - Root requirements proxy
+# Points directly to backend/requirements.txt so both Render default build
+# ("pip install -r requirements.txt") and custom build ("pip install -r backend/requirements.txt") succeed.
+-r backend/requirements.txt
